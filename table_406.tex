@@ -1,0 +1,25 @@
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\# & Granular & Object-Only & Unified & Best Val Acc \\
+\hline
+1 &  &  &  & 34.38\% \\
+\hline
+2 & $\checkmark$ &  &  & 30.84\% \\
+\hline
+3 &  & $\checkmark$ &  & 68.44\% \\
+\hline
+4 & $\checkmark$ & $\checkmark$ &  & 68.83\% \\
+\hline
+5 &  &  & $\checkmark$ & 35.39\% \\
+\hline
+6 & $\checkmark$ &  & $\checkmark$ & 36.17\% \\
+\hline
+7 &  & $\checkmark$ & $\checkmark$ & 48.28\% \\
+\hline
+8 & $\checkmark$ & $\checkmark$ & $\checkmark$ & 58.54\% \\
+\hline
+\end{tabular}
+\caption{I-RAVEN models (trained until 406 epochs). Best validation accuracy from \texttt{./scripts/get\_best\_metrics.sh} filtered by 406/checkpoint.}
+\end{table}

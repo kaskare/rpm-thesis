@@ -72,6 +72,9 @@ def train(args, env,perception_cb, device):
             model_output = model(images.view(B*N,1,H,W))
             # Compare query with codebook and compute probabilities
             marg_prob = metric_fc(model_output,B,N)
+            # print(len(marg_prob))   
+            # print(marg_prob[0].shape)
+            # exit(0)
             # Infer the scene probabilities
             scene_prob, scene_logprob = env.prepare(marg_prob)
             # Rule probability computation 
@@ -282,7 +285,7 @@ def main():
     arg_parser.add_argument("--device", type=int, default=0, help="device index for GPU; if GPU unavailable, leave it as default")
     arg_parser.add_argument("--lr", type=float, default=0.95e-4, help="learning rate")
     arg_parser.add_argument("--weight-decay", type=float, default=5e-4, help="weight decay of optimizer, same as l2 reg")
-    arg_parser.add_argument("--num-workers", type=int, default=8, help="number of workers for data loader")
+    arg_parser.add_argument("--num-workers", type=int, default=2, help="number of workers for data loader")
     arg_parser.add_argument("--aux", type=float, default=1.0, help="weight of auxiliary loss (attribute-rules)")
     arg_parser.add_argument("--main-loss", type=float, default=1.0, help="weight of the main loss")
     arg_parser.add_argument("--clip", type=float, default=10, help="Max value/norm in gradient clipping (now l2 norm)")

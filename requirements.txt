@@ -1,5 +1,7 @@
 tqdm
 matplotlib
+networkx
 tensorboard
 progressbar
 scikit-learn
+PyYAML

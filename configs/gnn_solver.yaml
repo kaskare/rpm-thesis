@@ -1,0 +1,33 @@
+# GNN Solver for RAVEN — config and defaults
+# CLI args override these values
+
+# Paths (no defaults; set via CLI or override)
+frontend_checkpoint: log/universal_frontend_correct_proportional_mean1 
+dataset: data/RAVEN-10000
+save_dir: log/gnn_solver_128_emb
+precomputed_dir: ""
+
+# Mode
+mode: train  # train | test | precompute
+
+# Node representation
+node_repr: embedding  # embedding | vsa
+embed_dim: 128
+
+# GNN architecture
+hidden_dim: 128
+num_layers: 4
+dropout: 0.1
+
+# Training
+epochs: 100
+batch_size: 32
+lr: 0.01
+weight_decay: 0.0001
+clip: 1.0
+threshold: 0.23
+num_workers: 0
+
+# Misc
+seed: 42
+device: cuda:0

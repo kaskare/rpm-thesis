@@ -1,0 +1,25 @@
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|r|r|}
+\hline
+Constellation & Test acc. & Correct / total \\
+\hline
+\texttt{center\_single} & 75.40\% & 1508 / 2000 \\
+\hline
+\texttt{distribute\_four} & 55.85\% & 1117 / 2000 \\
+\hline
+\texttt{distribute\_nine} & 47.25\% & 945 / 2000 \\
+\hline
+\texttt{left\_center\_single\_right\_center\_single} & 73.40\% & 1468 / 2000 \\
+\hline
+\texttt{up\_center\_single\_down\_center\_single} & 74.20\% & 1484 / 2000 \\
+\hline
+\texttt{in\_center\_single\_out\_center\_single} & 84.45\% & 1689 / 2000 \\
+\hline
+\texttt{in\_distribute\_four\_out\_center\_single} & 71.15\% & 1423 / 2000 \\
+\hline
+\textbf{Overall} & \textbf{68.81\%} & \textbf{9634 / 14000} \\
+\hline
+\end{tabular}
+\caption{I-RAVEN per-constellation test accuracy (best model checkpoint, \texttt{eval\_gnn\_test.py} / \texttt{scripts/test\_i\_raven.sh}).}
+\end{table}

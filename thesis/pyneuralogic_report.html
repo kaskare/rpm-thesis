@@ -1,0 +1,925 @@
+<title>Expressiveness Is Not Trainability</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600;700&display=swap">
+
+<style>
+/* Layout: long-form lab notebook — sticky section index on wide screens, one reading column, data tables inline. */
+:root{
+  --ground:#FBFBFC;
+  --raised:#FFFFFF;
+  --sunken:#F3F4F7;
+  --ink:#1A1D23;
+  --ink-soft:#3D434D;
+  --muted:#5C636E;
+  --faint:#868D99;
+  --rule:#E1E4E9;
+  --rule-strong:#CBD0D8;
+  --accent:#0F6E72;
+  --accent-soft:#E3F0F0;
+  --fail:#A4343A;
+  --fail-soft:#F7E7E8;
+  --pass:#2E6B4F;
+  --pass-soft:#E5F0EA;
+  --shadow:0 1px 2px rgba(20,25,35,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#14171C;
+    --raised:#1B1F26;
+    --sunken:#1E232B;
+    --ink:#E4E7EC;
+    --ink-soft:#C3C9D2;
+    --muted:#98A0AC;
+    --faint:#727A87;
+    --rule:#2A3038;
+    --rule-strong:#3A424D;
+    --accent:#5FBFC2;
+    --accent-soft:#16302F;
+    --fail:#E08A8F;
+    --fail-soft:#331E20;
+    --pass:#7FBE9C;
+    --pass-soft:#172B22;
+    --shadow:0 1px 2px rgba(0,0,0,.3);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#14171C;
+  --raised:#1B1F26;
+  --sunken:#1E232B;
+  --ink:#E4E7EC;
+  --ink-soft:#C3C9D2;
+  --muted:#98A0AC;
+  --faint:#727A87;
+  --rule:#2A3038;
+  --rule-strong:#3A424D;
+  --accent:#5FBFC2;
+  --accent-soft:#16302F;
+  --fail:#E08A8F;
+  --fail-soft:#331E20;
+  --pass:#7FBE9C;
+  --pass-soft:#172B22;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:16px;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{
+  max-width:1180px;
+  margin:0 auto;
+  padding:0 28px 96px;
+  display:grid;
+  grid-template-columns:1fr;
+  gap:0 56px;
+}
+@media(max-width:480px){.wrap{padding:0 16px 72px}}
+@media(min-width:1040px){
+  .wrap{grid-template-columns:216px minmax(0,1fr)}
+}
+
+/* ---------- masthead ---------- */
+header.mast{
+  grid-column:1/-1;
+  padding:64px 0 40px;
+  border-bottom:1px solid var(--rule);
+  margin-bottom:44px;
+}
+.kicker{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:11.5px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--accent);
+  margin:0 0 18px;
+}
+h1{
+  font-family:"IBM Plex Serif",Georgia,serif;
+  font-weight:700;
+  font-size:clamp(2.1rem,4.6vw,3.15rem);
+  line-height:1.1;
+  letter-spacing:-.021em;
+  margin:0 0 20px;
+  text-wrap:balance;
+  max-width:19ch;
+}
+.standfirst{
+  font-size:1.115rem;
+  line-height:1.6;
+  color:var(--ink-soft);
+  max-width:62ch;
+  margin:0;
+}
+.standfirst strong{color:var(--ink);font-weight:600}
+
+/* ---------- headline figures ---------- */
+.figures{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(158px,1fr));
+  gap:1px;
+  background:var(--rule);
+  border:1px solid var(--rule);
+  margin:0 0 52px;
+}
+.fig{background:var(--ground);padding:20px 22px}
+.fig .n{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:1.85rem;
+  font-weight:500;
+  letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;
+  display:block;
+  line-height:1.1;
+}
+.fig .l{
+  display:block;
+  font-size:12.5px;
+  color:var(--muted);
+  margin-top:7px;
+  line-height:1.4;
+}
+.fig.hi .n{color:var(--accent)}
+.fig.tgt .n{color:var(--ink)}
+.fig.low .n{color:var(--faint)}
+
+/* ---------- side index ---------- */
+nav.toc{display:none}
+@media(min-width:1040px){
+  nav.toc{
+    display:block;
+    align-self:start;
+    position:sticky;
+    top:calc(env(safe-area-inset-top, 0px) + 32px);
+    padding-bottom:40px;
+  }
+}
+nav.toc p{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:10.5px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--faint);
+  margin:0 0 12px;
+}
+nav.toc ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+nav.toc a{
+  display:flex;
+  gap:9px;
+  padding:3px 0;
+  color:var(--muted);
+  text-decoration:none;
+  font-size:13.2px;
+  line-height:1.35;
+  border-radius:2px;
+}
+nav.toc a:hover{color:var(--accent)}
+nav.toc a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+nav.toc .num{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:11px;
+  color:var(--faint);
+  padding-top:1px;
+  min-width:15px;
+  font-variant-numeric:tabular-nums;
+}
+nav.toc li.new a{color:var(--ink)}
+
+/* ---------- body ---------- */
+main{min-width:0;max-width:74ch}
+section{margin:0 0 60px;scroll-margin-top:24px}
+h2{
+  font-family:"IBM Plex Serif",Georgia,serif;
+  font-size:1.5rem;
+  font-weight:600;
+  letter-spacing:-.014em;
+  line-height:1.25;
+  margin:0 0 6px;
+  text-wrap:balance;
+  display:flex;
+  gap:13px;
+  align-items:baseline;
+}
+h2 .sn{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:.78rem;
+  font-weight:500;
+  color:var(--accent);
+  letter-spacing:.04em;
+  flex:none;
+}
+h3{
+  font-family:"IBM Plex Sans",sans-serif;
+  font-size:1.03rem;
+  font-weight:600;
+  margin:34px 0 8px;
+  letter-spacing:-.005em;
+}
+.deck{color:var(--muted);font-size:14.5px;margin:0 0 22px;padding-left:28px}
+#status .deck{padding-left:0}
+p{margin:0 0 15px;max-width:68ch}
+main a{color:var(--accent);text-underline-offset:2px}
+strong{font-weight:600}
+code{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:.855em;
+  background:var(--sunken);
+  padding:.1em .34em;
+  border-radius:2px;
+  color:var(--ink-soft);
+}
+ul,ol.body{margin:0 0 15px;padding-left:20px;max-width:68ch}
+li{margin-bottom:7px}
+
+/* ---------- tables ---------- */
+.tw{overflow-x:auto;margin:0 0 20px;border:1px solid var(--rule)}
+table{border-collapse:collapse;width:100%;font-size:13.8px;min-width:min(100%,420px)}
+th,td{padding:8px 13px;text-align:left;border-bottom:1px solid var(--rule);vertical-align:top}
+thead th{
+  background:var(--sunken);
+  font-family:"IBM Plex Mono",monospace;
+  font-size:10.5px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--muted);
+  font-weight:500;
+  white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:none}
+td.n,th.n{text-align:right;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.mark td{background:var(--accent-soft)}
+tr.bad td{background:var(--fail-soft)}
+tr.total td{border-top:1px solid var(--rule-strong);font-weight:600}
+td.good{color:var(--pass);font-weight:600}
+td.warn{color:var(--fail);font-weight:600}
+td.void{color:var(--faint)}
+caption{
+  caption-side:bottom;
+  text-align:left;
+  font-size:12.4px;
+  color:var(--faint);
+  padding:9px 13px;
+  border-top:1px solid var(--rule);
+}
+
+/* ---------- pills ---------- */
+.pill{
+  display:inline-block;
+  font-family:"IBM Plex Mono",monospace;
+  font-size:10px;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+  padding:2px 7px;
+  border-radius:2px;
+  white-space:nowrap;
+  font-weight:500;
+}
+.pill.no{background:var(--fail-soft);color:var(--fail)}
+.pill.yes{background:var(--pass-soft);color:var(--pass)}
+
+/* ---------- callout ---------- */
+.note{
+  border-left:2px solid var(--accent);
+  padding:2px 0 2px 18px;
+  margin:0 0 20px;
+  color:var(--ink-soft);
+  max-width:66ch;
+}
+.note.alert{border-left-color:var(--fail)}
+.note p:last-child{margin-bottom:0}
+.note .lab{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:10.5px;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+  color:var(--accent);
+  display:block;
+  margin-bottom:5px;
+}
+.note.alert .lab{color:var(--fail)}
+
+pre{
+  font-family:"IBM Plex Mono",monospace;
+  font-size:12.7px;
+  line-height:1.62;
+  background:var(--sunken);
+  border:1px solid var(--rule);
+  padding:14px 16px;
+  overflow-x:auto;
+  margin:0 0 20px;
+  color:var(--ink-soft);
+}
+pre code{background:none;padding:0;font-size:inherit}
+
+footer{
+  grid-column:1/-1;
+  border-top:1px solid var(--rule);
+  padding-top:22px;
+  color:var(--faint);
+  font-size:13px;
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="kicker">I-RAVEN · PyNeuraLogic 0.9.2 · working notes · updated 19 Oct 2026</p>
+  <h1>Expressiveness Is Not Trainability</h1>
+  <p class="standfirst">Porting a relational GNN from PyTorch to a differentiable logic program. The relational structure transfers cleanly; the optimisation machinery does not. Given the right split, with PyNeuraLogic doing message passing and scoring and PyTorch doing embeddings and optimisation, the port reaches <strong>68.5% on I-RAVEN across all seven constellations</strong>, the same end to end through a ResNet-18. The torch GNN, retrained over three seeds with both pipeline bugs fixed, averages 45.3%; its old published 68.8% was trained on wrongly decoded positions and cannot be reproduced. A separate symbolic template, with no embeddings at all, reaches 98% on ground-truth attributes.</p>
+</header>
+
+<div class="figures">
+  <div class="fig hi"><span class="n">68.49%</span><span class="l">PyNeuraLogic, XML labels</span></div>
+  <div class="fig hi"><span class="n">68.46%</span><span class="l">same model, end to end</span></div>
+  <div class="fig tgt"><span class="n">45.25%</span><span class="l">torch GNN, mean of 3 seeds</span></div>
+  <div class="fig hi"><span class="n">98.44%</span><span class="l">symbolic template, ground-truth attributes</span></div>
+  <div class="fig low"><span class="n">12.5%</span><span class="l">chance floor</span></div>
+</div>
+
+<nav class="toc" aria-label="Sections">
+  <p>Contents</p>
+  <ol>
+    <li class="new"><a href="#status"><span class="num">·</span>Where it stands</a></li>
+    <li><a href="#s1"><span class="num">1</span>Torch baseline</a></li>
+    <li><a href="#s2"><span class="num">2</span>Environment</a></li>
+    <li><a href="#s3"><span class="num">3</span>Framework traps</a></li>
+    <li><a href="#s4"><span class="num">4</span>The elimination</a></li>
+    <li><a href="#s5"><span class="num">5</span>Structural diff</a></li>
+    <li><a href="#s6"><span class="num">6</span>Overfit test</a></li>
+    <li><a href="#s7"><span class="num">7</span>The ladder</a></li>
+    <li><a href="#s8"><span class="num">8</span>The hybrid</a></li>
+    <li><a href="#s9"><span class="num">9</span>All seven</a></li>
+    <li><a href="#s10"><span class="num">10</span>Position bugs</a></li>
+    <li class="new"><a href="#s11"><span class="num">11</span>End to end</a></li>
+    <li><a href="#s12"><span class="num">12</span>Files</a></li>
+    <li><a href="#s13"><span class="num">13</span>Open questions</a></li>
+    <li class="new"><a href="#s14"><span class="num">14</span>Audit</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<section id="status">
+  <h2>Where it stands</h2>
+  <p class="deck">I-RAVEN test split, 2000 puzzles per constellation, scored once on the final checkpoint. These numbers supersede the porting-stage results in §4–§9, which were measured on <code>center_single</code> alone.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Model</th><th>Input</th><th class="n">Test</th></tr></thead>
+    <tbody>
+      <tr class="mark"><td><strong>PyNeuraLogic level 2, final</strong> (<code>max_data_L2</code>, epoch 126 of 130)</td><td>XML labels</td><td class="n"><strong>68.49%</strong></td></tr>
+      <tr class="mark"><td>same checkpoint, through the ResNet-18 frontend (§11)</td><td>end to end</td><td class="n"><strong>68.46%</strong></td></tr>
+      <tr><td>torch GNN, both pipeline fixes, mean of 3 seeds (41.74 / 35.01 / 59.02)</td><td>XML labels</td><td class="n">45.25%</td></tr>
+      <tr><td>torch GNN, published (wrong positions, not reproducible)</td><td>XML labels</td><td class="n void">68.81%</td></tr>
+      <tr><td>PyNeuraLogic level 2 at epoch 62 (38 epochs at 2000/constellation, then 24 at 6000)</td><td>XML labels</td><td class="n">64.00%</td></tr>
+      <tr><td>PyNeuraLogic level 2, 2000/constellation (<code>allcons_v2_L2</code>)</td><td>XML labels</td><td class="n">51.78%</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="tw"><table>
+    <thead><tr><th>Constellation</th><th class="n">PyNeuraLogic</th><th class="n">Torch, 3 seeds</th><th class="n">Δ</th><th class="n">Torch, published</th></tr></thead>
+    <tbody>
+      <tr><td><code>center_single</code></td><td class="n">85.70</td><td class="n">50.22</td><td class="n good">+35.48</td><td class="n">75.40</td></tr>
+      <tr><td><code>distribute_four</code></td><td class="n">40.85</td><td class="n">36.63</td><td class="n good">+4.22</td><td class="n void">55.85</td></tr>
+      <tr><td><code>distribute_nine</code></td><td class="n">38.20</td><td class="n">32.55</td><td class="n good">+5.65</td><td class="n void">47.25</td></tr>
+      <tr><td><code>left/right</code></td><td class="n">83.10</td><td class="n">47.53</td><td class="n good">+35.57</td><td class="n">73.40</td></tr>
+      <tr><td><code>up/down</code></td><td class="n">84.00</td><td class="n">46.85</td><td class="n good">+37.15</td><td class="n">74.20</td></tr>
+      <tr><td><code>in/out</code></td><td class="n">90.25</td><td class="n">55.53</td><td class="n good">+34.72</td><td class="n">84.45</td></tr>
+      <tr><td><code>in_distribute_four_out</code></td><td class="n">57.30</td><td class="n">47.47</td><td class="n good">+9.83</td><td class="n void">71.15</td></tr>
+      <tr class="total"><td>Overall</td><td class="n">68.49</td><td class="n">45.25</td><td class="n good">+23.24</td><td class="n void">68.81</td></tr>
+    </tbody>
+    <caption>Torch figures per constellation are three-seed means; the seeds range from 35% to 59% overall. Greyed figures were trained on the corrupted positions of §10 and are not valid comparisons. On the four constellations the position bug never touched, PyNeuraLogic beats the published torch model by 6–10 points.</caption>
+  </table></div>
+
+  <h3>Data was the constraint</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Run</th><th class="n">Puzzles / constellation</th><th class="n">Dim</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td><code>allcons_v2_L2</code></td><td class="n">2000</td><td class="n">128</td><td>51.78% test; run on to 150 epochs, it saturates near 54.4% val</td></tr>
+      <tr class="bad"><td><code>full_iraven_L2</code></td><td class="n">6000</td><td class="n">256</td><td>25.32% test after 6 epochs and 3 days</td></tr>
+      <tr class="mark"><td><strong><code>max_data_L2</code></strong></td><td class="n">6000</td><td class="n">128</td><td><strong>68.49% test</strong> at epoch 126 (130 epochs, finished 19 Oct); 64.00% at epoch 62. Warm-started from <code>allcons_v2_L2</code> at its epoch 38</td></tr>
+    </tbody>
+  </table></div>
+  <p>The earlier full-data failure came from the dimension, not the data: dim 256 costs 3.7× more per epoch and learns far more slowly per update. Kept at dim 128, tripling the data and training on added almost seventeen points on test, from 51.78% to 68.49%. Validation was still creeping up at the end (10-epoch means 68.5% → 69.4% over epochs 91–130) while the training loss kept falling. No from-scratch full-data run at dim 128 exists.</p>
+
+  <h3>Checked not to be an artefact</h3>
+  <p>Each check has a control showing it can fail. All run from <code>sanity_checks.py</code>; the model checks use the epoch-62 checkpoint.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Failure mode</th><th>Test</th><th>Result</th><th>Control</th></tr></thead>
+    <tbody>
+      <tr><td>Test puzzles leaked into training</td><td>exact matches against all 42,000 train puzzles, whole and context-only</td><td class="good">0 duplicates</td><td>—</td></tr>
+      <tr><td>Answer-position bias</td><td>answer index distribution</td><td class="good">uniform, ~250 of 2000 each</td><td>—</td></tr>
+      <tr><td>Answer readable from the candidates alone</td><td>pick the candidate most similar to the others</td><td class="good">12.4–12.6%, chance</td><td>same test on RAVEN: 90–100%</td></tr>
+      <tr><td>Labels don't match the images</td><td>every dark pixel on a labelled object; object colours match the pixels</td><td class="good">100%, candidates included</td><td>wrong puzzle's labels: colour ~10%</td></tr>
+      <tr><td>Model uses candidate order</td><td>shuffle the 8 candidates</td><td class="good">scores change by exactly 0</td><td>—</td></tr>
+      <tr><td>Model ignores the context</td><td>give each puzzle another puzzle's context, or none</td><td class="good">11.5% / 12.2%</td><td>normal context: 64.6%</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>A symbolic template</h3>
+  <p>A different PyNeuraLogic model with no embeddings and no message passing: attribute values, rows and slot sets are symbols, crisp rules derive which relations hold on each row, and learned weights score each candidate row (<code>pynl_symbolic.py</code>). On unseen validation puzzles with ground-truth attributes it reaches <strong>97.58%</strong> with a generic vocabulary of primitives and <strong>98.44%</strong> with RAVEN's rule families; non-learned solvers over the same vocabularies reach 96.34% and 97.75%. The learned primitive weights rediscovered the rules (position union and colour addition weighted highest). Its relations are designed rather than learned, which is the price of the accuracy.</p>
+
+  <div class="note alert">
+    <span class="lab">Still open</span>
+    <p>PyNeuraLogic has one seed, against a torch GNN that varies from 35% to 59% across seeds. Running since 19 Oct: the symbolic templates end to end on the test split, their learning curves and random initialisations, and five GNN ablations aimed at the weak spot, puzzles where the set of occupied slots changes (row/column edge labels, within-panel edges with their own weights, position-aware empty slots).</p>
+  </div>
+</section>
+
+<section id="s1">
+  <h2><span class="sn">01</span>The torch baseline</h2>
+  <p class="deck">Read from <code>best_val_acc</code> inside each checkpoint, not from the summary doc.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Benchmark</th><th>Best config</th><th class="n">Val</th><th class="n">Test</th></tr></thead>
+    <tbody>
+      <tr><td>RAVEN</td><td><code>gnn</code> + <code>object_only</code> + <code>unified</code></td><td class="n">96.45%</td><td class="n">96.41%</td></tr>
+      <tr><td><strong>I-RAVEN</strong></td><td><code>gnn</code> + <code>granular</code> + <code>object_only</code></td><td class="n">68.83%</td><td class="n">68.81%</td></tr>
+    </tbody>
+    <caption>The I-RAVEN row was later found to be trained on corrupted positions (§10).</caption>
+  </table></div>
+
+  <p><code>gnn</code> is <code>RelGNLayer</code>: plain relational message passing, no attention. <strong>GAT failed outright</strong>, every variant landing between 15.17% and 26.53% against a 12.5% chance floor, with several runs stopping at epoch 1, 15, 16 or 54. Read that as "did not train", not as evidence against attention. GCN sat in the middle at 87.49% (RAVEN) and 64.49% (I-RAVEN).</p>
+
+  <p><strong><code>object_only</code> is the single biggest factor.</strong> Dropping panel super-nodes moves RAVEN from 38.40% to 81.09% and I-RAVEN from 34.38% to 68.44%. The <code>same_pos_cross_panel</code> edges that replace the panel scaffolding do the real work.</p>
+
+  <h3>1.1 &nbsp;RAVEN's answer-set leakage, measured</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Benchmark</th><th class="n">object_only</th><th class="n">+ unified</th><th class="n">Δ</th></tr></thead>
+    <tbody>
+      <tr><td>RAVEN</td><td class="n">81.09%</td><td class="n">96.45%</td><td class="n good">+15.4</td></tr>
+      <tr><td>I-RAVEN</td><td class="n">68.44%</td><td class="n">48.28%</td><td class="n warn">−20.2</td></tr>
+    </tbody>
+    <caption>Same code, same hyperparameters, sign flip.</caption>
+  </table></div>
+
+  <p>RAVEN builds its eight candidates by perturbing the correct answer one attribute at a time, so the answer is the attribute-wise centroid of the candidate set, recoverable without looking at the context at all. <code>unified_graph</code> puts all eight candidates in one graph where they exchange messages, which is exactly the mechanism needed to exploit that. I-RAVEN removes the bias, and there the same mechanism costs twenty points.</p>
+
+  <div class="note alert">
+    <span class="lab">Consequence</span>
+    <p>96.4% is not a real number. Any port should target the I-RAVEN config and keep candidates from seeing each other. The I-RAVEN 68.8% turned out not to be valid either: it was trained on the corrupted positions of §10, and the retrain with both fixes averages 45.25% over three seeds.</p>
+  </div>
+
+  <h3>1.2 &nbsp;The winning architecture</h3>
+  <p><code>emb 256 / hidden 384 / 3 layers / lr 1e-3 / dropout 0.1 / batch 8 / AdamW wd 1e-4</code></p>
+  <ul>
+    <li><strong>Graph</strong>: 8 context panels + 1 candidate, one graph per candidate. Objects only. 17 typed relations.</li>
+    <li><strong>Encoder</strong>: a plain <em>sum</em> of embedding lookups over pos, color, shape, size, kind, role, panel-grid.</li>
+    <li><strong>Layer</strong> ×3: <code>msg = W([x_src + rel_emb ; x_dst ; rel_emb])</code>, <code>scatter_mean</code> per destination, then <code>LayerNorm(x + dropout(out_proj(agg)))</code>.</li>
+    <li><strong>Loss</strong>: one <em>8-way softmax</em> ranking the candidates. The non-unified path still scores each candidate on its own graph, then stacks: independent scoring, joint normalisation.</li>
+  </ul>
+</section>
+
+<section id="s2">
+  <h2><span class="sn">02</span>Environment</h2>
+  <p>PyNeuraLogic <strong>0.9.2</strong> in conda env <code>pynl</code> (Python 3.11.16, JPype 1.7.1, torch 2.14.0+cpu). The old <code>nvsa</code> env is Python 3.7.12, which caps <code>neuralogic</code> at 0.8.0; 0.9.x needs Python 3.10 or later, so it cannot be upgraded in place.</p>
+
+  <div class="note alert">
+    <span class="lab">Three traps</span>
+    <p><code>ml load Java/21</code> <strong>silently does nothing on the amd compute nodes</strong>: <code>JAVA_HOME</code> comes back empty and JPype dies, though the module works fine on the login node. Pin the path and verify <code>libjvm.so</code>.</p>
+    <p><code>~/.local/lib/python3.11/site-packages</code> shadows the conda env. Always set <code>PYTHONNOUSERSITE=1</code>.</p>
+    <p>The default JVM heap <strong>kills a Jupyter kernel</strong>. <code>set_max_memory_size(16)</code> fixes it.</p>
+  </div>
+
+  <p>PyNeuraLogic is JVM/CPU only, so never request a GPU for it. Compute scales roughly with d², and the engine is largely single-threaded (~1.5 cores utilised regardless of <code>--cpus-per-task</code>).</p>
+
+  <h3>2.1 &nbsp;API changes 0.8 → 0.9 that break old code</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Old (0.8.0)</th><th>New (0.9.2)</th></tr></thead>
+    <tbody>
+      <tr><td><code>core.Template</code></td><td>gone: <code>Model()</code>, <code>m += rule</code>, <code>m.build()</code></td></tr>
+      <tr><td><code>nn.get_evaluator</code></td><td>gone: <code>nn.Trainer</code></td></tr>
+      <tr><td><code>neuralogic.optim.Adam</code></td><td>module gone: <code>nn.Adam</code></td></tr>
+      <tr><td><code>inference.inference_engine</code></td><td>module gone; closest is <code>core.Grounder</code></td></tr>
+      <tr><td><code>m[R.h0/1] = Metadata(…)</code></td><td><code>m += (R.h0/1) | Metadata(…)</code></td></tr>
+      <tr><td>—</td><td>predicate metadata <strong>rejects <code>aggregation</code></strong>; that goes on the rule</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="s3">
+  <h2><span class="sn">03</span>Framework traps</h2>
+  <p class="deck">Each cost real debugging time. None produces a clear error message.</p>
+  <ol class="body">
+    <li><strong>Embedding tables must be declared as weighted facts.</strong> A body atom with no matching facts silently fails to ground; you get <code>Query not matched anywhere in the template</code>, which points at the wrong place entirely.</li>
+    <li><strong>Every sample needs a unique query atom.</strong> With a nullary query all eight candidates share one identity and PyNeuraLogic <em>merges them</em>: 3440 samples came back as 2240, with no error. This also means duplicating samples to oversample positives does nothing; copies are deduplicated.</li>
+    <li><strong><code>build_dataset()</code> may be called only once</strong> per built model. The second call throws <code>ArrayIndexOutOfBoundsException</code>.</li>
+    <li><strong><code>Aggregation.CONCAT</code> does not emit in the order you named the constants.</strong> It uses the grounder's own permutation, <code>[6,0,4,3,1,2,7,5]</code> here. Uncorrected, the head scores candidate <em>i</em> against candidate <em>j</em>'s target and the model cannot learn. The order depends only on the constants, not template depth, so a depth-0 companion can be probed to recover it.</li>
+    <li><strong>Rules sharing a head combine with <code>SUM</code></strong>; <code>AVG</code> applies within one rule, over its groundings.</li>
+    <li><strong>Constant tensor inputs need <code>requires_grad=True</code></strong>, or autograd never records the node and backward never reaches the template weights.</li>
+    <li><strong>Weight sharing across topologies breaks backward.</strong> Two modules from one <code>Model</code> do share weights and forward correctly, but the second topology's backward throws a dimension error, because trainer state binds to whichever topology grounded first.</li>
+  </ol>
+</section>
+
+<section id="s4">
+  <h2><span class="sn">04</span>The elimination</h2>
+  <p class="deck">Five hypotheses. Four were real defects. None was the main cause.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Hypothesis</th><th>Test</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td>Class imbalance</td><td>Plateau loss 0.3810 ≈ 0.3768, the constant base-rate optimum. Retrained on a balanced set</td><td><span class="pill no">rejected</span> 49–53% for 12 epochs</td></tr>
+      <tr><td>Additive readout</td><td>Body atoms sum, so no <code>ctx × cand</code> interaction term; <code>ctx</code> cancels under argmax</td><td><span class="pill yes">real, minor</span> 13.8 → 20.0%</td></tr>
+      <tr><td>No LayerNorm</td><td>Eight terms summed with nothing renormalising; output std decayed to ~1e-8</td><td><span class="pill yes">real</span> collapse cured, acc +2.6</td></tr>
+      <tr><td>Binary vs softmax</td><td>Built the softmax version; loss started at ln 8 = 2.0794 and reached 2.0785 after 300 epochs</td><td><span class="pill no">rejected</span> flat at the floor</td></tr>
+      <tr><td>Capacity / scale</td><td>300 epochs, dim 64, 2000 puzzles</td><td><span class="pill no">rejected</span> peaked ep 89, then degraded</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>Fixing the three real defects moved a toy from 13.8% to 21.2%. Scaling moved it to 27.2%. The gap to 75.4% stayed at roughly forty-eight points.</p>
+
+  <h3>4.1 &nbsp;Expressing 8-way softmax in PyNeuraLogic</h3>
+  <p>It is possible, and worth recording:</p>
+<pre><code>m += (R.answer(V.G) &lt;= (R.cand_of(V.B, V.G), R.score(V.B))) \
+     | Metadata(aggregation=Aggregation.CONCAT)     # 8 scalars -&gt; one 8-vector
+Sample(R.answer(gid)[onehot], facts)                 # target as one-hot
+Settings(error_function=CrossEntropy(with_logits=True))  # softmaxes internally</code></pre>
+  <p>One sample is one puzzle, with all eight candidate sub-graphs present but fully disjoint: context duplicated per branch, no candidate-candidate edges. That reproduces the torch path exactly and avoids the leakage. At full scale it never learned.</p>
+</section>
+
+<section id="s5">
+  <h2><span class="sn">05</span>Structural diff</h2>
+  <p class="deck">"Same GNN structure" is true only of the relational part.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Torch</th><th>Naive port</th><th>Why it matters</th></tr></thead>
+    <tbody>
+      <tr class="bad"><td><code>LayerNorm</code> every layer</td><td><strong>nothing</strong></td><td>at hidden 384 loss diverged to <strong>3643</strong> in 2 epochs</td></tr>
+      <tr class="bad"><td>batch 8, AdamW</td><td><code>batch_size=1</code>, the default</td><td>16 000 noisy steps/epoch instead of 2 000</td></tr>
+      <tr class="bad"><td><code>x + f(agg)</code>, identity skip</td><td>a <strong>learned matrix</strong> in the skip path</td><td>not a residual; destroys gradient flow</td></tr>
+      <tr><td>one <code>scatter_mean</code> over all edges</td><td>AVG per relation, then SUM</td><td>~3× the magnitude, feeding row 1</td></tr>
+      <tr><td>one shared <code>W</code> for 17 relations</td><td>separate <code>[d,d]</code> per relation</td><td>6.64M vs 1.79M params, zero sharing</td></tr>
+      <tr><td>2-layer head, tuned init</td><td>single <code>Linear(2D→1)</code></td><td>no hidden layer in the readout</td></tr>
+      <tr><td>dropout 0.1, weight decay</td><td>none</td><td>no regularisation</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>Fixing the first five moved the 10-puzzle overfit from 60–70% to <strong>90%</strong>. Separately, at hidden 384 with lr 1e-3 the loss goes 2.52 → 3643 → 43.4; lr 1e-5 is stable and still descending. Needing a 100× smaller learning rate is itself the missing-normalisation symptom.</p>
+</section>
+
+<section id="s6">
+  <h2><span class="sn">06</span>The decisive test</h2>
+  <p class="deck">A model with over a million parameters should memorise ten examples in tens of epochs.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Variant</th><th class="n">Best train acc, 10 puzzles</th></tr></thead>
+    <tbody>
+      <tr><td>Pure PyNeuraLogic, as first written</td><td class="n">60–70% after 120 epochs</td></tr>
+      <tr><td>Pure PyNeuraLogic, structurally aligned</td><td class="n">90% after 400 epochs</td></tr>
+      <tr class="mark"><td><strong>Hybrid with torch head</strong></td><td class="n"><strong>100% at epoch 14</strong></td></tr>
+    </tbody>
+    <caption>The pure version was still at 50% by epoch 200 of an 800-epoch run.</caption>
+  </table></div>
+
+  <div class="note">
+    <span class="lab">The cleanest result here</span>
+    <p>The template was always expressive enough. <strong>Optimisation was the entire gap.</strong> A failure to fit the training set rules out overfitting, data volume and generalisation in one stroke.</p>
+  </div>
+</section>
+
+<section id="s7">
+  <h2><span class="sn">07</span>The ablation ladder</h2>
+  <p class="deck">One script, <code>--level N</code>, so hyperparameters cannot drift between arms. Identical settings throughout.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th class="n">Lvl</th><th>Torch owns</th><th>PyNeuraLogic owns</th><th class="n">Best val</th><th class="n">Min loss</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td>emb, proj, <strong>head</strong>, loss, opt</td><td>message passing</td><td class="n">32.6%</td><td class="n">0.180</td></tr>
+      <tr class="mark"><td class="n">2</td><td>emb, proj, loss, opt</td><td>MP + <strong>head</strong></td><td class="n"><strong>39.0%</strong></td><td class="n">0.255</td></tr>
+      <tr class="bad"><td class="n">3</td><td>loss, opt only; <strong>0 torch params</strong></td><td><strong>emb</strong> + MP + head</td><td class="n">20.8%</td><td class="n">0.636</td></tr>
+      <tr class="bad"><td class="n">4</td><td>—</td><td><strong>everything</strong></td><td class="n">15.4%</td><td class="n">1.402</td></tr>
+    </tbody>
+    <caption>2000 train / 500 val, dim 64, 2 layers, 80 epochs, center_single. Chance 12.5%. Level 2 is the design that later reached 64% on all seven constellations.</caption>
+  </table></div>
+
+  <p><strong>Moving the scoring head into PyNeuraLogic helped</strong>: level 2 beat level 1 by 6.4 points. Readout, context pooling and per-candidate scoring are all learnable as rules.</p>
+
+  <p><strong>The collapse is entirely 2 → 3: −18.2 points.</strong> That step moves only the attribute embeddings from <code>nn.Embedding</code> into a <code>[d, n_values]</code> matrix over a one-hot, mathematically the same operation. The further 3 → 4 drop of 5.4 isolates the training loop as real but secondary.</p>
+
+  <p>Train loss says it more sharply: levels 1–2 reach ~0.2, while <strong>level 4 never fits the training set at all</strong> (1.402 against a 2.079 uniform floor).</p>
+
+  <div class="note alert">
+    <span class="lab">Caveat</span>
+    <p>Single seed per level. The 18-point 2→3 gap is unlikely to be noise; the 6.4-point 1↔2 ordering could plausibly flip. Worth three seeds before citing.</p>
+  </div>
+</section>
+
+<section id="s8">
+  <h2><span class="sn">08</span>The hybrid</h2>
+  <p class="deck">PyNeuraLogic for relational message passing, PyTorch for everything numeric.</p>
+
+  <p>All eight context panels and all eight candidates in one graph, one forward pass. Candidates connect to the context but not to each other, preserving the no-leakage property.</p>
+
+<pre><code>epoch    loss    val acc
+    1  2.0301     16.0%
+   20  1.4773     26.0%
+   60  0.8854     47.5%
+  121  0.3899     52.9%   &lt;- best
+  150  0.3055     51.2%</code></pre>
+
+  <p>Monotone loss from 2.03 to 0.305, no divergence, no collapse. Mean validation went from 22.7% over the first twenty epochs to 51.3% over the last twenty. <strong>Not converged</strong>: loss was still falling at epoch 150, with its minimum at 147.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Approach</th><th class="n">Best val, I-RAVEN center_single</th></tr></thead>
+    <tbody>
+      <tr><td>Pure PyNeuraLogic, binary</td><td class="n">27.2%</td></tr>
+      <tr><td>Pure PyNeuraLogic, 8-way softmax</td><td class="n">16.0%</td></tr>
+      <tr class="mark"><td><strong>Hybrid</strong></td><td class="n"><strong>52.9%</strong></td></tr>
+      <tr><td>Torch GNN, published (test split)</td><td class="n">75.4%</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>8.1 &nbsp;The uncomfortable implication</h3>
+  <p>In this hybrid, the symbolic component is reduced to <strong>pure topology</strong>: a message-passing schedule over a fixed graph. No attribute constants, no grounding over attribute values, no logical embeddings. All semantic content lives in torch. And that is the version that works.</p>
+
+  <p>The more of the symbolic machinery moved out of PyNeuraLogic, the better it performed. A reviewer will ask what the logic is buying; for the 52.9% model the honest answer is "the graph topology, and not much else". The pure version is the one that actually does neurosymbolic reasoning, and it is stuck at 27.2%. <strong>That contrast is the result.</strong> The final level-2 model shifts the balance back somewhat: its scoring head is also written as rules, and PyNeuraLogic holds 87% of its parameters.</p>
+</section>
+
+<section id="s9">
+  <h2><span class="sn">09</span>All seven constellations</h2>
+  <p>Object counts vary, which breaks the static-graph requirement.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Constellation</th><th class="n">Objects / panel</th><th class="n">Slots</th></tr></thead>
+    <tbody>
+      <tr><td><code>center_single</code></td><td class="n">always 1</td><td class="n">1</td></tr>
+      <tr><td><code>left/right</code>, <code>up/down</code>, <code>in/out</code></td><td class="n">always 2</td><td class="n">2</td></tr>
+      <tr class="bad"><td><code>distribute_four</code></td><td class="n">1–4</td><td class="n">4</td></tr>
+      <tr class="bad"><td><code>in_distribute_four_out</code></td><td class="n">2–5</td><td class="n">5</td></tr>
+      <tr class="bad"><td><code>distribute_nine</code></td><td class="n">1–9</td><td class="n">9</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>One module per constellation with shared weights fails on backward (§3.7). The working approach is a common <strong>9-slot topology</strong>: 16 panels × 9 slots = 144 nodes, 2808 edges, 484 ms/puzzle at hidden 128, with a learned pad embedding for inactive slots. The best configuration later dropped the within-panel edges, leaving 1656.</p>
+
+  <div class="note">
+    <span class="lab">Slot semantics</span>
+    <p>Slot <em>k</em> is the <em>k</em>-th <strong>universal position</strong> of that constellation, not the <em>k</em>-th object present. A puzzle is entirely one constellation, so slot <em>k</em> denotes the same position in all sixteen panels and same-slot cross-panel edges link matching positions. Verified across 4243 objects, zero mismatches.</p>
+  </div>
+
+  <h3>9.1 &nbsp;Overfit probe, all seven at once</h3>
+  <p><strong>92.9%</strong>: thirteen of fourteen puzzles memorised, six constellations at 100% including <code>distribute_nine</code>. Only <code>distribute_four</code> stuck, at 50%.</p>
+
+  <p>Isolating it: five puzzles, saturating at <strong>80%</strong>, loss flat at <strong>0.4159</strong> for 150 epochs. And ln(8)/5 = 0.4159 exactly, so four puzzles are fit perfectly and one sits at <em>precisely</em> uniform. The model emits identical logits for all eight candidates on it. That signature led directly to the next section.</p>
+</section>
+
+<section id="s10">
+  <h2><span class="sn">10</span>The position bugs</h2>
+  <p class="deck">Two decoding bugs in the original torch pipeline, not only in the port. The slot bug (10.1–10.2) is specific to I-RAVEN; the spatial-relation bug (10.3) affects both datasets.</p>
+
+  <p><code>parse_ground_truth</code> derived an object's slot from <code>all_positions.index(bbox)</code>, where <code>all_positions</code> is the layout's XML <code>Position</code> attribute. The two datasets write that attribute differently:</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Dataset</th><th><code>Position</code> lists</th><th><code>Position.index(bbox)</code> is</th><th>Bug</th></tr></thead>
+    <tbody>
+      <tr><td>RAVEN-10000</td><td><strong>every</strong> slot of the layout</td><td>the true slot</td><td><span class="pill yes">dormant</span></td></tr>
+      <tr class="bad"><td>I-RAVEN-10000</td><td>only the <strong>occupied</strong> slots</td><td>rank among present objects</td><td><span class="pill no">live</span></td></tr>
+    </tbody>
+  </table></div>
+
+<pre><code>distribute_four, one panel     RAVEN:   3 objects, Position lists 4 bboxes
+                               I-RAVEN: 2 objects, Position lists 2 bboxes</code></pre>
+
+  <p>I-RAVEN's generator rewrites the XML when it rebuilds the candidates, and in doing so shrinks <code>Position</code> to the occupied slots. Code written and tested against RAVEN is correct there and silently wrong on I-RAVEN, which is how it went unnoticed. For any panel holding fewer objects than the constellation's maximum, position identity is destroyed: a lone object at slot 3 and a lone object at slot 0 both become local index 0.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Constellation</th><th class="n">Puzzles with indistinguishable candidates</th><th class="n">Published torch test acc</th></tr></thead>
+    <tbody>
+      <tr><td><code>center_single</code></td><td class="n">0 / 40</td><td class="n">75.40%</td></tr>
+      <tr><td><code>left/right</code></td><td class="n">0 / 40</td><td class="n">73.40%</td></tr>
+      <tr><td><code>up/down</code></td><td class="n">0 / 40</td><td class="n">74.20%</td></tr>
+      <tr><td><code>in/out</code></td><td class="n">0 / 40</td><td class="n">84.45%</td></tr>
+      <tr class="bad"><td><code>distribute_four</code></td><td class="n"><strong>13 / 40</strong></td><td class="n">55.85%</td></tr>
+      <tr class="bad"><td><code>distribute_nine</code></td><td class="n"><strong>13 / 40</strong></td><td class="n">47.25%</td></tr>
+      <tr class="bad"><td><code>in_distribute_four_out</code></td><td class="n"><strong>12 / 40</strong></td><td class="n">71.15%</td></tr>
+    </tbody>
+    <caption>Affected constellations average 58.1%; unaffected, 76.9%.</caption>
+  </table></div>
+
+  <p>The three worst results are exactly the three broken ones. Roughly a third of those puzzles are <strong>unanswerable</strong>: two or more candidates encode identically, and one of them is the answer.</p>
+
+  <h3>10.1 &nbsp;The fix, and its regression check</h3>
+  <p><code>canonical_positions()</code> derives the slot from <strong>bbox geometry</strong>, using the union of every bbox ever seen in that component, cached per constellation, hard-failing if the count disagrees with the expected slot total.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Constellation</th><th class="n">Panels changed</th><th class="n">Duplicates after</th></tr></thead>
+    <tbody>
+      <tr><td>The four fixed-count ones</td><td class="n good">0 / 480 each</td><td class="n">0</td></tr>
+      <tr><td><code>distribute_four</code></td><td class="n">334 / 480 &nbsp;(70%)</td><td class="n">0</td></tr>
+      <tr><td><code>distribute_nine</code></td><td class="n warn">449 / 480 &nbsp;(94%)</td><td class="n">0</td></tr>
+      <tr><td><code>in_distribute_four_out</code></td><td class="n">369 / 480 &nbsp;(77%)</td><td class="n">0</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>Zero change where object counts are fixed, where the old code was accidentally correct, and all duplicates gone.</p>
+
+  <div class="note">
+    <span class="lab">Done</span>
+    <p>The torch GNN was first retrained on fixed positions, same configuration: 55.09% test. With the spatial relations fixed as well, three seeds give 41.74 / 35.01 / 59.02% (mean 45.25%; see <a href="#status">Where it stands</a>).</p>
+  </div>
+
+  <h3>10.2 &nbsp;Second sweep: the ResNet frontend and its tools</h3>
+  <p>The same line had been copied into three more files, all about the ResNet-18 perception frontend. All three now call <code>gnn.data.canonical_positions</code>, so the repository has one slot decoder. Two archived copies are left untouched.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>File</th><th>Function</th></tr></thead>
+    <tbody>
+      <tr><td><code>train_frontend.py</code></td><td><code>parse_xml_panel_targets</code>, the ResNet's training labels</td></tr>
+      <tr><td><code>predict_frontend.py</code></td><td><code>parse_ground_truth</code>, ground truth shown beside predictions</td></tr>
+      <tr><td><code>extract_objects.py</code></td><td><code>parse_ground_truth</code>, ground truth for object extraction</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="tw"><table>
+    <thead><tr><th>Constellation</th><th class="n">RAVEN</th><th class="n">I-RAVEN</th><th class="n">Fixed vs <code>gnn.data</code></th></tr></thead>
+    <tbody>
+      <tr><td>The four fixed-count ones</td><td class="n">0</td><td class="n">0</td><td class="n">0</td></tr>
+      <tr><td><code>distribute_four</code></td><td class="n good">0</td><td class="n">2335 &nbsp;(73%)</td><td class="n">0</td></tr>
+      <tr><td><code>distribute_nine</code></td><td class="n good">0</td><td class="n">2995 &nbsp;(94%)</td><td class="n">0</td></tr>
+      <tr><td><code>in_distribute_four_out</code></td><td class="n good">0</td><td class="n">2442 &nbsp;(76%)</td><td class="n">0</td></tr>
+    </tbody>
+    <caption>Panels changed by the fix, of 3200 per constellation (first 200 test puzzles), in all three files.</caption>
+  </table></div>
+
+  <p><strong>No existing result changes.</strong> The frontend was trained on RAVEN, where the bug is dormant, so its labels were correct and its checkpoints stay valid. Nothing in the scripts or logs ran these files on I-RAVEN. For new code: never derive a slot from <code>Position.index(bbox)</code>; use <code>canonical_positions(config, dataset_root)[(component_index, tuple(bbox))]</code>.</p>
+
+  <h3>10.3 &nbsp;Third bug: wrong spatial relations in the torch graph</h3>
+  <p>The torch graph types within-panel edges by spatial relation (<code>left_of</code>, <code>above</code>, <code>same_row</code>, <code>overlap</code> …). <code>infer_relations</code> looks each object's centre up by its <strong>universal position id</strong>, but <code>build_position_centers</code> keyed centres by the <strong>rank</strong> of each bbox in a sorted list of all bboxes, a different numbering, and also treated the centre-based bboxes as corner-based. The panel centre, universal position 0, was given (0.33, 0.33) instead of (0.5, 0.5).</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Constellation</th><th class="n">Relations wrong</th><th>Example: labelled vs true</th></tr></thead>
+    <tbody>
+      <tr><td><code>distribute_four</code></td><td class="n">33.4%</td><td>4→2: below, <strong>left_of</strong> vs below, same_col</td></tr>
+      <tr class="bad"><td><code>distribute_nine</code></td><td class="n">75.1%</td><td>7→10: above, <strong>left_of</strong> vs above, same_col</td></tr>
+      <tr><td><code>left/right</code></td><td class="n good">0.0%</td><td>correct by coincidence</td></tr>
+      <tr class="bad"><td><code>up/down</code></td><td class="n warn">100%</td><td>upper→lower: <strong>left_of, same_row</strong> vs above, same_col</td></tr>
+      <tr class="bad"><td><code>in/out</code></td><td class="n warn">100%</td><td>outer→inner: <strong>above, left_of</strong> vs overlap</td></tr>
+      <tr class="bad"><td><code>in_distribute_four_out</code></td><td class="n">79.5%</td><td>0→19: <strong>above, same_col</strong> vs below, left_of</td></tr>
+    </tbody>
+    <caption>Within-panel object pairs, first 200 test puzzles per constellation, against exact bbox centres.</caption>
+  </table></div>
+
+  <p>It affects every torch GNN run, on RAVEN and I-RAVEN, published and retrained. The labels are wrong but consistent, a fixed function of the position pair, so the GNN could still use them as arbitrary edge types; distinct geometric relations get merged, though, and no claim about spatial reasoning can rest on those models. The PyNeuraLogic model uses no spatial relations and is unaffected.</p>
+
+  <p><strong>Fix:</strong> <code>universal_position_centers()</code> takes each universal position's centre from its bbox geometry. The trainer uses it by default (<code>--legacy-centers</code> restores the old behaviour), and <code>eval_gnn_test.py</code> now evaluates with the centres stored in each checkpoint, so every old checkpoint reproduces its reported number exactly. With the fix, no relation is wrong in any constellation. The retrain with both fixes runs over three seeds (<code>submit_gnn_fixrel.sh</code>).</p>
+
+  <h3>10.4 &nbsp;Rotation is not a missing attribute</h3>
+  <p><code>Angle</code> sits on every entity and is captured by neither pipeline. Across 420 puzzles in all seven constellations, the rules govern only Type (660), Size (660), Color (660), Number/Position (506), Number (81) and Position (73). <code>Angle</code> appears <strong>zero</strong> times. It is a noise distractor, so dropping it is correct, and after the position fix no candidate collisions remain without it.</p>
+</section>
+
+<section id="s11">
+  <h2><span class="sn">11</span>End to end</h2>
+  <p class="deck">Everything above reasons over ground-truth attributes read from the XML. Here the XML is replaced by what a ResNet-18 sees in the images.</p>
+
+  <h3>11.1 &nbsp;The perception frontend</h3>
+  <p>An NVSA-style universal frontend (<code>train_frontend.py</code>), trained on RAVEN-10000, all seven constellations jointly.</p>
+  <ul>
+    <li><strong>Input</strong>: one panel at a time, 160×160 grayscale, repeated to 3 channels for the ImageNet-pretrained ResNet-18. First conv stride 1 and no max-pool, so small objects keep their resolution. Output: a 512-d vector per panel.</li>
+    <li><strong>Targets</strong>: a <em>frozen</em> random codebook of 6622 rows, one per combination of 22 positions × 5 types × 6 sizes × 10 colours, plus one "object here" row per position. Each row is the element-wise product of four random ±1 vectors (type ⊙ size ⊙ colour ⊙ position). Only the ResNet trains.</li>
+    <li><strong>Loss</strong>: cosine similarity to every row under the NVSA paper's additive cross-entropy, one term per object, averaged. A multi-object panel learns to output the superposition of its objects' vectors.</li>
+    <li><strong>Best checkpoints</strong>: <code>…_mean3</code> at 95.26% panel accuracy and <code>…_mean1</code> at 95.04%.</li>
+  </ul>
+
+  <h3>11.2 &nbsp;The pipeline</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Stage</th><th>Where</th><th>Does</th></tr></thead>
+    <tbody>
+      <tr><td><code>perceive</code></td><td>GPU, env <code>nvsa</code></td><td>runs both frontends over every I-RAVEN val and test panel (448,000) and scores perception against the ground truth. 10 minutes on one A100; outputs cached.</td></tr>
+      <tr><td><code>solve</code></td><td>CPU, env <code>pynl</code></td><td>picks the frontend with better <strong>val</strong> perception, decodes its test detections, and scores the same puzzles end to end and with XML labels, with the same checkpoint. About 90 minutes.</td></tr>
+    </tbody>
+  </table></div>
+  <p>At each position the constellation uses, the best of its 300 attribute rows is taken, and the object exists if that cosine exceeds 0.23, the frontend's training threshold. The frontend's position IDs, PyNeuraLogic's <code>POS_MAP</code> and the ground-truth parsers are identical, so detections need no remapping.</p>
+
+  <h3>11.3 &nbsp;Perception on I-RAVEN</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Constellation</th><th class="n">Panels exactly right</th><th class="n">Puzzles, all 16 right</th></tr></thead>
+    <tbody>
+      <tr><td><code>center_single</code>, <code>left/right</code>, <code>up/down</code>, <code>in/out</code></td><td class="n">100.00%</td><td class="n">100.00%</td></tr>
+      <tr><td><code>distribute_four</code></td><td class="n">99.99%</td><td class="n">99.90%</td></tr>
+      <tr><td><code>distribute_nine</code></td><td class="n">96.02%</td><td class="n">76.45%</td></tr>
+      <tr><td><code>in_distribute_four_out</code></td><td class="n">96.34%</td><td class="n">71.55%</td></tr>
+      <tr class="total"><td>Overall</td><td class="n">98.91%</td><td class="n">92.56%</td></tr>
+    </tbody>
+    <caption>Test split, <code>mean3</code>. Higher than the 95.3% reported in training because the training eval counts every row above threshold, while the pipeline takes the single best row per position.</caption>
+  </table></div>
+
+  <h3>11.4 &nbsp;Perception costs nothing</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Constellation</th><th class="n">All 16 perceived</th><th class="n">End to end</th><th class="n">XML labels</th><th class="n">Δ</th></tr></thead>
+    <tbody>
+      <tr><td><code>center_single</code></td><td class="n">100.0%</td><td class="n">85.70</td><td class="n">85.70</td><td class="n">0.00</td></tr>
+      <tr><td><code>distribute_four</code></td><td class="n">99.9%</td><td class="n">40.85</td><td class="n">40.85</td><td class="n">0.00</td></tr>
+      <tr><td><code>distribute_nine</code></td><td class="n">76.5%</td><td class="n">38.05</td><td class="n">38.20</td><td class="n">−0.15</td></tr>
+      <tr><td><code>left/right</code></td><td class="n">100.0%</td><td class="n">83.10</td><td class="n">83.10</td><td class="n">0.00</td></tr>
+      <tr><td><code>up/down</code></td><td class="n">100.0%</td><td class="n">84.00</td><td class="n">84.00</td><td class="n">0.00</td></tr>
+      <tr><td><code>in/out</code></td><td class="n">100.0%</td><td class="n">90.25</td><td class="n">90.25</td><td class="n">0.00</td></tr>
+      <tr><td><code>in_distribute_four_out</code></td><td class="n">71.5%</td><td class="n">57.30</td><td class="n">57.30</td><td class="n">0.00</td></tr>
+      <tr class="total"><td>Overall</td><td class="n">92.6%</td><td class="n">68.46</td><td class="n">68.49</td><td class="n">−0.03</td></tr>
+    </tbody>
+    <caption><code>max_data_L2</code>, epoch 126, I-RAVEN test. At epoch 62 the same comparison gave 63.96% vs 64.00%.</caption>
+  </table></div>
+  <p>When all 16 panels are perceived correctly the input is identical to the XML, so the answer is too. The whole difference comes from the ~1,040 puzzles with a perception error; on those the end-to-end accuracy is 36.3% (<code>distribute_nine</code>) and 57.5% (<code>in_distribute_four_out</code>), close to each constellation's overall level. A typical error is one small object in one crowded panel, which rarely changes the winning candidate.</p>
+
+  <div class="note alert">
+    <span class="lab">Image overlap</span>
+    <p>The frontend was trained on RAVEN, which shares images with I-RAVEN test: 8% of <code>distribute_nine</code> panels, 33% of <code>in_distribute_four_out</code> panels (51% of whole contexts), and every <code>center_single</code> panel. Perception on <strong>unseen</strong> panels is 95.7% and 95.4%, against 98–100% on seen ones, so perception is inflated by under a point where it matters and the end-to-end number barely moves. The reasoner never saw RAVEN.</p>
+  </div>
+
+  <h3>11.5 &nbsp;Can the whole thing be trained end to end?</h3>
+  <p><strong>Technically yes.</strong> Exactly one step blocks gradients:</p>
+<pre><code>pixels → ResNet → cosine vs codebook → [threshold + argmax → integer IDs] → embedding lookup → PyNeuraLogic → 8 logits
+                                             ↑ the only non-differentiable step</code></pre>
+  <p>The fix is to replace the hard decode with <strong>soft attribute probabilities</strong>: per position, a softmax over the 300 codebook similarities, collapsed into P(type), P(size) and P(color), plus a soft existence probability. The node embedding becomes the probability-weighted sum of the embedding rows, blended with the pad token by the existence probability. With certain probabilities this reproduces the current model exactly, which gives a clean regression test. It is the same trick NVSA's own end-to-end training uses (<code>raven/main_nvsa_marg.py</code>).</p>
+  <p>Everything downstream already passes gradients: level 2 trains its torch embeddings through the PyNeuraLogic layer, and training runs backward once per puzzle. A GPU node (A100, 128 CPUs, 1 TB RAM) holds the ResNet and the JVM side by side, and speed would be set by the reasoner at ~6.3 h per full-data epoch.</p>
+
+  <div class="note">
+    <span class="lab">The catch</span>
+    <p>Perception costs 0.03 points, and joint training can at best recover what perception loses. The limit is the reasoner, at 68.5% even with perfect inputs. End-to-end training buys a methodological claim, fully differentiable end to end, rather than a better number.</p>
+  </div>
+
+  <div class="tw"><table>
+    <thead><tr><th>Version</th><th>What it tests</th><th>Risk</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1.</strong> Joint fine-tuning from the trained ResNet and reasoner, attribute loss kept as an auxiliary term</td><td>that the pipeline trains jointly without losing accuracy; the auxiliary loss stops the ResNet's "colour 3" drifting from actual colour 3</td><td><span class="pill yes">low</span> a day to build, 2–3 GPU days</td></tr>
+      <tr><td><strong>2.</strong> Perception learned only from the answer, no attribute labels</td><td>whether a logic reasoner can teach perception. NVSA manages it because its reasoner is a fixed rule executor; here both sides learn from one weak signal</td><td><span class="pill no">high</span> tends to collapse or stall</td></tr>
+    </tbody>
+  </table></div>
+  <p>Version 1 if the thesis needs the end-to-end claim. For a higher number, the effort belongs in the reasoner. Not built yet.</p>
+</section>
+
+<section id="s12">
+  <h2><span class="sn">12</span>Files</h2>
+  <div class="tw"><table>
+    <thead><tr><th>File</th><th>What</th></tr></thead>
+    <tbody>
+      <tr><td><code>train_all_constellations.py</code></td><td>All seven jointly, 9-slot padded topology, <code>--level {1,2}</code>, resumable. <strong>The model behind the headline numbers</strong></td></tr>
+      <tr><td><code>pynl_best_architecture_walkthrough.ipynb</code></td><td>Walkthrough of the best model, importing the real training code</td></tr>
+      <tr><td><code>eval_pynl_test.py</code></td><td>Full test-split evaluation, against the fixed-position torch GNN</td></tr>
+      <tr><td><code>sanity_checks.py</code></td><td><code>splits</code>, <code>shortcut</code>, <code>images</code>, <code>model</code>: checks that the result is not an artefact</td></tr>
+      <tr><td><code>pixel_pipeline.py</code></td><td>End to end: <code>perceive</code> (ResNet, GPU) and <code>solve</code> (PyNeuraLogic, CPU)</td></tr>
+      <tr><td><code>train_frontend.py</code>, <code>predict_frontend.py</code>, <code>extract_objects.py</code></td><td>ResNet-18 perception frontend and its tools; position parse fixed</td></tr>
+      <tr><td><code>train_pynl.py</code></td><td>Pure, per-candidate binary scoring (27.2%). Hosts <code>parse()</code> and <code>POS_MAP</code></td></tr>
+      <tr><td><code>train_pynl_softmax.py</code></td><td>Pure, 8-way softmax (16.0%)</td></tr>
+      <tr><td><code>train_pynl_aligned.py</code></td><td>Pure, structurally corrected: shared <code>W</code>, identity residual, 2-layer head</td></tr>
+      <tr><td><code>train_pynl_torch.py</code></td><td>Hybrid, center_single (52.9%)</td></tr>
+      <tr><td><code>train_ladder.py</code></td><td>The 4-level ablation, <code>--level N</code></td></tr>
+      <tr><td><code>gnn/data.py</code></td><td>Both torch bugs fixed here: <code>canonical_positions</code> (slot decoder) and <code>universal_position_centers</code> (relation centres)</td></tr>
+      <tr><td><code>analyze_constellation.py</code></td><td>Per-rule and per-object-count failure analysis; two-component rule keys fixed</td></tr>
+    </tbody>
+    <caption>Submit scripts: <code>submit_max.sh</code> (chained resumable jobs behind <code>max_data_L2</code>), <code>submit_pixels.sh</code> (§11), <code>submit_gnn_fixrel.sh</code> (torch retrain with both fixes, three seeds), plus the earlier <code>submit_pynl*.sh</code>, <code>submit_ladder*.sh</code>, <code>submit_all_constellations.sh</code>.</caption>
+  </table></div>
+
+  <div class="note alert">
+    <span class="lab">Stale, do not cite</span>
+    <p><code>table_i_raven_per_constellation_test.tex</code>, <code>table_406.tex</code> and <code>scripts/BEST_MODELS_RESULTS.md</code> still report the invalid 68.81% and 68.83% I-RAVEN numbers. Regenerate them once the three-seed retrain and the final PyNeuraLogic checkpoint are in.</p>
+  </div>
+</section>
+
+<section id="s13">
+  <h2><span class="sn">13</span>Open questions</h2>
+  <ol class="body">
+    <li><strong>A trustworthy torch baseline.</strong> The published run can't be reproduced and both existing torch models used wrong spatial relations. The three-seed retrain with both fixes settles the baseline and its spread.</li>
+    <li><strong>The reasoner is now the bottleneck, not perception.</strong> Re-measured at epoch 62: <code>distribute_four</code> and <code>distribute_nine</code> score 66–69% when the layout stays constant and about 30% otherwise. Number rules sit at 26–29% and Position-Progression is worst at 18–22%. The model handles attribute rules and fixed layouts and fails when the set of occupied slots changes. Panel layout features and within-panel edges both hurt when tried.</li>
+    <li><strong>A from-scratch full-data run.</strong> The 64% model is a warm start from the 2000/constellation one.</li>
+    <li><strong>End-to-end training</strong> (§11.5): version 1 is low-risk and earns the claim; version 2 is the research question.</li>
+    <li><strong>Why can't PyNeuraLogic learn input embeddings?</strong> The narrow failure from §7. Initialisation and gradient scale on fact-weight matrices are the place to look.</li>
+    <li><strong>Seeds.</strong> Every PyNeuraLogic number here is a single run; the torch baseline now gets three.</li>
+  </ol>
+
+  <div class="note">
+    <span class="lab">A framing that fits the evidence</span>
+    <p>GNNs are provably a special case of differentiable logic programming, and that equivalence invites the assumption that anything a GNN learns, a template can learn. These experiments show that is false in practice, and localise why: the declarative part transfers cleanly, while normalisation, skip topology, batching and embedding optimisation, none of which the framework gives you vocabulary for, are what make deep GNNs trainable. Hand those parts to PyTorch and keep the relational reasoning and scoring as rules, and the logic program outperforms the GNN it was ported from.</p>
+    <p>The leakage ablation (§1.1) and the position bug (§10) are independently publishable observations about the benchmark and its standard tooling.</p>
+  </div>
+</section>
+
+<section id="s14">
+  <h2><span class="sn">14</span>Audit</h2>
+  <p class="deck">Everything found on 30 September while checking this work for gaps and inconsistencies.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Finding</th><th>Impact</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr class="bad"><td><strong>Wrong spatial relations in the torch graph</strong> (§10.3): 33–100% of within-panel relations wrong in five of six multi-object constellations</td><td>every torch GNN run; not PyNeuraLogic</td><td><span class="pill yes">fixed</span> old checkpoints still reproduce; three-seed retrain running</td></tr>
+      <tr class="bad"><td><strong>Published torch 68.8% not reproducible.</strong> <code>ep405</code> and <code>ep406</code> share every recorded argument and seed 42, yet finished at 27.35% and 68.83%. <code>ep405</code> ran about 10× faster per epoch, pointing to different code. <code>ep406</code>'s first 88 epochs have no surviving log, and the training code was edited after it finished</td><td>the published-model comparison rests on one unreproducible run</td><td><span class="pill yes">disclosed</span> baseline replaced by the three-seed retrain</td></tr>
+      <tr><td><strong>Warm start.</strong> Epoch 62 is 38 epochs at 2000/constellation, identical to <code>allcons_v2</code>, then 24 at 6000</td><td>wording of the headline</td><td><span class="pill yes">disclosed</span></td></tr>
+      <tr><td><strong>Repeated test evaluation.</strong> Scored at epoch 56, epoch 62 and in the pixel run; never used to pick a checkpoint</td><td>mild</td><td>done: the final checkpoint (epoch 126) was scored once on 19 Oct</td></tr>
+      <tr><td><strong>Stale result files</strong> still carry the invalid 68.81% and 68.83% (§12)</td><td>thesis tables</td><td>new <code>table_iraven_final_test.tex</code> (19 Oct); the old files are left unchanged</td></tr>
+      <tr><td><strong>Sanity checks ran on epoch 56</strong>, the headline on epoch 62</td><td>consistency</td><td><span class="pill yes">re-run</span> same outcome on epoch 62</td></tr>
+      <tr><td><strong>The weak-spot claim came from the older model</strong>, via a script that merged the two components' rules in <code>in_distribute_four_out</code></td><td>§13.2</td><td><span class="pill yes">fixed</span> re-measured on epoch 62; the claim holds</td></tr>
+      <tr><td><strong><code>train_pynl.parse</code> treated centre-based bboxes as corner-based</strong></td><td>spatial relations in the early pure-PyNeuraLogic scripts only; their reported numbers are center_single, which has no object pairs</td><td><span class="pill yes">fixed</span> no reported number changes</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+</main>
+
+<footer>Working notes · I-RAVEN · PyNeuraLogic 0.9.2 · single-seed results throughout · updated 30 September 2026</footer>
+</div>

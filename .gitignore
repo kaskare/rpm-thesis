@@ -1,0 +1,27 @@
+# data, checkpoints, results and logs: far too large for git
+data/
+experiments/
+log/
+out/
+left_center_single_right_center_single/
+*.out
+*.pt
+*.pth
+*.pth.tar
+*.bin
+*.npz
+__pycache__/
+*.pyc
+.vscode/
+
+# nested clone of the NVSA package (its own repository)
+neuro-vector-symbolic-architectures/
+
+# stray files named like command-line flags
+--checkpoint
+--sample
+--visualize
+
+# archived runs: keep the code and notes, not their logs and results
+archive/*/log/
+archive/*/experiments/
