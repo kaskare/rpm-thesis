@@ -346,13 +346,30 @@ except grey (colour 4) → breaks only the colour rule; candidate 1 breaks only 
 three. The model gave 7: 97.1%, 0: 1.7%, 1: 1.1% — its runners-up are exactly the one-attribute-off
 candidates.
 
-## 13. Open items
+## 13. Work launched on 2026-10-19 (results pending)
 
-* Use the final test result (68.49% / 68.46%, epoch 126) in the thesis; update the notebook headline
-  (`pynl_iraven_solver.ipynb` still quotes the epoch-62 numbers, and re-running it loads epoch 126).
-* Update `thesis/PYNEURALOGIC_NOTES.md` status and the report with: final run, 3-seed torch, symbolic
-  results, literature comparison.
-* Regenerate the stale `.tex` tables.
-* Seeds for PyNeuraLogic; random-init and learning-curve runs for the symbolic models.
-* Symbolic model end to end; GNN ablations from §8.
-* Git: commit to a local branch (code, notebooks, notes; `.gitignore` for data/checkpoints/logs).
+* **GNN ablations** (`submit_ablations.sh`, job 11825875, ~1–1.5 days): 2000/cons × 12 epochs against
+  `laygrid_nosp_off` (45.1% val): `ablate_control`, `ablate_rowcol` (`--edge-labels rowcol`),
+  `ablate_sp_pertype` (within-panel edges + `--per-type-weights`), `ablate_absentpos` (`--absent-pos`),
+  `ablate_combined`. The switches are off by default; with defaults the code reproduces the trained
+  checkpoint's outputs exactly (verified). `eval_pynl_test.load_model` reads them from a run's args.
+* **Symbolic models end to end** (`pynl_symbolic_e2e.py`, `submit_symbolic_e2e.sh`, job 11825915): test
+  split, both vocabularies, XML labels vs ResNet perception, plus the reference solvers → 
+  `experiments/symb_e2e_{prims,rules}_test.json`. Validation sample (140 puzzles, rules): 98.2% XML, 96.8%
+  end to end.
+* **Symbolic learning curves and random init** (`submit_symbolic_extra.sh`, job 11825919): n = 10, 30,
+  1000 per constellation and `--init-seed 1..3` at n = 300 → `experiments/symb_{model}_n{N}_lr0.01[_init{S}]`.
+* Done the same day: notebook headline updated to the final numbers and re-run (example still correct,
+  93.7%; its 350-puzzle sample shows 66.0%, noise against the 14,000-puzzle test); notes status, §15
+  (symbolic) and §16 (ablations) written; report republished as version 4; `table_iraven_final_test.tex`
+  created; everything committed to the local branch `pyneuralogic-thesis` (commit fd9a035, 117 files,
+  `.gitignore` keeps data, checkpoints, logs, `*.out` and `out/` out; not pushed anywhere).
+
+## 14. Open items
+
+* Read the results of §13 when the jobs finish and fold them into the notes, report and this file.
+* Seeds for the full PyNeuraLogic model (each full run took ~19 days; decide after the ablations, since
+  a better architecture would make seeds of the current one less useful).
+* Hybrid GNN + symbolic scores, or the symbolic model as the main end-to-end system (depends on §13).
+* Push `pyneuralogic-thesis` to a private repository of the user's (needs their own credentials; never
+  IBM's upstream).
