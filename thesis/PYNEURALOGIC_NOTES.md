@@ -13,7 +13,7 @@ with the goal of matching the torch GNN's I-RAVEN accuracy.
 | torch GNN, both position fixes, 3 seeds (`experiments/gnn_FIXREL_s{42,43,44}`) | 45.25% ± 12.4 (41.74 / 35.01 / 59.02) |
 | torch GNN, published (wrong positions, not reproducible) | 68.81% |
 | PyNeuraLogic level 2 at 2000/constellation (`allcons_v2_L2`) | 51.78% |
-| **symbolic PyNeuraLogic** (§15), ground-truth attributes, unseen validation | 97.58% (primitives), 98.44% (rules) |
+| **symbolic PyNeuraLogic, rules** (§15): test, with XML labels / end to end | **98.33% / 96.31%** |
 
 * **Final run:** 130 epochs in chained 3-day links, finished 2026-10-19; best validation 70.86% at
   epoch 126; the test split was scored once on that checkpoint. Per constellation (XML / end to end):
@@ -32,8 +32,7 @@ with the goal of matching the torch GNN's I-RAVEN accuracy.
   0 train/test duplicates, uniform answer index, the candidates-only shortcut at chance on I-RAVEN
   (90–100% on RAVEN), XML labels match the rendered images, the model is exactly invariant to candidate
   order, and a foreign or blank context collapses it to chance. Full audit list: §14.
-* **Running (launched 2026-10-19):** GNN ablations for the layout weak spot (§16); the symbolic models
-  end to end on the test split, their learning curves and random initialisations (§15).
+* **Running (launched 2026-10-19):** GNN ablations for the layout weak spot (§16).
 
 **Bottom line (porting stage, center_single only).** The relational structure transfers
 cleanly; the optimisation machinery does not. A pure PyNeuraLogic port reaches 27.2% on `center_single`; moving the numerical
@@ -778,12 +777,26 @@ softmax, native PyNeuraLogic training (`iso_value_compression=False` is required
   +11.0; type arithmetic and wrong colour offsets negative.
 * Caveats: the best epoch is chosen on the same validation puzzles; the vocabulary was chosen after
   measuring this dataset's rule semantics; the relations are designed, not learned.
-* **Running:** `pynl_symbolic_e2e.py` scores both checkpoints on the test split end to end (ResNet
-  perception → symbolic facts) and with XML labels, next to the reference solvers
-  (`submit_symbolic_e2e.sh`, results in `experiments/symb_e2e_{prims,rules}_test.json`). On a 140-puzzle
-  validation sample the rules model reached 98.2% with XML labels and 96.8% end to end.
-  `submit_symbolic_extra.sh`: learning curves (10, 30, 1000 puzzles/constellation) and random initial
-  weights (3 seeds, `--init-seed`).
+* **Test split, scored once (2026-10-19, `pynl_symbolic_e2e.py`, `experiments/symb_e2e_*_test.json`):**
+
+| model | XML labels | end to end (ResNet-18) |
+|---|---|---|
+| template, rules | **98.33%** | **96.31%** |
+| template, primitives | 97.55% | 95.71% |
+| reference solver, rules (non-learned) | 97.78% | 95.74% |
+| reference solver, primitives (non-learned) | 96.42% | 94.73% |
+
+  Per constellation (rules, XML / end to end): center_single 99.90 / 99.90, distribute_four
+  95.98 / 95.94, distribute_nine 95.46 / 85.44, left/right 99.95 / 99.95, up/down 99.95 / 99.95,
+  in/out 99.85 / 99.85, in_distribute_four 97.26 / 93.16. All of the end-to-end loss sits where
+  perception is imperfect (puzzles fully perceived: distribute_nine 76.5%, in_distribute_four 71.6%).
+* **Learning curve** (unseen val; initial weights all 0.1 = non-learned counting): primitives start at
+  96.01% and reach 97.13 / 97.35 / 97.49 / 97.58 / 97.58% with 10 / 30 / 100 / 300 / 1000 puzzles per
+  constellation; rules start at 97.96%, do not improve with 10 or 30 puzzles (training drifts to 97.6%),
+  and reach 98.25 / 98.44 / 98.49% with 100 / 300 / 1000.
+* **Random initial weights** (uniform 0–0.2, 3 seeds, 300/constellation): every seed converges to the same
+  validation accuracy as the equal start (97.58% primitives, 98.44% rules) from starts of 95.7–96.4% and
+  97.6–97.9%. The result does not depend on the initialisation.
 
 ## 16. GNN ablations for the layout weak spot (running, 2026-10-19)
 

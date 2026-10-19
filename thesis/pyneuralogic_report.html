@@ -334,14 +334,14 @@ footer{
 <header class="mast">
   <p class="kicker">I-RAVEN · PyNeuraLogic 0.9.2 · working notes · updated 19 Oct 2026</p>
   <h1>Expressiveness Is Not Trainability</h1>
-  <p class="standfirst">Porting a relational GNN from PyTorch to a differentiable logic program. The relational structure transfers cleanly; the optimisation machinery does not. Given the right split, with PyNeuraLogic doing message passing and scoring and PyTorch doing embeddings and optimisation, the port reaches <strong>68.5% on I-RAVEN across all seven constellations</strong>, the same end to end through a ResNet-18. The torch GNN, retrained over three seeds with both pipeline bugs fixed, averages 45.3%; its old published 68.8% was trained on wrongly decoded positions and cannot be reproduced. A separate symbolic template, with no embeddings at all, reaches 98% on ground-truth attributes.</p>
+  <p class="standfirst">Porting a relational GNN from PyTorch to a differentiable logic program. The relational structure transfers cleanly; the optimisation machinery does not. Given the right split, with PyNeuraLogic doing message passing and scoring and PyTorch doing embeddings and optimisation, the port reaches <strong>68.5% on I-RAVEN across all seven constellations</strong>, the same end to end through a ResNet-18. The torch GNN, retrained over three seeds with both pipeline bugs fixed, averages 45.3%; its old published 68.8% was trained on wrongly decoded positions and cannot be reproduced. A separate symbolic template, with no embeddings at all, reaches 98.3% on the test split with ground-truth attributes and 96.3% end to end.</p>
 </header>
 
 <div class="figures">
   <div class="fig hi"><span class="n">68.49%</span><span class="l">PyNeuraLogic, XML labels</span></div>
   <div class="fig hi"><span class="n">68.46%</span><span class="l">same model, end to end</span></div>
   <div class="fig tgt"><span class="n">45.25%</span><span class="l">torch GNN, mean of 3 seeds</span></div>
-  <div class="fig hi"><span class="n">98.44%</span><span class="l">symbolic template, ground-truth attributes</span></div>
+  <div class="fig hi"><span class="n">96.31%</span><span class="l">symbolic template, end to end</span></div>
   <div class="fig low"><span class="n">12.5%</span><span class="l">chance floor</span></div>
 </div>
 
@@ -425,11 +425,11 @@ footer{
   </table></div>
 
   <h3>A symbolic template</h3>
-  <p>A different PyNeuraLogic model with no embeddings and no message passing: attribute values, rows and slot sets are symbols, crisp rules derive which relations hold on each row, and learned weights score each candidate row (<code>pynl_symbolic.py</code>). On unseen validation puzzles with ground-truth attributes it reaches <strong>97.58%</strong> with a generic vocabulary of primitives and <strong>98.44%</strong> with RAVEN's rule families; non-learned solvers over the same vocabularies reach 96.34% and 97.75%. The learned primitive weights rediscovered the rules (position union and colour addition weighted highest). Its relations are designed rather than learned, which is the price of the accuracy.</p>
+  <p>A different PyNeuraLogic model with no embeddings and no message passing: attribute values, rows and slot sets are symbols, crisp rules derive which relations hold on each row, and learned weights score each candidate row (<code>pynl_symbolic.py</code>). On the test split it reaches <strong>98.33%</strong> with RAVEN's rule families and 97.55% with a generic vocabulary of primitives, with ground-truth attributes; <strong>end to end through the same ResNet-18 it reaches 96.31%</strong> and 95.71%. The end-to-end loss sits entirely in the two constellations where perception is imperfect (<code>distribute_nine</code> 95.5% → 85.4%, <code>in_distribute_four_out</code> 97.3% → 93.2%). Non-learned solvers over the same vocabularies reach 97.78% and 96.42%. Ten training puzzles per constellation already lift the primitives above plain counting, and three random initialisations all converge to the same accuracy. The learned primitive weights rediscovered the rules (position union and colour addition weighted highest). Its relations are designed rather than learned, which is the price of the accuracy.</p>
 
   <div class="note alert">
     <span class="lab">Still open</span>
-    <p>PyNeuraLogic has one seed, against a torch GNN that varies from 35% to 59% across seeds. Running since 19 Oct: the symbolic templates end to end on the test split, their learning curves and random initialisations, and five GNN ablations aimed at the weak spot, puzzles where the set of occupied slots changes (row/column edge labels, within-panel edges with their own weights, position-aware empty slots).</p>
+    <p>PyNeuraLogic has one seed, against a torch GNN that varies from 35% to 59% across seeds. Running since 19 Oct: five GNN ablations aimed at the weak spot, puzzles where the set of occupied slots changes (row/column edge labels, within-panel edges with their own weights, position-aware empty slots).</p>
   </div>
 </section>
 

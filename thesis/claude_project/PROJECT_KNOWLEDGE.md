@@ -212,6 +212,16 @@ model (78.80 vs 75.40, 79.70 vs 73.40, 78.70 vs 74.20, 86.65 vs 84.45).
 | `pynl_symbolic.py --model rules` (RAVEN rule families, learned weights) | **98.44%** |
 | non-learned reference: primitives / rules (`rpm_reference_solvers.py`, 2000/cons) | 96.34% / 97.75% |
 
+**Test split (scored once, 2026-10-19, `experiments/symb_e2e_{prims,rules}_test.json`):** rules template
+**98.33% with XML labels, 96.31% end to end**; primitives 97.55% / 95.71%; non-learned references
+97.78% / 95.74% (rules) and 96.42% / 94.73% (primitives). The end-to-end loss is entirely in
+distribute_nine (95.5 → 85.4) and in_distribute_four (97.3 → 93.2), the two constellations with imperfect
+perception. In the literature table this end-to-end number sits between ALANS-V (93.5) and Rel-SAR / NVSA
+(98.1 / 99.0), all of which also use attribute-trained perception with designed reasoning.
+Learning curve: primitives 96.01% (equal start) → 97.13 / 97.35 / 97.49 / 97.58 / 97.58% at 10 / 30 / 100 /
+300 / 1000 puzzles per constellation; rules 97.96% start, no gain at 10–30, then 98.25 / 98.44 / 98.49%.
+Random initial weights (3 seeds) converge to exactly the same validation accuracy.
+
 The reference rule solver **never ranks a wrong candidate above the answer**: 95.74% unique right, 4.26%
 ties (mostly 2-way), 0.00% wrong. Ties concentrate where objects come and go (distribute_nine 10.2%,
 distribute_four 7.6%, in_distribute_four 5.9%). Primitives: 93.06% / 6.90% / 0.04%. Learned weights
@@ -346,19 +356,16 @@ except grey (colour 4) → breaks only the colour rule; candidate 1 breaks only 
 three. The model gave 7: 97.1%, 0: 1.7%, 1: 1.1% — its runners-up are exactly the one-attribute-off
 candidates.
 
-## 13. Work launched on 2026-10-19 (results pending)
+## 13. Work launched on 2026-10-19
 
 * **GNN ablations** (`submit_ablations.sh`, job 11825875, ~1–1.5 days): 2000/cons × 12 epochs against
   `laygrid_nosp_off` (45.1% val): `ablate_control`, `ablate_rowcol` (`--edge-labels rowcol`),
   `ablate_sp_pertype` (within-panel edges + `--per-type-weights`), `ablate_absentpos` (`--absent-pos`),
   `ablate_combined`. The switches are off by default; with defaults the code reproduces the trained
   checkpoint's outputs exactly (verified). `eval_pynl_test.load_model` reads them from a run's args.
-* **Symbolic models end to end** (`pynl_symbolic_e2e.py`, `submit_symbolic_e2e.sh`, job 11825915): test
-  split, both vocabularies, XML labels vs ResNet perception, plus the reference solvers → 
-  `experiments/symb_e2e_{prims,rules}_test.json`. Validation sample (140 puzzles, rules): 98.2% XML, 96.8%
-  end to end.
-* **Symbolic learning curves and random init** (`submit_symbolic_extra.sh`, job 11825919): n = 10, 30,
-  1000 per constellation and `--init-seed 1..3` at n = 300 → `experiments/symb_{model}_n{N}_lr0.01[_init{S}]`.
+* **Symbolic models end to end** (`pynl_symbolic_e2e.py`, job 11825915) — done: rules 98.33% XML /
+  96.31% end to end on the test split (see §5).
+* **Symbolic learning curves and random init** (`submit_symbolic_extra.sh`, job 11825919) — done (see §5).
 * Done the same day: notebook headline updated to the final numbers and re-run (example still correct,
   93.7%; its 350-puzzle sample shows 66.0%, noise against the 14,000-puzzle test); notes status, §15
   (symbolic) and §16 (ablations) written; report republished as version 4; `table_iraven_final_test.tex`
