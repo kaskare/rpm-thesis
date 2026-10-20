@@ -20,8 +20,9 @@ Full project state: `thesis/claude_project/PROJECT_KNOWLEDGE.md`. Lab notes: `th
   aside before reading from a directory a live job writes to.
 - Validation puzzles 0–299 per constellation are used for checkpoint selection; use 300+ for demos.
   Score the test split once per final checkpoint.
-- `origin` is IBM's public upstream repo. Do not push or open PRs there. Data, experiments and logs
-  are far too large for git.
+- `origin` is the user's private repo `kaskare/rpm-thesis` (pushed from RCI with a write deploy key,
+  SSH host alias `github-rpm`). `ibm` is IBM's public upstream: never push or open PRs there.
+  Data, experiments and logs are far too large for git.
 - The user prefers "end to end" over "from pixels", and compact notebooks.
 
 ## Key code
@@ -30,4 +31,5 @@ Full project state: `thesis/claude_project/PROJECT_KNOWLEDGE.md`. Lab notes: `th
 - `pynl_symbolic.py` + `rpm_symbolic.py`: symbolic models; `rpm_reference_solvers.py`: non-learned references.
 - `pixel_pipeline.py` + `submit_pixels.sh`: end to end through the ResNet-18 frontend.
 - `eval_pynl_test.py`, `sanity_checks.py`; notebook `pynl_iraven_solver.ipynb`.
+- `llm/`: LLM benchmark on I-RAVEN (images end to end, or text with XML labels); see `llm/README.md`.
 - `neuralogic_code/`: snapshot copy of the above with an index (not auto-updated).
