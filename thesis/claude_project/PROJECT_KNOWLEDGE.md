@@ -83,7 +83,7 @@ published torch number, 68.81%, which was trained on buggy positions and is not 
 
 ## 4. The best PyNeuraLogic model (GNN-style, "level 2")
 
-Code: `train_all_constellations.py` (also copied, with an index, in `neuralogic_code/`).
+Code: `train_all_constellations.py` (index of all code: `thesis/CODE_INDEX.md`).
 Run: `experiments/max_data_L2` via `submit_max.sh ARM=data` (chained 3-day SLURM links, `--resume`).
 
 **Settings:** `--level 2 --embed-dim 128 --hidden-dim 128 --layers 3 --lr 1e-3 --nl-lr 1e-4
@@ -328,7 +328,7 @@ We use: `Model`, `neuralogic.nn.Adam`, `Model.save`, epochs in `train()`, `.fixe
 | `submit_max.sh`, `submit_symbolic.sh`, `submit_gnn_fixrel.sh` | SLURM jobs |
 | `pynl_iraven_solver.ipynb` (+ `thesis/pynl_iraven_solver.html`) | compact end-to-end notebook, model inline, verified identical to the training code |
 | `pynl_best_architecture_walkthrough.ipynb`, `pixels_to_answer.ipynb` | longer walkthroughs (HTML in `thesis/`) |
-| `neuralogic_code/` | snapshot copy of all current PyNeuraLogic code with a README index |
+| `thesis/CODE_INDEX.md` | index of the PyNeuraLogic code; superseded experiments in `archive/pyneuralogic_experiments/` |
 | `thesis/PYNEURALOGIC_NOTES.md` | the detailed lab notes (status, bugs §10, pixels §11, files §12, open questions §13, audit §14); status block predates the 3-seed torch and symbolic results |
 | `thesis/pyneuralogic_report.html` | report, published as https://claude.ai/artifact/JZNH9G6j2DaYVNKG4BUVfn (v3, stale: lacks symbolic + 3-seed numbers) |
 | `archive/pyneuralogic_2026-03-31_to_05-06/` | the April work (`scripts/raven_pyneuralogic.py`) |

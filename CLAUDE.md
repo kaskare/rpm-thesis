@@ -32,4 +32,5 @@ Full project state: `thesis/claude_project/PROJECT_KNOWLEDGE.md`. Lab notes: `th
 - `pixel_pipeline.py` + `submit_pixels.sh`: end to end through the ResNet-18 frontend.
 - `eval_pynl_test.py`, `sanity_checks.py`; notebook `pynl_iraven_solver.ipynb`.
 - `llm/`: LLM benchmark on I-RAVEN (images end to end, or text with XML labels); see `llm/README.md`.
-- `neuralogic_code/`: snapshot copy of the above with an index (not auto-updated).
+- `thesis/CODE_INDEX.md`: where each part of the PyNeuraLogic code lives. Superseded experiment
+  scripts are in `archive/pyneuralogic_experiments/` (not runnable from there as is).
