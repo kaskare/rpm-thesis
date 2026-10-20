@@ -35,5 +35,11 @@ Deduce the rules that link the panels across each row and select the candidate t
 
 {puzzle}"""
 
-PROMPTS = {"tehlar": TEHLAR, "tehlar_clean": TEHLAR_CLEAN, "xml_text": XML_TEXT}
-TEXT_PROMPTS = {"xml_text"}
+IRAVENX_TEXT = """You are an IQ test solver. Below is a Raven's Progressive Matrices question written out as text: rows of a matrix of panels with the last panel of the last row missing, and eight candidate answers labelled A to H. Each panel is one object written as (type, size, colour), each a non-negative integer.
+
+Deduce the rules that link the panels across each row and select the candidate that completes the matrix. Explain your reasoning, then conclude with exactly one line: 'The correct answer is: X', where X is a single letter from A to H.
+
+{puzzle}"""
+
+PROMPTS = {"tehlar": TEHLAR, "tehlar_clean": TEHLAR_CLEAN, "xml_text": XML_TEXT, "iravenx_text": IRAVENX_TEXT}
+TEXT_PROMPTS = {"xml_text", "iravenx_text"}

@@ -18,6 +18,7 @@ from .parse import parse_answer
 from .prompts import PROMPTS, TEXT_PROMPTS
 from .providers import PROVIDERS
 from .render import render_png
+from . import iravenx
 from .xml_labels import describe
 
 
@@ -37,8 +38,11 @@ def main(argv=None):
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--manifest", help="JSONL puzzle list (from --data ... --write-manifest)")
     src.add_argument("--data", help="root folder with I-RAVEN .npz files")
+    src.add_argument("--iravenx", help="I-RAVEN-X .json(.gz) from IBM's iravenx_task.py; uses --prompt iravenx_text")
     ap.add_argument("--splits", default="test", help="comma separated: train,val,test")
-    ap.add_argument("--per-config", type=int, help="puzzles per (variant, configuration); default all")
+    ap.add_argument("--per-config", type=int, help="puzzles per (variant, configuration); default all "
+                    "(I-RAVEN-X: the first N puzzles, default 500 as in IBM's setup)")
+    ap.add_argument("--nshow", type=int, default=3, help="I-RAVEN-X: rows shown (IBM default 3)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--write-manifest", help="save the sampled puzzle list here and exit")
     ap.add_argument("--provider", choices=PROVIDERS)
@@ -55,8 +59,17 @@ def main(argv=None):
     ap.add_argument("--out")
     a = ap.parse_args(argv)
 
-    puzzles = (load_manifest(a.manifest) if a.manifest
-               else sample(a.data, tuple(a.splits.split(",")), a.per_config, a.seed))
+    if a.manifest:
+        puzzles = load_manifest(a.manifest)
+    elif a.iravenx:
+        puzzles = iravenx.sample(a.iravenx, a.per_config or 500)
+    else:
+        puzzles = sample(a.data, tuple(a.splits.split(",")), a.per_config, a.seed)
+    if a.iravenx or (puzzles and puzzles[0].id.startswith("iravenx/")):
+        if a.prompt != "iravenx_text":
+            ap.error("I-RAVEN-X puzzles need --prompt iravenx_text")
+    elif a.prompt == "iravenx_text":
+        ap.error("--prompt iravenx_text needs I-RAVEN-X puzzles (--iravenx or an I-RAVEN-X manifest)")
     if a.write_manifest:
         save_manifest(puzzles, a.write_manifest)
         print(f"{len(puzzles)} puzzles -> {a.write_manifest}")
@@ -76,14 +89,17 @@ def main(argv=None):
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     lock = threading.Lock()
     meta = dict(provider=a.provider, model=a.model, prompt=a.prompt,
-                input="xml" if a.prompt in TEXT_PROMPTS else "image", prompt_sha=prompt_sha,
-                effort=a.effort, temperature=a.temperature, max_tokens=a.max_tokens, base_url=a.base_url)
+                input={"xml_text": "xml", "iravenx_text": "iravenx"}.get(a.prompt, "image"), prompt_sha=prompt_sha,
+                effort=a.effort, temperature=a.temperature, max_tokens=a.max_tokens, base_url=a.base_url,
+                nshow=a.nshow if a.prompt == "iravenx_text" else None)
 
     def work(run, p):
         rec = dict(meta, run=run, id=p.id, variant=p.variant, config=p.config, split=p.split, target=p.answer)
         t0 = time.time()
         try:
-            if a.prompt in TEXT_PROMPTS:
+            if a.prompt == "iravenx_text":
+                rep = call(prompt.format(puzzle=iravenx.describe(p.path, a.nshow)), None)
+            elif a.prompt in TEXT_PROMPTS:
                 rep = call(prompt.format(puzzle=describe(p.path[:-4] + ".xml", p.config)), None)
             else:
                 rep = call(prompt, render_png(p.path))
