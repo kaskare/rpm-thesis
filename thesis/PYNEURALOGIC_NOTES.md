@@ -686,6 +686,11 @@ belongs in the reasoner. *Not built yet.*
 | `analyze_constellation.py` | per-rule / per-object-count failure analysis (two-component rule keys fixed 2026-09-30) |
 | `archive/pyneuralogic_2026-03-31_to_05-06/` | the previous PyNeuraLogic attempt, with MANIFEST |
 
+Moved on 2026-10-20 to `archive/pyneuralogic_experiments/`: `train_pynl_softmax.py`,
+`train_pynl_aligned.py`, `train_pynl_torch.py`, `train_ladder.py`, `pynl_iraven_minimal.ipynb` and the
+submit scripts `submit_pynl*.sh`, `submit_ladder*.sh`, `submit_full.sh`, `submit_sweep.sh`,
+`submit_layout_grid.sh`, `submit_all_constellations.sh`. LaTeX tables are in `thesis/tables/`.
+
 Submit scripts: `submit_pynl*.sh`, `submit_ladder*.sh`, `submit_all_constellations.sh`,
 `submit_max.sh` (chained resumable jobs behind `max_data_L2`), `submit_pixels.sh` (§11),
 `submit_gnn_fixrel.sh` (torch retrain with both fixes, three seeds).

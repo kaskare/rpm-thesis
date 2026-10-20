@@ -1,17 +1,13 @@
-# PyNeuraLogic code — snapshot of 2026-10-19
+# PyNeuraLogic code index
 
-All the code behind the current PyNeuraLogic models in one place, for reading.
-
-**These are copies.** The originals stay in the repository root. The running `max_data`
-training job (`submit_max.sh`) uses them, and several of these scripts import modules
-that only exist there (`gnn/`, the ResNet frontend). Edit and run the originals from the
-repository root. This folder doesn't update itself.
+Where the code behind the current PyNeuraLogic models lives and how it connects. All paths are
+relative to the repository root; line numbers are as of 2026-10-19.
 
 ## Reading order
 
 1. `train_all_constellations.py` — the GNN-style model (best result).
 2. `pynl_symbolic.py` — the symbolic models.
-3. `april_archive/raven_pyneuralogic.py` — your April model, for comparison.
+3. `archive/pyneuralogic_2026-03-31_to_05-06/scripts/raven_pyneuralogic.py` — your April model, for comparison.
 
 ## Files
 
@@ -37,7 +33,7 @@ The torch ↔ PyNeuraLogic bridge is library code, not ours:
 | `pixel_pipeline.py` | `perceive` (env `nvsa`, GPU): the ResNet-18 frontend reads attributes from every panel. `solve` (env `pynl`): the model above answers from those predictions. |
 | `submit_pixels.sh` | `STAGE=perceive` or `STAGE=solve`. |
 
-The frontend itself is torch-only and not copied: `train_frontend.py` and `predict_frontend.py` in the repository root.
+The frontend itself is torch-only: `train_frontend.py` and `predict_frontend.py`.
 
 ### The symbolic models (ground-truth attributes)
 
@@ -60,7 +56,7 @@ The frontend itself is torch-only and not copied: `train_frontend.py` and `predi
 | `pynl_iraven_solver.ipynb` | End to end with few comments: puzzle images, the ResNet-18 perception, then the reasoner defined inline, through to accuracy end to end and with XML labels. Includes an exact-match check against `train_all_constellations.py`. Executed copy: `thesis/pynl_iraven_solver.html`. |
 | `pixels_to_answer.ipynb` | One puzzle from images to answer. Executed copy: `thesis/pixels_to_answer.html`. |
 
-### `april_archive/raven_pyneuralogic.py`
+### `archive/pyneuralogic_2026-03-31_to_05-06/scripts/raven_pyneuralogic.py`
 
 The April model, kept for comparison: pure PyNeuraLogic, one binary sample per candidate, objects as nodes. It scored near chance (9–19.5% test per constellation). Template at :405, dataset at :364, evaluation at :455.
 
@@ -69,12 +65,12 @@ The April model, kept for comparison: pure PyNeuraLogic, one binary sample per c
 ```
 train_all_constellations.py ──imports──> train_pynl.py (parse, POS_MAP)
 eval_pynl_test.py, sanity_checks.py, pixel_pipeline.py ──import──> train_all_constellations.py
-pynl_symbolic.py, rpm_reference_solvers.py ──import──> rpm_symbolic.py ──> gnn/data.py (repo root)
+pynl_symbolic.py, rpm_reference_solvers.py ──import──> rpm_symbolic.py ──> gnn/data.py
 ```
 
-## Not copied (earlier steps)
+## Earlier steps
 
-- `train_pynl_softmax.py`, `train_pynl_torch.py`, `train_pynl_aligned.py`, `train_ladder.py`: the porting steps and the 4-level ablation behind the hybrid design (notes §4–§8).
+- `archive/pyneuralogic_experiments/`: `train_pynl_softmax.py`, `train_pynl_torch.py`, `train_pynl_aligned.py`, `train_ladder.py` and their job scripts: the porting steps and the 4-level ablation behind the hybrid design (notes §4–§8).
 - Torch GNN baseline: `train_object_vsa_gnn_frontend.py` and the `gnn/` package.
 
 The full story, numbers and bugs are in `thesis/PYNEURALOGIC_NOTES.md`.
