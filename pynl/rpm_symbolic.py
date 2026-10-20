@@ -16,7 +16,7 @@ from collections import Counter, defaultdict
 
 import numpy as np
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # repo root
 sys.path.insert(0, ROOT)
 from gnn.data import canonical_positions
 

@@ -6,7 +6,7 @@ from scratch after an audit of his code (`TEHLAR_AUDIT.md`), plus a text input w
 - **End to end (images):** one PNG per puzzle (3x3 grid, missing cell marked with a cross, candidates
   A-H below), Tehlar's prompt (`--prompt tehlar`, byte-identical to what his code sent).
 - **With XML labels (text):** `--prompt xml_text`; panels written out as text from the `.xml` via the
-  same `parse`/`POS_MAP` as `train_pynl.py` (a test checks they stay identical).
+  same `parse`/`POS_MAP` as `pynl/train_pynl.py` (a test checks they stay identical).
 
 The answer is the letter after the last "The correct answer is:". Unparseable answers count as wrong.
 The ground truth is the npz `target`.

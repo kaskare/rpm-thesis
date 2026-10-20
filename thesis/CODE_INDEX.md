@@ -1,7 +1,8 @@
 # PyNeuraLogic code index
 
-Where the code behind the current PyNeuraLogic models lives and how it connects. All paths are
-relative to the repository root; line numbers are as of 2026-10-19.
+Where the code behind the current PyNeuraLogic models lives and how it connects. Scripts and job
+files below are in `pynl/`, notebooks in `notebooks/`, the ResNet-18 frontend in `frontend/` and the
+torch GNN in `torch_gnn/`; run everything from the repository root. Line numbers are as of 2026-10-19.
 
 ## Reading order
 
@@ -33,7 +34,7 @@ The torch ↔ PyNeuraLogic bridge is library code, not ours:
 | `pixel_pipeline.py` | `perceive` (env `nvsa`, GPU): the ResNet-18 frontend reads attributes from every panel. `solve` (env `pynl`): the model above answers from those predictions. |
 | `submit_pixels.sh` | `STAGE=perceive` or `STAGE=solve`. |
 
-The frontend itself is torch-only: `train_frontend.py` and `predict_frontend.py`.
+The frontend itself is torch-only: `frontend/train_frontend.py` and `frontend/predict_frontend.py`.
 
 ### The symbolic models (ground-truth attributes)
 
@@ -71,6 +72,6 @@ pynl_symbolic.py, rpm_reference_solvers.py ──import──> rpm_symbolic.py �
 ## Earlier steps
 
 - `archive/pyneuralogic_experiments/`: `train_pynl_softmax.py`, `train_pynl_torch.py`, `train_pynl_aligned.py`, `train_ladder.py` and their job scripts: the porting steps and the 4-level ablation behind the hybrid design (notes §4–§8).
-- Torch GNN baseline: `train_object_vsa_gnn_frontend.py` and the `gnn/` package.
+- Torch GNN baseline: `torch_gnn/train_object_vsa_gnn_frontend.py` and the `gnn/` package.
 
 The full story, numbers and bugs are in `thesis/PYNEURALOGIC_NOTES.md`.

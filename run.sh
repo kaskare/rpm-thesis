@@ -60,20 +60,20 @@ num_workers=0
 # python raven/main_nvsa_marg.py --mode train --config in_distribute_four_out_center_single --epochs 100 --s 5 --trainable-s \
 # --exp_dir $EXPPATH --dataset $DATAPATH --dataset-i-raven $DATAPATHIRAVEN  --seed $SEED --run $RUN --batch-size $batch_size
 
-# python3 train_frontend.py  --dataset data/RAVEN-10000\
+# python3 frontend/train_frontend.py  --dataset data/RAVEN-10000\
 #    --load-from log/universal_frontend_correct_proportional_mean3 \
 #    --save-dir log/universal_frontend_correct_proportional_mean3  --epochs 200 \
 #     --batch-size 16 --lr 0.001 --num-workers 2 --per-object-loss --loss-reduction mean
 
 # Step 1: Precompute frontend features (run once, then comment out)
-# python3 gnn_solver.py \
+# python3 torch_gnn/gnn_solver.py \
 #     --frontend-checkpoint log/universal_frontend_correct_proportional_mean1 \
 #     --dataset data/RAVEN-10000 \
 #     --save-dir log/gnn_solver \
 #     --mode precompute --device cuda:0
 
 # Step 2: Train GNN (config: configs/gnn_solver.yaml)
-# python3 train_object_vsa_gnn_frontend.py \
+# python3 torch_gnn/train_object_vsa_gnn_frontend.py \
 #   --dataset-root data/RAVEN-10000 \
 #   --frontend-checkpoint log/universal_frontend_correct_proportional_mean1 \
 #   --device cuda:0 \
@@ -115,7 +115,7 @@ UNIFIED_FLAG=""
 
 # ========== Single config (set granular/object_only/unified_graph above) ==========
 run_single() {
-  python3 train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 --use-gt --node-repr "$node_repr" \
+  python3 torch_gnn/train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 --use-gt --node-repr "$node_repr" \
     --gnn-type "$gnn_type" $GRANULAR_FLAG $OBJECT_ONLY_FLAG $UNIFIED_FLAG --lr $lr --embed-dim $embed_dim --hidden-dim $hidden_dim \
     --save-dir "$SAVE_DIR" --epochs $epochs --batch-size 16 --num-workers 2
 }
@@ -138,7 +138,7 @@ train_all_configs() {
         OBJECT_ONLY_FLAG=""; [ "$object_only" = "true" ] && OBJECT_ONLY_FLAG="--object-only"
         UNIFIED_FLAG=""; [ "$unified_graph" = "true" ] && UNIFIED_FLAG="--unified-graph"
         echo "=== Training: granular=$granular object_only=$object_only unified_graph=$unified_graph -> $SAVE_DIR ==="
-        python3 train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 --use-gt --node-repr "$node_repr" \
+        python3 torch_gnn/train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 --use-gt --node-repr "$node_repr" \
           --gnn-type "$gnn_type" $GRANULAR_FLAG $OBJECT_ONLY_FLAG $UNIFIED_FLAG --lr $lr --embed-dim $embed_dim --hidden-dim $hidden_dim \
           --save-dir "$SAVE_DIR" --epochs $epochs --batch-size 16 --num-workers 2
       done
@@ -153,7 +153,7 @@ else
 fi
 
 ## Frontend
-# python3 train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 \
+# python3 torch_gnn/train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 \
 #   --frontend-checkpoint log/universal_frontend_correct_proportional_mean1 \
 #   --node-repr "$node_repr" \
 #   --gnn-type "$gnn_type" $GRANULAR_FLAG --lr $lr --embed-dim $embed_dim --hidden-dim $hidden_dim \
@@ -162,6 +162,6 @@ fi
 # VSA example:
 # node_repr=vsa; lr=0.001; hidden_dim=256
 # SAVE_SUBFOLDER="lr${lr}_${node_repr}_h${hidden_dim}"
-# python3 train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 --use-gt --node-repr vsa \
+# python3 torch_gnn/train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 --use-gt --node-repr vsa \
 #   --frontend-checkpoint log/universal_frontend_correct_proportional_mean1 --lr $lr --hidden-dim $hidden_dim \
 #   --save-dir "${SAVEPATH}/object_vsa_gnn_frontend/${SAVE_SUBFOLDER}" --epochs 200 --batch-size 16 --num-workers 2

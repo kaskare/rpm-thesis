@@ -24,16 +24,16 @@ Graph structure:
 
 Usage:
     # Load defaults from configs/gnn_solver.yaml; override via CLI
-    python gnn_solver.py --config configs/gnn_solver.yaml \
+    python torch_gnn/gnn_solver.py --config configs/gnn_solver.yaml \
         --frontend-checkpoint log/universal_frontend_correct_proportional_mean \
         --dataset data/RAVEN-10000 --save-dir log/gnn_solver
 
     # Precompute (embedding mode only)
-    python gnn_solver.py --config configs/gnn_solver.yaml \
+    python torch_gnn/gnn_solver.py --config configs/gnn_solver.yaml \
         --frontend-checkpoint ... --dataset ... --mode precompute
 
     # Test
-    python gnn_solver.py --config configs/gnn_solver.yaml \
+    python torch_gnn/gnn_solver.py --config configs/gnn_solver.yaml \
         --frontend-checkpoint ... --dataset ... --save-dir log/gnn_solver --mode test
 """
 
@@ -47,7 +47,7 @@ try:
 except ImportError:
     yaml = None
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # repo root
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, 'raven'))
 sys.path.insert(0, os.path.join(ROOT, 'neuro-vector-symbolic-architectures'))

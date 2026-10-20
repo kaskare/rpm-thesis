@@ -13,7 +13,7 @@
 #SBATCH --error=log/slurm_symbx_%a_%A.err
 
 # Extra symbolic runs (pynl_symbolic.py), lr 0.01, 30 epochs, validation = unseen val puzzles 300+:
-#   learning curve  : 10, 30, 1000 puzzles/constellation (100 and 300 exist from submit_symbolic.sh)
+#   learning curve  : 10, 30, 1000 puzzles/constellation (100 and 300 exist from pynl/submit_symbolic.sh)
 #   random init     : 300/constellation, rule weights start uniform in [0, 0.2], seeds 1-3
 # for both vocabularies (prims, rules).
 
@@ -38,5 +38,5 @@ case $i in
 esac
 JVM=$([ $NTR -ge 1000 ] && echo 100 || echo 40)
 echo "node $(hostname) - ${SAVE}"
-srun python3 -u pynl_symbolic.py train --model ${MODEL} --n-train ${NTR} --n-val 300 --epochs 30 \
+srun python3 -u pynl/pynl_symbolic.py train --model ${MODEL} --n-train ${NTR} --n-val 300 --epochs 30 \
     --lr 0.01 --jvm-gb ${JVM} ${EXTRA} --save-dir experiments/${SAVE}

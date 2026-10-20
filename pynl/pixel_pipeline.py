@@ -26,17 +26,18 @@ Position IDs need no remapping: the frontend's universal codebook positions, tra
 and gnn.config.CONFIG_POS_MAP are identical (checked).
 
 Usage:
-    python pixel_pipeline.py perceive --splits val,test \
+    python pynl/pixel_pipeline.py perceive --splits val,test \
         --frontends log/universal_frontend_correct_proportional_mean1,log/universal_frontend_correct_proportional_mean3
-    python pixel_pipeline.py solve --run-dir experiments/max_data_L2 --frontend auto --split test
+    python pynl/pixel_pipeline.py solve --run-dir experiments/max_data_L2 --frontend auto --split test
 """
 import argparse, glob, json, os, shutil, sys, tempfile, time
 from collections import defaultdict
 
 import numpy as np
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
-for _p in (ROOT, os.path.join(ROOT, "raven"), os.path.join(ROOT, "neuro-vector-symbolic-architectures")):
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # repo root
+for _p in (ROOT, os.path.join(ROOT, "pynl"), os.path.join(ROOT, "torch_gnn"), os.path.join(ROOT, "frontend"),
+           os.path.join(ROOT, "raven"), os.path.join(ROOT, "neuro-vector-symbolic-architectures")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 

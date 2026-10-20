@@ -83,8 +83,8 @@ published torch number, 68.81%, which was trained on buggy positions and is not 
 
 ## 4. The best PyNeuraLogic model (GNN-style, "level 2")
 
-Code: `train_all_constellations.py` (index of all code: `thesis/CODE_INDEX.md`).
-Run: `experiments/max_data_L2` via `submit_max.sh ARM=data` (chained 3-day SLURM links, `--resume`).
+Code: `pynl/train_all_constellations.py` (index of all code: `thesis/CODE_INDEX.md`).
+Run: `experiments/max_data_L2` via `pynl/submit_max.sh ARM=data` (chained 3-day SLURM links, `--resume`).
 
 **Settings:** `--level 2 --embed-dim 128 --hidden-dim 128 --layers 3 --lr 1e-3 --nl-lr 1e-4
 --batch-size 8 --agg avg --no-same-panel`, layout features off, 6000 puzzles/constellation,
@@ -315,6 +315,9 @@ We use: `Model`, `neuralogic.nn.Adam`, `Model.save`, epochs in `train()`, `.fixe
 ---
 
 ## 10. Files
+
+PyNeuraLogic scripts and jobs are in `pynl/`, notebooks in `notebooks/`, the torch GNN in `torch_gnn/`,
+the ResNet-18 frontend in `frontend/`. Everything runs from the repository root.
 
 | file | role |
 |---|---|

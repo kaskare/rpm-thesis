@@ -14,7 +14,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # repo root
 sys.path.insert(0, ROOT)
 
 from gnn import (
@@ -226,8 +226,8 @@ if __name__ == "__main__":
 
 
 # With frontend (slower):
-#   python3 train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 \
+#   python3 torch_gnn/train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 \
 #     --frontend-checkpoint log/... --epochs 100 --batch-size 16 --num-workers 2
 # With ground truth + VSA codebook (faster, no frontend inference, uses stored codebook):
-#   python3 train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 --use-gt --node-repr vsa \
+#   python3 torch_gnn/train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 --use-gt --node-repr vsa \
 #     --frontend-checkpoint log/universal_frontend_... --epochs 100 --batch-size 32 --num-workers 2

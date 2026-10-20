@@ -690,6 +690,8 @@ Moved on 2026-10-20 to `archive/pyneuralogic_experiments/`: `train_pynl_softmax.
 `train_pynl_aligned.py`, `train_pynl_torch.py`, `train_ladder.py`, `pynl_iraven_minimal.ipynb` and the
 submit scripts `submit_pynl*.sh`, `submit_ladder*.sh`, `submit_full.sh`, `submit_sweep.sh`,
 `submit_layout_grid.sh`, `submit_all_constellations.sh`. LaTeX tables are in `thesis/tables/`.
+The current code then moved into folders: `pynl/` (PyNeuraLogic scripts and jobs), `notebooks/`,
+`frontend/` (ResNet-18), `torch_gnn/` (torch GNN). File names in earlier sections are unchanged.
 
 Submit scripts: `submit_pynl*.sh`, `submit_ladder*.sh`, `submit_all_constellations.sh`,
 `submit_max.sh` (chained resumable jobs behind `max_data_L2`), `submit_pixels.sh` (§11),

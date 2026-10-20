@@ -14,8 +14,8 @@ template_best.bin fix cannot be evaluated, and this script says so rather than
 silently scoring a half-random model.
 
 Usage:
-    python eval_pynl_test.py experiments/full_iraven_L2
-    python eval_pynl_test.py experiments/*_L2 --n-test 2000
+    python pynl/eval_pynl_test.py experiments/full_iraven_L2
+    python pynl/eval_pynl_test.py experiments/*_L2 --n-test 2000
 """
 import argparse, glob, json, os, sys, time
 from collections import defaultdict

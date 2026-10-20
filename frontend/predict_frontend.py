@@ -6,24 +6,24 @@ RAVEN sample, showing predictions vs ground truth side by side.
 
 Usage:
     # Basic prediction (prints to console)
-    python predict_frontend.py \
+    python frontend/predict_frontend.py \
         --checkpoint log/universal_frontend_test4 \
         --sample data/RAVEN-10000/center_single/RAVEN_0_train.npz
 
     # With visualization (saves annotated PNG)
-    python predict_frontend.py \
+    python frontend/predict_frontend.py \
         --checkpoint log/universal_frontend_test4 \
         --sample data/RAVEN-10000/distribute_four/RAVEN_42_train.npz \
         --visualize
 
     # Custom threshold and device
-    python predict_frontend.py \
+    python frontend/predict_frontend.py \
         --checkpoint log/universal_frontend_test4 \
         --sample data/RAVEN-10000/distribute_nine/RAVEN_0_train.npz \
         --threshold 0.2 --device cuda:0
 
     # Batch evaluation over a whole constellation/split
-    python predict_frontend.py \
+    python frontend/predict_frontend.py \
         --checkpoint log/universal_frontend_test4 \
         --dataset data/RAVEN-10000 \
         --config center_single --split val --max-samples 100
@@ -31,7 +31,7 @@ Usage:
 
 import argparse, os, sys, glob
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # repo root
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, 'raven'))
 sys.path.insert(0, os.path.join(ROOT, 'neuro-vector-symbolic-architectures'))

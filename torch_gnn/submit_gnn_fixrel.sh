@@ -37,9 +37,9 @@
 # "Already completed all epochs." and exits.
 #
 # Submit:  for s in 42 43 44; do j=$(sbatch --parsable --job-name=gnnrel_s$s \
-#            --export=ALL,SEED=$s submit_gnn_fixrel.sh); for i in 2 3; do \
+#            --export=ALL,SEED=$s torch_gnn/submit_gnn_fixrel.sh); for i in 2 3; do \
 #            j=$(sbatch --parsable --job-name=gnnrel_s$s --dependency=afterany:$j \
-#            --export=ALL,SEED=$s submit_gnn_fixrel.sh); done; done
+#            --export=ALL,SEED=$s torch_gnn/submit_gnn_fixrel.sh); done; done
 
 echo_green() { echo -e "\033[0;32m [$(date)] $1\033[0m"; }
 
@@ -56,7 +56,7 @@ mkdir -p log
 echo_green "node $(hostname) — torch GNN retrain, fixed positions + fixed relations, seed ${SEED}"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null
 
-srun python3 -u train_object_vsa_gnn_frontend.py \
+srun python3 -u torch_gnn/train_object_vsa_gnn_frontend.py \
     --dataset-root data/I-RAVEN-10000 \
     --use-gt \
     --node-repr embedding \

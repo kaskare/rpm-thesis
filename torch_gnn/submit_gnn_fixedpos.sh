@@ -42,7 +42,7 @@ mkdir -p log
 echo_green "node $(hostname) — torch GNN retrain, FIXED positions"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null
 
-srun python3 -u train_object_vsa_gnn_frontend.py \
+srun python3 -u torch_gnn/train_object_vsa_gnn_frontend.py \
     --dataset-root data/I-RAVEN-10000 \
     --use-gt \
     --node-repr embedding \

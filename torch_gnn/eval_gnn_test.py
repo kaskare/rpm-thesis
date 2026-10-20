@@ -5,8 +5,8 @@ Evaluate a trained GNN checkpoint on RAVEN or I-RAVEN test split.
 Reports overall accuracy and per-constellation accuracy.
 
 Usage:
-    python eval_gnn_test.py --checkpoint experiments/.../model_best.pt --dataset-root data/RAVEN-10000
-    python eval_gnn_test.py --checkpoint experiments/.../model_best.pt --dataset-root data/I-RAVEN-10000
+    python torch_gnn/eval_gnn_test.py --checkpoint experiments/.../model_best.pt --dataset-root data/RAVEN-10000
+    python torch_gnn/eval_gnn_test.py --checkpoint experiments/.../model_best.pt --dataset-root data/I-RAVEN-10000
 """
 
 import argparse
@@ -17,7 +17,7 @@ from collections import defaultdict
 import torch
 from torch.utils.data import DataLoader
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # repo root
 sys.path.insert(0, ROOT)
 
 from gnn import (

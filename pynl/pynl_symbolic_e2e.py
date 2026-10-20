@@ -15,14 +15,14 @@ way and asserts it equals read_puzzle.
 Ties share credit, as in pynl_symbolic.accuracy.
 
 Usage:
-    python pynl_symbolic_e2e.py --model rules --run-dir experiments/symb_rules_n300_lr0.01 --split test
+    python pynl/pynl_symbolic_e2e.py --model rules --run-dir experiments/symb_rules_n300_lr0.01 --split test
 """
 import argparse, json, os, sys, time
 from collections import Counter, defaultdict
 
 import numpy as np
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # repo root
 sys.path.insert(0, ROOT)
 from rpm_symbolic import read_puzzle, component_offsets, CONSTELLATIONS
 from train_pynl import parse, POS_MAP, _canonical

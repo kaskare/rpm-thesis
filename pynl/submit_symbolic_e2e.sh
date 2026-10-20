@@ -28,5 +28,5 @@ case ${SLURM_ARRAY_TASK_ID} in
   1) MODEL=prims ;;
   2) MODEL=rules ;;
 esac
-srun python3 -u pynl_symbolic_e2e.py --model ${MODEL} --run-dir experiments/symb_${MODEL}_n300_lr0.01 \
+srun python3 -u pynl/pynl_symbolic_e2e.py --model ${MODEL} --run-dir experiments/symb_${MODEL}_n300_lr0.01 \
     --split test --jvm-gb 40

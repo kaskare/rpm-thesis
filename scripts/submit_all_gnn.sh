@@ -100,10 +100,10 @@ for granular in false true; do
         echo ""
         echo "cd \"$ROOT\""
         if [ "$use_nvsa_frontend" = true ]; then
-          echo "python3 train_object_vsa_gnn_frontend.py --dataset-root data/I-RAVEN-10000 --node-repr $node_repr \\"
+          echo "python3 torch_gnn/train_object_vsa_gnn_frontend.py --dataset-root data/I-RAVEN-10000 --node-repr $node_repr \\"
           echo "  --frontend-checkpoint \"$FRONTEND_CHECKPOINT\" --frontend-device $FRONTEND_DEVICE \\"
         else
-          echo "python3 train_object_vsa_gnn_frontend.py --dataset-root data/I-RAVEN-10000 --use-gt --node-repr $node_repr \\"
+          echo "python3 torch_gnn/train_object_vsa_gnn_frontend.py --dataset-root data/I-RAVEN-10000 --use-gt --node-repr $node_repr \\"
         fi
         echo "  --gnn-type $gnn_type $GRANULAR_FLAG $OBJECT_ONLY_FLAG $UNIFIED_FLAG --lr $lr --embed-dim $embed_dim --hidden-dim $hidden_dim \\"
         echo "  --save-dir \"$SAVE_DIR\" --epochs $epochs --batch-size 16 --num-workers 2"

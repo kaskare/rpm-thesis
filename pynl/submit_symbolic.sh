@@ -34,6 +34,6 @@ case ${SLURM_ARRAY_TASK_ID:-1} in
   4) NTR=300; LR=0.003 ;;
 esac
 echo_green "node $(hostname) — symbolic ${MODEL}, ${NTR}/constellation, lr ${LR}"
-srun python3 -u pynl_symbolic.py train --model ${MODEL} --n-train ${NTR} --n-val 300 --epochs 30 \
+srun python3 -u pynl/pynl_symbolic.py train --model ${MODEL} --n-train ${NTR} --n-val 300 --epochs 30 \
     --lr ${LR} --jvm-gb 40 --save-dir experiments/symb_${MODEL}_n${NTR}_lr${LR}
 echo_green "done"
