@@ -13,7 +13,7 @@ for granular in "" "--granular"; do
     for unified_graph in "" "--unified-graph"; do
       FLAGS="$granular $object_only $unified_graph"
       echo "  granular=$([ -n "$granular" ] && echo true || echo false) object_only=$([ -n "$object_only" ] && echo true || echo false) unified=$([ -n "$unified_graph" ] && echo true || echo false)"
-      python draw_gnn_graph.py --sample "$SAMPLE" --use-gt $FLAGS
+      python torch_gnn/draw_gnn_graph.py --sample "$SAMPLE" --use-gt $FLAGS
     done
   done
 done

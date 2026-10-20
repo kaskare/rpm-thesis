@@ -26,11 +26,18 @@ Full project state: `thesis/claude_project/PROJECT_KNOWLEDGE.md`. Lab notes: `th
 - The user prefers "end to end" over "from pixels", and compact notebooks.
 
 ## Key code
-- `train_all_constellations.py`: best model (graph, template, torch bridge, training); run
-  `experiments/max_data_L2` via `submit_max.sh`.
+Scripts live in folders but run from the repo root (`python3 pynl/eval_pynl_test.py ...`), so `data/` and
+`experiments/` paths are unchanged. Python puts a script's own folder on `sys.path` and scripts
+add the root, so imports stay bare (`from train_pynl import parse`) and checkpoints load as before.
+- `pynl/`: PyNeuraLogic code and its SLURM jobs.
+- `pynl/train_all_constellations.py`: best model (graph, template, torch bridge, training); run
+  `experiments/max_data_L2` via `pynl/submit_max.sh`.
 - `pynl_symbolic.py` + `rpm_symbolic.py`: symbolic models; `rpm_reference_solvers.py`: non-learned references.
 - `pixel_pipeline.py` + `submit_pixels.sh`: end to end through the ResNet-18 frontend.
-- `eval_pynl_test.py`, `sanity_checks.py`; notebook `pynl_iraven_solver.ipynb`.
+- `eval_pynl_test.py`, `sanity_checks.py`.
+- `notebooks/`: `pynl_iraven_solver.ipynb` and the walkthroughs (they `chdir` to the repo root).
+- `frontend/`: ResNet-18 perception (`train_frontend.py`, `predict_frontend.py`, `extract_objects.py`).
+- `torch_gnn/` + the `gnn/` package: torch GNN baseline (`train_object_vsa_gnn_frontend.py`, `eval_gnn_test.py`).
 - `llm/`: LLM benchmark on I-RAVEN (images end to end, or text with XML labels); see `llm/README.md`.
 - `thesis/CODE_INDEX.md`: where each part of the PyNeuraLogic code lives. Superseded experiment
   scripts are in `archive/pyneuralogic_experiments/` (not runnable from there as is).

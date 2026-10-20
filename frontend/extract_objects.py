@@ -6,20 +6,20 @@ RAVEN dataset samples using a trained NVSA frontend (ResNet-18 + VSA codebook).
 
 Usage:
     # Single sample
-    python extract_objects.py \
+    python frontend/extract_objects.py \
         --config center_single \
         --checkpoint log/nvsa_test01/center_single_.../0/ckpt \
         --sample data/RAVEN-10000/center_single/RAVEN_0_train.npz
 
     # Single sample with visualization (saves annotated PNG)
-    python extract_objects.py \
+    python frontend/extract_objects.py \
         --config center_single \
         --checkpoint log/nvsa_test01/center_single_.../0/ckpt \
         --sample data/RAVEN-10000/center_single/RAVEN_0_train.npz \
         --visualize
 
     # Batch evaluation over the test set (accuracy report)
-    python extract_objects.py \
+    python frontend/extract_objects.py \
         --config center_single \
         --checkpoint log/nvsa_test01/center_single_.../0/ckpt \
         --dataset data/RAVEN-10000 \
@@ -31,7 +31,7 @@ Usage:
 import argparse, os, sys, glob
 
 # Add paths so we can import nvsa (from neuro-vector-symbolic-architectures/) and raven/
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # repo root
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, 'raven'))
 sys.path.insert(0, os.path.join(ROOT, 'neuro-vector-symbolic-architectures'))
@@ -544,13 +544,13 @@ if __name__ == "__main__":
     main()
 
 
-# python extract_objects.py \
+# python frontend/extract_objects.py \
 #   --config center_single \
 #   --checkpoint log/nvsa_test01/center_single_pret_1_bs_8_lr_9.5e-05_wd_0.0005_s_7.0_ts_True_m_0.0_clip_10_main_loss_1.0_aux_1.0_d_1024_k_4_exe_s_1_exe_cos2pmf_Identity_det_actthreshold_det_m0.000/0/ckpt \
 #   --sample data/RAVEN-10000/center_single/RAVEN_0_train.npz \
 #   --visualize
 
-# python extract_objects.py \
+# python frontend/extract_objects.py \
 #   --config distribute_four \
 #   --checkpoint log/nvsa_test01/distribute_four_pret_1_bs_8_lr_9.5e-05_wd_0.0005_s_6.0_ts_True_m_0.0_clip_10_main_loss_1.0_aux_1.0_d_1024_k_4_exe_s_1_exe_cos2pmf_Identity_det_actthreshold_det_m0.000/0/ckpt \
 #   --sample data/RAVEN-10000/distribute_four/RAVEN_0_train.npz \

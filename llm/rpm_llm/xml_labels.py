@@ -1,6 +1,6 @@
 """Text input with XML labels: each panel's objects from the I-RAVEN .xml, written out as text.
 
-`parse` and `POS_MAP` are copied from train_pynl.py (keep in sync); the only change is
+`parse` and `POS_MAP` are copied from pynl/train_pynl.py (keep in sync); the only change is
 ast.literal_eval instead of eval. The slot of an object comes from its bbox, not from
 the XML `Position` list, which only lists occupied slots (the I-RAVEN position bug).
 """

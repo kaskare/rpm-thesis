@@ -41,12 +41,12 @@
 #
 # Submit as a chain -- each link --resume's from the previous one's last epoch
 # (the data arm needs more RAM than the 140G default directive):
-#   ml=$(sbatch --parsable --export=ALL,ARM=conv submit_max.sh)
+#   ml=$(sbatch --parsable --export=ALL,ARM=conv pynl/submit_max.sh)
 #   for i in 2 3 4; do ml=$(sbatch --parsable --dependency=afterany:$ml \
-#                             --export=ALL,ARM=conv submit_max.sh); done
-#   md=$(sbatch --parsable --mem=200G --export=ALL,ARM=data submit_max.sh)
+#                             --export=ALL,ARM=conv pynl/submit_max.sh); done
+#   md=$(sbatch --parsable --mem=200G --export=ALL,ARM=data pynl/submit_max.sh)
 #   for i in 2 3 4; do md=$(sbatch --parsable --mem=200G --dependency=afterany:$md \
-#                             --export=ALL,ARM=data submit_max.sh); done
+#                             --export=ALL,ARM=data pynl/submit_max.sh); done
 # A link that starts after the run is already finished loads the data, sees
 # "Already completed all N epochs" and exits in ~10 minutes.
 
@@ -83,7 +83,7 @@ esac
 
 echo_green "node $(hostname) — MAX TRAINING, arm ${ARM}: ${N_TRAIN}/constellation, up to ${EPOCHS} epochs"
 
-srun python3 -u "${ROOT_PATH}/train_all_constellations.py" \
+srun python3 -u "${ROOT_PATH}/pynl/train_all_constellations.py" \
     --level 2 \
     --dataset-root "${ROOT_PATH}/data/I-RAVEN-10000" \
     --n-train ${N_TRAIN} \

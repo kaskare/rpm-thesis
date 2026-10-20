@@ -29,7 +29,7 @@ echo "Checkpoint: $CHECKPOINT"
 echo "Dataset:    $DATASET_ROOT"
 echo ""
 
-python3 eval_gnn_test.py \
+python3 torch_gnn/eval_gnn_test.py \
   --checkpoint "$CHECKPOINT" \
   --dataset-root "$DATASET_ROOT" \
   "$@"

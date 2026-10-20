@@ -49,7 +49,7 @@ esac
 
 echo_green "node $(hostname) — ABLATION ARM ${SLURM_ARRAY_TASK_ID}: ${NAME}  (${OPTS})"
 
-srun python3 -u "${ROOT_PATH}/train_all_constellations.py" \
+srun python3 -u "${ROOT_PATH}/pynl/train_all_constellations.py" \
     --level 2 \
     --dataset-root "${ROOT_PATH}/data/I-RAVEN-10000" \
     --n-train 2000 \

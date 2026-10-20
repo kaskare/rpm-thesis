@@ -79,7 +79,7 @@ def test_run_text_mode_sends_no_image(d4, tmp_path, monkeypatch):
 def test_parser_matches_train_pynl():
     import ast
     from pathlib import Path
-    src = Path(__file__).resolve().parents[2] / "train_pynl.py"
+    src = Path(__file__).resolve().parents[2] / "pynl" / "train_pynl.py"
     if not src.exists():
         pytest.skip("train_pynl.py not found")
 

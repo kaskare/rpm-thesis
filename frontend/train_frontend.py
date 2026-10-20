@@ -11,13 +11,13 @@ Key differences from the per-constellation end-to-end training (main_nvsa_marg.p
   - SGD optimizer with momentum=0.9 and weight_decay=1e-4 (per paper)
 
 Usage:
-    python train_frontend.py \
+    python frontend/train_frontend.py \
         --dataset data/RAVEN-10000 \
         --save-dir log/universal_frontend \
         --epochs 50 --batch-size 32 --lr 0.01
 
     # Evaluate a trained model
-    python train_frontend.py \
+    python frontend/train_frontend.py \
         --dataset data/RAVEN-10000 \
         --save-dir log/universal_frontend \
         --mode test
@@ -25,7 +25,7 @@ Usage:
 
 import argparse, os, sys, glob
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # repo root
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, 'raven'))
 sys.path.insert(0, os.path.join(ROOT, 'neuro-vector-symbolic-architectures'))
@@ -660,7 +660,7 @@ if __name__ == "__main__":
 
 
 
-# python predict_frontend.py \
+# python frontend/predict_frontend.py \
 #     --checkpoint log/universal_frontend_test4 \
 #     --sample data/RAVEN-10000/distribute_nine/RAVEN_0_train.npz \
 #     --threshold 0.15

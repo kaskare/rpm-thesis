@@ -15,22 +15,22 @@ Unified object-only: context objects at 3x3 grid; candidates in ring around cent
 
 Usage:
     # Default: panel nodes, 8 context + 1 candidate
-    python draw_gnn_graph.py --sample data/RAVEN-10000/center_single/RAVEN_0_train.npz --use-gt -o graph.png
+    python torch_gnn/draw_gnn_graph.py --sample data/RAVEN-10000/center_single/RAVEN_0_train.npz --use-gt -o graph.png
 
     # Object-only (no panel nodes)
-    python draw_gnn_graph.py --sample ... --use-gt --object-only -o graph_obj.png
+    python torch_gnn/draw_gnn_graph.py --sample ... --use-gt --object-only -o graph_obj.png
 
     # Unified (all 8 candidates in one graph)
-    python draw_gnn_graph.py --sample ... --use-gt --unified-graph -o graph_unified.png
+    python torch_gnn/draw_gnn_graph.py --sample ... --use-gt --unified-graph -o graph_unified.png
 
     # Granular (attr nodes per object)
-    python draw_gnn_graph.py --sample ... --use-gt --granular -o graph_gran.png
+    python torch_gnn/draw_gnn_graph.py --sample ... --use-gt --granular -o graph_gran.png
 
     # Combined: unified + object-only
-    python draw_gnn_graph.py --sample ... --use-gt --unified-graph --object-only -o graph_unified_obj.png
+    python torch_gnn/draw_gnn_graph.py --sample ... --use-gt --unified-graph --object-only -o graph_unified_obj.png
 
     # Choose candidate (default: target). Ignored when --unified-graph
-    python draw_gnn_graph.py --sample ... --use-gt --candidate 3 -o graph.png
+    python torch_gnn/draw_gnn_graph.py --sample ... --use-gt --candidate 3 -o graph.png
 """
 
 import argparse
@@ -38,7 +38,7 @@ import os
 import re
 import sys
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # repo root
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "raven"))
 sys.path.insert(0, os.path.join(ROOT, "neuro-vector-symbolic-architectures"))

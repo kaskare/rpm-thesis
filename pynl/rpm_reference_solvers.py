@@ -16,7 +16,7 @@ rules        RAVEN's four rule families with their exact semantics in this datas
 
 Both report expected accuracy (ties share credit) on the validation split.
 
-Usage:  python rpm_reference_solvers.py --split val --n 2000
+Usage:  python pynl/rpm_reference_solvers.py --split val --n 2000
 """
 import argparse, os, sys
 from collections import Counter
@@ -24,7 +24,7 @@ from multiprocessing import Pool
 
 import numpy as np
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # repo root
 sys.path.insert(0, ROOT)
 from rpm_symbolic import read_puzzle, files, CONSTELLATIONS
 

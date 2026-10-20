@@ -1,7 +1,8 @@
 # Superseded PyNeuraLogic experiments (moved here 2026-10-20)
 
 Kept because `thesis/PYNEURALOGIC_NOTES.md` §4–§8 report their results. They ran from the repository
-root (`ROOT_PATH`, `from train_pynl import ...`); to rerun one, copy it back to the root.
+root when the current code lived there (`from train_pynl import ...`); to rerun one, copy it into
+`pynl/` and prefix its script path in the job file with `pynl/`.
 
 | file | what (notes §12) |
 |---|---|

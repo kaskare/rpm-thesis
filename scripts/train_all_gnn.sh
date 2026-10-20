@@ -42,7 +42,7 @@ for granular in false true; do
       echo ""
       echo "=== granular=$granular object_only=$object_only unified_graph=$unified_graph ==="
       echo "    -> $SAVE_DIR"
-      python3 train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 --use-gt --node-repr "$node_repr" \
+      python3 torch_gnn/train_object_vsa_gnn_frontend.py --dataset-root data/RAVEN-10000 --use-gt --node-repr "$node_repr" \
         --gnn-type "$gnn_type" $GRANULAR_FLAG $OBJECT_ONLY_FLAG $UNIFIED_FLAG --lr $lr --embed-dim $embed_dim --hidden-dim $hidden_dim \
         --save-dir "$SAVE_DIR" --epochs $epochs --batch-size 16 --num-workers 2
     done

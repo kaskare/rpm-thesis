@@ -20,11 +20,11 @@ Each check targets one specific way a high accuracy could be fake:
             (c) blanking the context entirely must do the same.
 
 Usage:
-    python sanity_checks.py splits
-    python sanity_checks.py shortcut
-    python sanity_checks.py images --n 200
-    python sanity_checks.py images --n 200 --mismatch     # negative control: must FAIL
-    python sanity_checks.py model --run-dir experiments/max_data_L2 --n 250
+    python pynl/sanity_checks.py splits
+    python pynl/sanity_checks.py shortcut
+    python pynl/sanity_checks.py images --n 200
+    python pynl/sanity_checks.py images --n 200 --mismatch     # negative control: must FAIL
+    python pynl/sanity_checks.py model --run-dir experiments/max_data_L2 --n 250
 """
 import argparse, glob, os, random, shutil, sys, tempfile, xml.etree.ElementTree as ET
 from collections import Counter
@@ -32,7 +32,7 @@ from multiprocessing import Pool
 
 import numpy as np
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # repo root
 sys.path.insert(0, ROOT)
 from train_pynl import parse, POS_MAP                              # the parse the model uses
 

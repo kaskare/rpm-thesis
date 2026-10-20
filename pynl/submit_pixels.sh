@@ -19,9 +19,9 @@
 #
 # Submit (solve only starts if perceive succeeded):
 #   p=$(sbatch --parsable --partition=amdgpufast --gres=gpu:1 --cpus-per-task=16 --mem=64G \
-#              --time=3:00:00 --export=ALL,STAGE=perceive submit_pixels.sh)
+#              --time=3:00:00 --export=ALL,STAGE=perceive pynl/submit_pixels.sh)
 #   sbatch --dependency=afterok:$p --partition=amdfast --cpus-per-task=8 --mem=64G \
-#          --time=4:00:00 --export=ALL,STAGE=solve submit_pixels.sh
+#          --time=4:00:00 --export=ALL,STAGE=solve pynl/submit_pixels.sh
 
 echo_green() { echo -e "\033[0;32m [$(date)] $1\033[0m"; }
 
@@ -37,7 +37,7 @@ case "${STAGE}" in
     conda activate nvsa
     nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
     echo_green "node $(hostname) — PERCEIVE: ResNet-18 frontends over I-RAVEN val+test"
-    srun python3 -u pixel_pipeline.py perceive --splits val,test --workers 14 --batch 16
+    srun python3 -u pynl/pixel_pipeline.py perceive --splits val,test --workers 14 --batch 16
     ;;
   solve)
     ml load Java/21 2>/dev/null || true
@@ -53,7 +53,7 @@ case "${STAGE}" in
     export LD_LIBRARY_PATH="${JAVA_HOME}/lib/server:${LD_LIBRARY_PATH}"
     conda activate pynl
     echo_green "node $(hostname) — SOLVE: PyNeuraLogic on perceived objects, I-RAVEN test"
-    srun python3 -u pixel_pipeline.py solve --frontend auto --split test --jvm-gb 40
+    srun python3 -u pynl/pixel_pipeline.py solve --frontend auto --split test --jvm-gb 40
     ;;
   *)
     echo "FATAL: set STAGE=perceive or STAGE=solve (got '${STAGE}')" >&2; exit 1 ;;
