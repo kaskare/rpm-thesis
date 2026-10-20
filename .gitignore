@@ -25,3 +25,6 @@ neuro-vector-symbolic-architectures/
 # archived runs: keep the code and notes, not their logs and results
 archive/*/log/
 archive/*/experiments/
+
+# LLM benchmark raw outputs (responses can be large); reports (*.md) and manifests are tracked
+llm/results/*.jsonl
