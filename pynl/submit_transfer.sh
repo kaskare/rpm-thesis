@@ -16,7 +16,8 @@
 # labels, tested unchanged on I-RAVEN-X. Arm 1: one weight per primitive shared by all attributes;
 # arm 2: one weight per (attribute, primitive), as pynl_symbolic's prims model.
 #   a=$(sbatch --parsable pynl/submit_transfer.sh)
-#   sbatch --dependency=afterok:$a --export=ALL,TEST=1 pynl/submit_transfer.sh    # scores each checkpoint once
+#   sbatch --dependency=afterok:$a --export=ALL,TEST=1 pynl/submit_transfer.sh    # best and last checkpoint, once each
+# Training logs accuracy on I-RAVEN-X dev puzzles 1000-1199 per epoch (history.json); it never selects on them.
 # I-RAVEN-X files (IBM's raven-large-language-models, src/datasets/generation/iravenx_task.py;
 # --nconf defaults to 1, so pass 0 for the clean files):
 #   python iravenx_task.py --n 3 --maxval 10 --nconf 0 --save_dir <repo>/data/iravenx
@@ -46,7 +47,7 @@ done
 
 if [ -n "${TEST}" ]; then
   echo_green "node $(hostname) — transfer ${W}: test (I-RAVEN test + I-RAVEN-X)"
-  srun python3 -u pynl/pynl_transfer.py test --weights ${W} --iravenx ${IRX} --jvm-gb 48
+  srun python3 -u pynl/pynl_transfer.py test --weights ${W} --iravenx ${IRX} --n-test 1000 --jvm-gb 48
   exit
 fi
 echo_green "node $(hostname) — transfer ${W}: train on I-RAVEN, 300/constellation"

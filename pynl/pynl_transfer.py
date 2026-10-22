@@ -11,9 +11,10 @@ POSITIONS instead of a fixed row(R, P1, P2, P3):
                       val(P, C, A, V)                           as in pynl_symbolic
                       full(Row, C, A)                           every panel of the row has a value
                       msig(Row, C, A, M), uniform(M)            the row's sorted values as one constant; all equal
-                      sum_but_last/sum_but_first(Row, C, A, S)  sums over the row
-                      step(X, Y, K), off(S, Z, K)               Y = X + K, Z = S + K, for numbers in the same row
-                                                                (so values are not limited to 0-9)
+                      plus_to(Row, C, A, Z, K)                  Z = (sum of all but the last) + K
+                      minus_to(Row, C, A, X, K)                 X = (sum of all but the first) - K
+                      step(X, Y, K)                             Y = X + K, for numbers in the same row
+                                                                (so values are not limited to a 0-9 table)
   relations           eq_ab first == second        eq_bc penult == last        eq_ac first == last
                       eq_abc every panel equal
                       step_ab{k} second == first + k                   step_bc{k} last == penult + k
@@ -29,8 +30,10 @@ are pynl_symbolic's.
                       model is not told which attributes matter, so it also scores confounders
 
   check  unit weights: template score == Python count, on I-RAVEN val 300+ and on I-RAVEN-X
-  train  on I-RAVEN train, best epoch on I-RAVEN val 0..n-1
-  test   the best checkpoint, once: I-RAVEN test and each --iravenx file (first --n-iravenx puzzles)
+  train  on I-RAVEN train, best epoch on I-RAVEN val 0..n-1; also logs, never selects on, accuracy on
+         I-RAVEN-X dev puzzles (--dev, from puzzle 1000 on, apart from the test puzzles)
+  test   the best and the last checkpoint, once each: I-RAVEN test and each --iravenx file
+         (first --n-iravenx puzzles)
 """
 import argparse, json, os, sys, time
 from collections import defaultdict
@@ -89,7 +92,8 @@ def puzzle_tuples(rows, vals, extra, gid):
         T += [("first", r, P[0]), ("second", r, P[1]), ("penult", r, P[-2]), ("last", r, P[-1])]
     # whole-row facts come from Python: recursion along the row (running sums, all-equal) is exact
     # too, but its grounding grows too fast once confounders fill the value range (47 s for one
-    # puzzle with a single confounder); arithmetic only relates numbers of the same row, for the same reason
+    # puzzle with a single confounder); joining a sum fact with an offset fact (sum(S), off(S, Z, K))
+    # made the grounder's subsumption engine stall on some puzzles, hence plus_to / minus_to
     for (r, c, a), v in row_values(rows, vals).items():
         if None in v:
             continue
@@ -97,9 +101,8 @@ def puzzle_tuples(rows, vals, extra, gid):
         T += [("full", r, c, a), ("msig", r, c, a, sig)] + ([("uniform", sig)] if len(set(v)) == 1 else [])
         U = set(v)
         T += [("step", f"v{x}", f"v{x + k}", kname(k)) for x in U for k in STEPS if x + k in U]
-        for name, S in (("sum_but_last", sum(v[:-1])), ("sum_but_first", sum(v[1:]))):
-            T.append((name, r, c, a, f"v{S}"))
-            T += [("off", f"v{S}", f"v{S + k}", kname(k)) for k in OFFS if S + k in U]
+        T += [("plus_to", r, c, a, f"v{sum(v[:-1]) + k}", kname(k)) for k in OFFS if sum(v[:-1]) + k >= 0]
+        T += [("minus_to", r, c, a, f"v{sum(v[1:]) - k}", kname(k)) for k in OFFS if sum(v[1:]) - k >= 0]
     return sorted(set(T), key=str)
 
 
@@ -173,9 +176,9 @@ def build_template(weights="per_attr", fixed_unit_weights=False):
         H(f"step_ab{k:+d}", full, R.first(Rw, P1), R.second(Rw, P2), val(P1, X), val(P2, Y), R.step(X, Y, kname(k)))
         H(f"step_bc{k:+d}", full, R.penult(Rw, P1), R.last(Rw, P2), val(P1, X), val(P2, Y), R.step(X, Y, kname(k)))
     for k in OFFS:
-        H(f"plus{k:+d}", R.sum_but_last(Rw, Cc, A, S), R.last(Rw, L), val(L, Z), R.off(S, Z, kname(k)))
+        H(f"plus{k:+d}", R.plus_to(Rw, Cc, A, Z, kname(k)), R.last(Rw, L), val(L, Z))
         # last == first - middle + k  <=>  first == (middle + last) - k
-        H(f"minus{k:+d}", R.sum_but_first(Rw, Cc, A, S), R.first(Rw, P), val(P, X), R.off(S, X, kname(-k)))
+        H(f"minus{k:+d}", R.minus_to(Rw, Cc, A, X, kname(k)), R.first(Rw, P), val(P, X))
     H("msame", R.msig(Rw, Cc, A, S), R.msig("r1", Cc, A, S))
 
     # slot-wise identity and set primitives: pynl_symbolic's, on I-RAVEN's rows of three
@@ -244,12 +247,12 @@ def load_iraven(split, n, start, root, cfgs=CONSTELLATIONS):
     return out
 
 
-def load_iravenx(path, n):
+def load_iravenx(path, n, start=0):
     import gzip
     d = json.load(gzip.open(path, "rt") if path.endswith(".gz") else open(path))
     tag = os.path.basename(path).split(".json")[0]
     return [{"group": tag, "kind": "iravenx", "payload": d[str(i)]["rpm"], "y": int(d[str(i)]["target"])}
-            for i in range(min(n, len(d)))]
+            for i in range(start, min(start + n, len(d)))]
 
 
 def make_sample(item, gid, R, Sample):
@@ -276,6 +279,9 @@ def main():
     ap.add_argument("--iravenx", default="data/iravenx/center_single_shuffle_n_10_maxval_1000.json",
                     help="comma-separated I-RAVEN-X files (.json or .json.gz)")
     ap.add_argument("--n-iravenx", type=int, default=500, help="first N puzzles of each file (IBM: 500)")
+    ap.add_argument("--dev", default="data/iravenx/center_single_shuffle_n_10_maxval_1000.json",
+                    help="train mode: I-RAVEN-X file whose puzzles 1000.. are logged per epoch ('' = none)")
+    ap.add_argument("--n-dev", type=int, default=200)
     ap.add_argument("--n-train", type=int, default=300, help="I-RAVEN puzzles per constellation")
     ap.add_argument("--n-val", type=int, default=300, help="I-RAVEN val 0..n-1 per constellation")
     ap.add_argument("--n-test", type=int, default=0, help="I-RAVEN test puzzles per constellation (0 = all)")
@@ -341,55 +347,66 @@ def main():
         return
 
     os.makedirs(args.save_dir, exist_ok=True)
-    tmpl = os.path.join(args.save_dir, "template_best.bin")
+    ckpt = {c: os.path.join(args.save_dir, f"template_{c}.bin") for c in ("best", "last")}
     if args.mode == "test":
         best = json.load(open(os.path.join(args.save_dir, "best.json")))
         assert best["args"]["weights"] == args.weights, "checkpoint was trained with other --weights"
         sets = [("I-RAVEN test", load_iraven("test", args.n_test, 0, args.root))]
         sets += [(os.path.basename(p), load_iravenx(p, args.n_iravenx)) for p in irx]
-        res = {"checkpoint": tmpl, "epoch": best["epoch"], "weights": args.weights}
+        res = {"weights": args.weights, "best_epoch": best["epoch"], "last_epoch": best["args"]["epochs"]}
         for name, data in sets:
-            scores = []
-            for c in range(0, len(data), args.chunk):   # a fresh build per chunk: build_dataset runs once per model
+            scores = {c: [] for c in ckpt}
+            for i in range(0, len(data), args.chunk):   # a fresh build per chunk: build_dataset runs once per model
                 model = fresh(0.0)
-                built, order = grounded(model, data[c:c + args.chunk], "e")   # order read before load: bias is 0
-                model.load(tmpl)
-                scores += scores_of(model, built, order)
-            acc, per = accuracy(scores, data)
-            res[name] = {"acc": acc, "per": per, "n": len(data)}
-            print(f"{name:<55} {100 * acc:6.2f}%  (n={len(data)})", flush=True)
+                built, order = grounded(model, data[i:i + args.chunk], "e")   # order read before load: bias is 0
+                for c, path in ckpt.items():
+                    model.load(path)
+                    scores[c] += scores_of(model, built, order)
+            res[name] = {"n": len(data)}
+            for c in ckpt:
+                acc, per = accuracy(scores[c], data)
+                res[name][c] = {"acc": acc, "per": per}
+            print(f"{name:<55} best {100 * res[name]['best']['acc']:6.2f}%  last {100 * res[name]['last']['acc']:6.2f}%"
+                  f"  (n={len(data)})", flush=True)
         json.dump(res, open(os.path.join(args.save_dir, "test.json"), "w"), indent=1)
         return
 
     # ---- train: softmax cross-entropy over the 8 candidates, on I-RAVEN only ----
     tr = load_iraven("train", args.n_train, 0, args.root)
     va = load_iraven("val", args.n_val, 0, args.root)
+    dev = load_iravenx(os.path.join(ROOT, args.dev), args.n_dev, start=1000) if args.dev else []
     model = fresh(args.lr)
-    built, order = grounded(model, tr + va, "t")
-    set_targets(built, tr + va, order)
-    b_tr, b_va = built[:len(tr)], built[len(tr):]
-    print(f"{len(tr)} train / {len(va)} val puzzles grounded in {time.time() - t0:.0f}s; "
-          f"CONCAT order {order}", flush=True)
+    built, order = grounded(model, tr + va + dev, "t")
+    set_targets(built, tr + va + dev, order)
+    b_tr, b_va, b_dev = built[:len(tr)], built[len(tr):len(tr) + len(va)], built[len(tr) + len(va):]
+    print(f"{len(tr)} train / {len(va)} val / {len(dev)} I-RAVEN-X dev puzzles grounded in "
+          f"{time.time() - t0:.0f}s; CONCAT order {order}", flush=True)
+
+    def evaluate():
+        acc, per = accuracy(scores_of(model, b_va, order), va)
+        return acc, per, accuracy(scores_of(model, b_dev, order), dev)[0] if dev else float("nan")
 
     def save(ep, acc, per):
-        model.save(tmpl)
+        model.save(ckpt["best"])
         json.dump({"epoch": ep, "val_acc": acc, "per_constellation": per, "args": vars(args),
                    "concat_order": order}, open(os.path.join(args.save_dir, "best.json"), "w"), indent=1)
 
-    best, per = accuracy(scores_of(model, b_va, order), va)
+    best, per, dacc = evaluate()
     save(0, best, per)                    # epoch 0 can be the best one
-    hist = [{"epoch": 0, "val_acc": best, "per": per}]
-    print(f"epoch   0  (initial weights)  val {100 * best:.2f}%", flush=True)
+    hist = [{"epoch": 0, "val_acc": best, "per": per, "dev_acc": dacc}]
+    print(f"epoch   0  (initial weights)  val {100 * best:.2f}%  I-RAVEN-X dev {100 * dacc:.1f}%", flush=True)
     for ep in range(1, args.epochs + 1):
         res = model.train(b_tr, epochs=1)
         loss = float(np.mean([float(np.asarray(r[2]).flatten()[0]) for r in res])) if res else float("nan")
-        acc, per = accuracy(scores_of(model, b_va, order), va)
-        hist.append({"epoch": ep, "loss": loss, "val_acc": acc, "per": per})
+        acc, per, dacc = evaluate()
+        hist.append({"epoch": ep, "loss": loss, "val_acc": acc, "per": per, "dev_acc": dacc})
         if acc > best:
             best = acc
             save(ep, acc, per)
-        print(f"epoch {ep:>3}  loss {loss:.4f}  val {100 * acc:.2f}%  best {100 * best:.2f}%  " +
-              "  ".join(f"{k[:6]} {100 * v:.0f}" for k, v in per.items()), flush=True)
+        print(f"epoch {ep:>3}  loss {loss:.4f}  val {100 * acc:.2f}%  best {100 * best:.2f}%  "
+              f"I-RAVEN-X dev {100 * dacc:.1f}%  " + "  ".join(f"{k[:6]} {100 * v:.0f}" for k, v in per.items()),
+              flush=True)
+    model.save(ckpt["last"])
     json.dump(hist, open(os.path.join(args.save_dir, "history.json"), "w"), indent=1)
 
 
