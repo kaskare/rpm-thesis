@@ -14,7 +14,18 @@ rules        RAVEN's four rule families with their exact semantics in this datas
              Distribute_Three. A rule is abduced if it holds on rows 1 and 2; each candidate
              scores one point per (component, attribute) whose abduced rule it satisfies.
 
-Both report expected accuracy (ties share credit) on the validation split.
+rules+cols   rules, with Distribute_Three also checked down the columns, as NVSA does: columns
+             1 and 2 (panels 0,3,6 and 1,4,7) must hold the same three values as rows 1 and 2.
+             The generator lays the three values out as a Latin square, so this never rejects
+             a true Distribute_Three; it only drops rows that share a multiset by chance.
+
+rules+cols+ms  rules+cols, with Constant also holding when every panel of the row has the same
+             multiset of values. In grids whose objects differ, a Position rule (progression,
+             Distribute_Three) moves the objects with their attributes, so no slot-wise match
+             exists; these are exactly the Constant attributes I-RAVEN modifies in candidates
+             (SRAN sampling.py, sample_attr_avail).
+
+All report expected accuracy (ties share credit) on the validation split.
 
 Usage:  python pynl/rpm_reference_solvers.py --split val --n 2000
 """
@@ -123,11 +134,13 @@ def solve_primitives(panels):
 
 
 # ── rule families ─────────────────────────────────────────────────────────────
-def entity_rule_holds(rule, attr, row, ci):
+def entity_rule_holds(rule, attr, row, ci, multiset=False):
     vals = [scalar(q[ci][attr]) for q in row]
     if rule == "constant":                        # one value across every object in the row,
         if row_uniform(row, ci, attr):            # or (fixed layout) the same value slot by slot
             return True
+        if multiset and row[0][ci][attr] and row[0][ci][attr] == row[1][ci][attr] == row[2][ci][attr]:
+            return True                           # or the same multiset in every panel
         return slot_prims(row, ci) >= {f"slotwise_equal_{attr}"} and \
                all(q[ci]["position"] == row[0][ci]["position"] for q in row)
     if None in vals:
@@ -168,12 +181,13 @@ NUMBER_RULES = ["constant"] + [f"prog{k:+d}" for k in STEPS] + ["add", "sub"]
 POSITION_RULES = ["constant"] + [f"shift{k:+d}" for k in STEPS] + ["union", "diff"]
 
 
-def solve_rules(panels):
+def solve_rules(panels, columns=False, multiset=False):
     ncomp = len(panels[0])
     r1, r2 = panels[0:3], panels[3:6]
+    c1, c2 = panels[0:7:3], panels[1:8:3]
     scores = np.zeros(8)
     for ci in range(ncomp):
-        groups = [(a, lambda rule, row, a=a: entity_rule_holds(rule, a, row, ci), ENTITY_RULES)
+        groups = [(a, lambda rule, row, a=a: entity_rule_holds(rule, a, row, ci, multiset), ENTITY_RULES)
                   for a in ATTR_IDX]
         groups.append(("number", lambda rule, row: number_rule_holds(rule, row, ci), NUMBER_RULES))
         groups.append(("position", lambda rule, row: position_rule_holds(rule, row, ci), POSITION_RULES))
@@ -182,6 +196,9 @@ def solve_rules(panels):
             dist3 = multiset_key(r1, ci, view) is not None and \
                     multiset_key(r1, ci, view) == multiset_key(r2, ci, view) and \
                     len(set(multiset_key(r1, ci, view))) == 3
+            if columns:
+                dist3 = dist3 and multiset_key(c1, ci, view) == multiset_key(r1, ci, view) == \
+                                  multiset_key(c2, ci, view)
             if not active and not dist3:
                 continue                     # nothing abduced: this attribute is noise here
             for c in range(8):
@@ -193,13 +210,18 @@ def solve_rules(panels):
 
 
 # ── evaluation ────────────────────────────────────────────────────────────────
+SOLVERS = (("primitives", solve_primitives), ("rules", solve_rules),
+           ("rules+cols", lambda p: solve_rules(p, columns=True)),
+           ("rules+cols+ms", lambda p: solve_rules(p, columns=True, multiset=True)))
+
+
 def _eval(job):
-    cfg, split, n = job
+    cfg, split, n, root = job
     res = Counter()
-    for f in files(cfg, split, n):
+    for f in files(cfg, split, n, root):
         y = int(np.load(f)["target"])
         panels, _ = read_puzzle(f.replace(".npz", ".xml"), cfg)
-        for name, solver in (("primitives", solve_primitives), ("rules", solve_rules)):
+        for name, solver in SOLVERS:
             s = solver(panels)
             top = np.flatnonzero(s == s.max())
             res[name] += (1.0 / len(top)) if y in top else 0.0
@@ -212,21 +234,21 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--split", default="val")
     ap.add_argument("--n", type=int, default=2000)
+    ap.add_argument("--root", default="data/I-RAVEN-10000", help="dataset folder, relative to the repo root")
     args = ap.parse_args()
     with Pool(len(CONSTELLATIONS)) as pool:
-        out = dict(pool.map(_eval, [(c, args.split, args.n) for c in CONSTELLATIONS]))
+        out = dict(pool.map(_eval, [(c, args.split, args.n, args.root) for c in CONSTELLATIONS]))
     print(f"Reference symbolic solvers on GROUND-TRUTH attributes, {args.split} split, up to {args.n}/constellation")
     print("(expected accuracy, ties share credit; strict = unique correct argmax)\n")
-    print(f"{'constellation':<40} {'n':>5} {'primitives':>11} {'strict':>7} {'rules':>8} {'strict':>7}")
+    names = [name for name, _ in SOLVERS]
+    line = lambda r, n: "".join(f" {100*r[k]/n:>10.2f}% {100*r[k + '_strict']/n:>6.1f}%" for k in names)
+    print(f"{'constellation':<40} {'n':>5}" + "".join(f" {k:>11} {'strict':>7}" for k in names))
     tot = Counter()
     for cfg in CONSTELLATIONS:
-        r = out[cfg]; n = r["n"]; tot.update(r)
-        print(f"{cfg:<40} {n:>5} {100*r['primitives']/n:>10.2f}% {100*r['primitives_strict']/n:>6.1f}% "
-              f"{100*r['rules']/n:>7.2f}% {100*r['rules_strict']/n:>6.1f}%")
-    n = tot["n"]
-    print("-" * 84)
-    print(f"{'OVERALL':<40} {n:>5} {100*tot['primitives']/n:>10.2f}% {100*tot['primitives_strict']/n:>6.1f}% "
-          f"{100*tot['rules']/n:>7.2f}% {100*tot['rules_strict']/n:>6.1f}%")
+        r = out[cfg]; tot.update(r)
+        print(f"{cfg:<40} {r['n']:>5}" + line(r, r["n"]))
+    print("-" * (46 + 20 * len(names)))
+    print(f"{'OVERALL':<40} {tot['n']:>5}" + line(tot, tot["n"]))
 
 
 if __name__ == "__main__":

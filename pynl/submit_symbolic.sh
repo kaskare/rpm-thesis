@@ -14,6 +14,9 @@
 # Symbolic PyNeuraLogic I-RAVEN models (pynl_symbolic.py), trained from answers on
 # ground-truth attributes. Array arms sweep training size and learning rate.
 #   MODEL=prims   generic primitives + analogy principle, learned weight per (attribute, primitive)
+#   MODEL=rules   RAVEN's rule families, learned weight per (attribute, rule)
+#   MODEL=rules_cols     rules, Distribute_Three also checked down columns 1 and 2 (as NVSA)
+#   MODEL=rules_cols_ms  rules_cols, Constant also as the same multiset of values in each panel
 # Validation = unseen val puzzles 300.. (never used for training or for anything else).
 
 echo_green() { echo -e "\033[0;32m [$(date)] $1\033[0m"; }

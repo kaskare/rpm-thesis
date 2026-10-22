@@ -61,11 +61,20 @@ def scalar(vals):
 CAND_ROWS = [f"k{k}" for k in range(8)]
 
 
-def puzzle_tuples(panels, gid):
-    """All facts of one puzzle: context rows r1, r2 and the 8 candidate rows k0..k7.
-    `puzzle(gid)` binds the unique query answer(gid)."""
+def rows_of(columns=False):
+    """context rows r1, r2 (and with columns, context columns c1, c2) and candidate rows k0..k7"""
     rows = {"r1": (0, 1, 2), "r2": (3, 4, 5)}
+    if columns:
+        rows.update({"c1": (0, 3, 6), "c2": (1, 4, 7)})
     rows.update({f"k{k}": (6, 7, 8 + k) for k in range(8)})
+    return rows
+
+
+def puzzle_tuples(panels, gid, columns=False, multiset=False):
+    """All facts of one puzzle: context rows r1, r2 (+ columns c1, c2) and the 8 candidate rows
+    k0..k7. `puzzle(gid)` binds the unique query answer(gid). With multiset, ms(P, C, A, U) names
+    each panel's multiset of values of A as one constant."""
+    rows = rows_of(columns)
     T = [("row", r, *(f"p{i}" for i in idx)) for r, idx in rows.items()]
     T += [("cand", r) for r in CAND_ROWS] + [("puzzle", gid)]
     for p in range(16):
@@ -77,6 +86,8 @@ def puzzle_tuples(panels, gid):
                     T.append(("val", P, C, a, f"v{v}"))
                 tup = "_".join(f"{sl}-{comp['slots'][sl][i]}" for sl in sorted(comp["slots"]))
                 T.append(("tup", P, C, a, f"t{tup}"))
+                if multiset and comp[a]:
+                    T.append(("ms", P, C, a, "u" + "_".join(map(str, comp[a]))))
             T.append(("val", P, C, "number", f"v{comp['number']}"))
             T.append(("occset", P, C, setname(ci, comp["position"])))
     for ci in range(len(panels[0])):
@@ -132,8 +143,7 @@ def python_counts(panels):
     """Per candidate: number of (component, attribute, primitive) relations held by
     both context rows and the candidate's row -- exactly what the template counts
     when every weight is 1."""
-    rows = {"r1": (0, 1, 2), "r2": (3, 4, 5)}
-    rows.update({f"k{k}": (6, 7, 8 + k) for k in range(8)})
+    rows = rows_of()
     prim = row_prim_sets(panels, rows)
     counts = np.zeros(8)
     for ci in range(len(panels[0])):
@@ -206,12 +216,14 @@ ADD_PRIM = {"size": "plus+1", "color": "plus+0", "number": "plus+0"}     # hand-
 SUB_PRIM = {"size": "minus-1", "color": "minus+0", "number": "minus+0"}
 
 
-def python_rule_counts(panels):
+def python_rule_counts(panels, columns=False, multiset=False):
     """Per candidate: number of (component, attribute, rule) where the rule holds on context
     rows 1 and 2 and on the candidate's row -- exactly what the rules template counts with
-    unit weights. Rules are defined as compositions of the primitives."""
-    rows = {"r1": (0, 1, 2), "r2": (3, 4, 5)}
-    rows.update({f"k{k}": (6, 7, 8 + k) for k in range(8)})
+    unit weights. Rules are defined as compositions of the primitives. With columns,
+    Distribute_Three must also hold on columns 1 and 2 (msame is relative to row 1, so
+    both columns hold row 1's three values, as in the generator's Latin square). With multiset,
+    Constant also holds when the row's three panels have the same multiset of values."""
+    rows = rows_of(columns)
     prim = row_prim_sets(panels, rows)
     counts = np.zeros(8)
     for ci in range(len(panels[0])):
@@ -224,6 +236,9 @@ def python_rule_counts(panels):
                       (lambda i, a=a: scalar(panels[i][ci][a]))
                 vals = [get(i) for i in idx]
                 if (a, "eq_abc") in P or (a, "tup_eq") in P: rh.add((a, "const"))
+                if multiset and a != "number" and panels[idx[0]][ci][a] and \
+                        all(panels[i][ci][a] == panels[idx[0]][ci][a] for i in idx):
+                    rh.add((a, "const"))
                 for k in STEPS:
                     if (a, f"step_ab{k:+d}") in P and (a, f"step_bc{k:+d}") in P: rh.add((a, f"prog{k:+d}"))
                 if a in ADD_PRIM and (a, ADD_PRIM[a]) in P: rh.add((a, "add"))
@@ -239,6 +254,8 @@ def python_rule_counts(panels):
             if ("position", "msame") in P and len(set(sets)) == 3: rh.add(("position", "dist3"))
             RH[r] = rh
         common = RH["r1"] & RH["r2"]
+        if columns:
+            common = {ar for ar in common if ar[1] != "dist3" or ar in RH["c1"] and ar in RH["c2"]}
         for k in range(8):
             counts[k] += len(common & RH[f"k{k}"])
     return counts
@@ -248,7 +265,7 @@ def python_rule_counts(panels):
 INIT_SEED = None      # set by --init-seed: rule weights start uniform in [0, 0.2] instead of all at 0.1
 
 
-def build_template(fixed_unit_weights=False, scoring="prims"):
+def build_template(fixed_unit_weights=False, scoring="prims", columns=False, multiset=False):
     from neuralogic.core import R, V as Var, Transformation, Aggregation, Metadata, Combination
     from neuralogic.core import Model
     m = Model()
@@ -347,6 +364,8 @@ def build_template(fixed_unit_weights=False, scoring="prims"):
 
         RH("const", hold("eq_abc"))
         RH("const", hold("tup_eq"))
+        if multiset:      # the same multiset of values in all three panels (objects moved with them)
+            RH("const", row, R.ms(P1, Cc, A, X), R.ms(P2, Cc, A, X), R.ms(P3, Cc, A, X))
         for k in STEPS:
             RH(f"prog{k:+d}", hold(f"step_ab{k:+d}"), hold(f"step_bc{k:+d}"))
         RH("add", R.holds(Rw, Cc, A, Pk), R.add_prim(A, Pk))
@@ -363,8 +382,16 @@ def build_template(fixed_unit_weights=False, scoring="prims"):
            R.sneq(X, Y), R.sneq(Y, Z), R.sneq(X, Z), a=pos)
         m += (R.rh / 4) | Metadata(transformation=Transformation.IDENTITY)
         # abduction: a rule shown by BOTH context rows, checked on the candidate's row
-        m += (R.sat(K, Cc, A, Ru) <= (R.rh("r1", Cc, A, Ru), R.rh("r2", Cc, A, Ru),
-                                      R.rh(K, Cc, A, Ru), R.cand(K))) | crisp
+        ctx = (R.rh("r1", Cc, A, Ru), R.rh("r2", Cc, A, Ru), R.rh(K, Cc, A, Ru), R.cand(K))
+        if not columns:
+            m += (R.sat(K, Cc, A, Ru) <= ctx) | crisp
+        else:   # Distribute_Three must also be shown by context columns 1 and 2
+            for rule in sorted(set(RULES_ENTITY + RULES_POSITION) - {"dist3"}):
+                m += R.rowrule(rule)
+            m += (R.sat(K, Cc, A, Ru) <= ctx + (R.rowrule(Ru),)) | crisp
+            m += (R.sat(K, Cc, A, "dist3") <= (R.rh("r1", Cc, A, "dist3"), R.rh("r2", Cc, A, "dist3"),
+                                               R.rh("c1", Cc, A, "dist3"), R.rh("c2", Cc, A, "dist3"),
+                                               R.rh(K, Cc, A, "dist3"), R.cand(K))) | crisp
         m += (R.sat / 4) | Metadata(transformation=Transformation.IDENTITY)
         # one weight per (attribute, rule family), summed over components
         for a in ATTRS_NUM:
@@ -404,10 +431,10 @@ def read_order(model, built_probe):
 
 
 # ── samples, check, training ──────────────────────────────────────────────────
-def make_sample(panels, y, gid, order, R, Sample):
+def make_sample(panels, y, gid, order, R, Sample, columns=False, multiset=False):
     """One sample per puzzle: query answer(gid) = one-hot of the answer, in CONCAT order."""
     target = [1.0 if order[j] == y else 0.0 for j in range(8)]
-    facts = [R.get(t[0])(*t[1:]) for t in puzzle_tuples(panels, gid)]
+    facts = [R.get(t[0])(*t[1:]) for t in puzzle_tuples(panels, gid, columns, multiset)]
     return Sample(R.answer(gid)[target], facts)
 
 
@@ -419,10 +446,10 @@ def unpermute(vec, order):
     return s
 
 
-def load_split(cfgs, split, n, start=0):
+def load_split(cfgs, split, n, start=0, root="data/I-RAVEN-10000"):
     data = []
     for cfg in cfgs:
-        for f in files(cfg, split)[start:start + n]:
+        for f in files(cfg, split, root=root)[start:start + n]:
             panels, _ = read_puzzle(f.replace(".npz", ".xml"), cfg)
             data.append((cfg, f, panels, int(np.load(f)["target"])))
     return data
@@ -441,8 +468,10 @@ def accuracy(scores, data):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("mode", choices=["check", "train"])
-    ap.add_argument("--model", default="prims", choices=["prims", "rules"],
-                    help="prims: generic primitives + analogy; rules: RAVEN's rule families")
+    ap.add_argument("--model", default="prims", choices=list(OPTIONS),
+                    help="prims: generic primitives + analogy; rules: RAVEN's rule families; "
+                         "rules_cols: rules with Distribute_Three also checked down the columns; "
+                         "rules_cols_ms: rules_cols with Constant also as the same multiset per panel")
     ap.add_argument("--n-train", type=int, default=100, help="puzzles per constellation")
     ap.add_argument("--n-val", type=int, default=100, help="unseen validation puzzles per constellation")
     ap.add_argument("--epochs", type=int, default=20)
@@ -452,7 +481,9 @@ def main():
     ap.add_argument("--save-dir", default=os.path.join(ROOT, "experiments/pynl_symbolic_prims"))
     ap.add_argument("--init-seed", type=int, default=None,
                     help="random initial rule weights (uniform 0..0.2) instead of all 0.1")
+    ap.add_argument("--root", default="data/I-RAVEN-10000", help="dataset folder, relative to the repo root")
     args = ap.parse_args()
+    opt = OPTIONS[args.model]
     global INIT_SEED
     INIT_SEED = args.init_seed
 
@@ -473,12 +504,12 @@ def main():
 
     if args.mode == "check":
         # weights fixed at 1, identity output: the template must count exactly what Python counts
-        data = load_split(cfgs, "val", args.n_val, start=300)
+        data = load_split(cfgs, "val", args.n_val, start=300, root=args.root)
         model = TEMPLATES[args.model](fixed_unit_weights=True)
         model.build(Settings(optimizer=Adam(lr=0.0), error_function=CrossEntropy(with_logits=True),
                              iso_value_compression=False))
         # targets are irrelevant in check mode, so samples can be built before the order is known
-        samples = [make_sample(p_, y, f"g{i}", list(range(8)), R, Sample) for i, (_, _, p_, y) in enumerate(data)]
+        samples = [make_sample(p_, y, f"g{i}", list(range(8)), R, Sample, **opt) for i, (_, _, p_, y) in enumerate(data)]
         built = list(model.build_dataset(Dataset([probe_sample(R, Sample)] + samples)))
         order = read_order(model, built[0])
         print(f"CONCAT order (output position -> candidate): {order}", flush=True)
@@ -496,8 +527,8 @@ def main():
 
     # ---- train: softmax cross-entropy over the 8 candidates ----
     os.makedirs(args.save_dir, exist_ok=True)
-    tr = load_split(cfgs, "train", args.n_train)
-    va = load_split(cfgs, "val", args.n_val, start=300)       # unseen; never used to pick anything else
+    tr = load_split(cfgs, "train", args.n_train, root=args.root)
+    va = load_split(cfgs, "val", args.n_val, start=300, root=args.root)   # unseen; never used to pick anything else
     model = TEMPLATES[args.model]()
     # iso_value_compression MUST be off: it merges neurons whose initial VALUES coincide, and with
     # every weight starting equal, a candidate's score can equal a constant fact's 1.0 -- that
@@ -507,8 +538,8 @@ def main():
                          iso_value_compression=False))
     # the one-hot targets depend on the CONCAT order, which is only known after building; build
     # with placeholder targets, read the order from the probe, then set each sample's target
-    s_tr = [make_sample(p_, y, f"t{i}", list(range(8)), R, Sample) for i, (_, _, p_, y) in enumerate(tr)]
-    s_va = [make_sample(p_, y, f"v{i}", list(range(8)), R, Sample) for i, (_, _, p_, y) in enumerate(va)]
+    s_tr = [make_sample(p_, y, f"t{i}", list(range(8)), R, Sample, **opt) for i, (_, _, p_, y) in enumerate(tr)]
+    s_va = [make_sample(p_, y, f"v{i}", list(range(8)), R, Sample, **opt) for i, (_, _, p_, y) in enumerate(va)]
     built = list(model.build_dataset(Dataset([probe_sample(R, Sample)] + s_tr + s_va)))  # only once
     order = read_order(model, built[0])
     print(f"CONCAT order (output position -> candidate): {order}", flush=True)
@@ -540,9 +571,15 @@ def main():
     json.dump(hist, open(os.path.join(args.save_dir, "history.json"), "w"), indent=1)
 
 
+# rules variants: Distribute_Three also down columns 1 and 2 (as NVSA); Constant also as the same
+# multiset of values in each panel. Samples and template of a model take the same options.
+OPTIONS = {"prims": {}, "rules": {}, "rules_cols": {"columns": True},
+           "rules_cols_ms": {"columns": True, "multiset": True}}
 TEMPLATES = {"prims": lambda **kw: build_template(scoring="prims", **kw),
-             "rules": lambda **kw: build_template(scoring="rules", **kw)}
-REFERENCE = {"prims": python_counts, "rules": python_rule_counts}
+             **{m: lambda m=m, **kw: build_template(scoring="rules", **OPTIONS[m], **kw)
+                for m in ("rules", "rules_cols", "rules_cols_ms")}}
+REFERENCE = {"prims": python_counts,
+             **{m: lambda p, m=m: python_rule_counts(p, **OPTIONS[m]) for m in ("rules", "rules_cols", "rules_cols_ms")}}
 
 
 if __name__ == "__main__":
