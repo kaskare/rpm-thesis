@@ -31,7 +31,8 @@ from rpm_reference_solvers import solve_primitives, solve_rules
 import pynl_symbolic as PS
 
 DATA = os.path.join(ROOT, "data/I-RAVEN-10000")
-REF = {"prims": solve_primitives, "rules": solve_rules}
+REF = {"prims": solve_primitives,
+       **{m: lambda p, m=m: solve_rules(p, **PS.OPTIONS[m]) for m in ("rules", "rules_cols", "rules_cols_ms")}}
 
 
 def layout_of(cfg):
@@ -82,7 +83,8 @@ def template_scores(model_name, tmpl_path, puzzles, settings_kw, R, Sample, Data
     """Fresh build per chunk (build_dataset may be called once per built model), then load the weights."""
     model = PS.TEMPLATES[model_name]()
     model.build(Settings(optimizer=Adam(lr=0.0), error_function=CrossEntropy(with_logits=True), **settings_kw))
-    samples = [PS.make_sample(p, 0, f"g{i}", list(range(8)), R, Sample) for i, p in enumerate(puzzles)]
+    samples = [PS.make_sample(p, 0, f"g{i}", list(range(8)), R, Sample, **PS.OPTIONS[model_name])
+               for i, p in enumerate(puzzles)]
     built = list(model.build_dataset(Dataset([PS.probe_sample(R, Sample)] + samples)))
     model.load(tmpl_path)
     order = PS.read_order(model, built[0])
@@ -93,7 +95,7 @@ def template_scores(model_name, tmpl_path, puzzles, settings_kw, R, Sample, Data
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--model", required=True, choices=["prims", "rules"])
+    ap.add_argument("--model", required=True, choices=list(PS.OPTIONS))
     ap.add_argument("--run-dir", required=True)
     ap.add_argument("--split", default="test", choices=["val", "test"])
     ap.add_argument("--preds", default=os.path.join(ROOT, "experiments/frontend_preds/"

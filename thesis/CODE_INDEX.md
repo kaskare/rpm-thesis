@@ -40,12 +40,12 @@ The frontend itself is torch-only: `frontend/train_frontend.py` and `frontend/pr
 
 | file | what it is | where to look |
 |---|---|---|
-| `pynl_symbolic.py` | Attribute values, rows and slot sets as symbols. Crisp relations (equal, successor ±1/±2, sum/difference, set union/difference/shift) are scored with learned weights. `--model prims` uses generic building blocks: 97.58% val. `--model rules` uses RAVEN's rule types: 98.44% val. | facts: `puzzle_tuples` :64, `background_tuples` :110 · template: `build_template` :248 · CONCAT order: `probe_sample` :385, `read_order` :393 · Python cross-check of the template: `python_counts` :131, `python_rule_counts` :209 · training: `main` :435 |
+| `pynl_symbolic.py` | Attribute values, rows and slot sets as symbols. Crisp relations (equal, successor ±1/±2, sum/difference, set union/difference/shift) are scored with learned weights. `--model prims` uses generic building blocks: 97.58% val. `--model rules` uses RAVEN's rule types: 98.44% val. `rules_cols` also checks Distribute_Three down columns 1 and 2 (as NVSA); `rules_cols_ms` also accepts Constant as the same multiset of values in each panel. | facts: `puzzle_tuples` :73, `background_tuples` :121 · template: `build_template` :268 · CONCAT order: `probe_sample` :418, `read_order` :426 · Python cross-check of the template: `python_counts` :142, `python_rule_counts` :219 · variants: `OPTIONS` :576 · training: `main` :468 |
 | `rpm_symbolic.py` | Puzzle reader for the above: numbers, slot sets and per-slot attributes per component. | `read_puzzle` :41 |
-| `rpm_reference_solvers.py` | The same two vocabularies as plain, non-learned Python solvers: 96.34% and 97.75% val. | `solve_primitives` :109, `solve_rules` :171 |
-| `submit_symbolic.sh` | Array job: 100/300 puzzles per constellation × lr 0.01/0.003, `MODEL=prims` or `MODEL=rules`. | |
+| `rpm_reference_solvers.py` | The same two vocabularies as plain, non-learned Python solvers: 96.34% and 97.75% val; `rules+cols` and `rules+cols+ms` add the column and multiset checks above. | `solve_primitives` :120, `solve_rules` :184 |
+| `submit_symbolic.sh` | Array job: 100/300 puzzles per constellation × lr 0.01/0.003, `MODEL=prims`, `rules`, `rules_cols` or `rules_cols_ms`. | |
 | `pynl_symbolic_e2e.py` | Scores a trained symbolic model end to end (ResNet perception → symbolic facts) and with XML labels, next to the non-learned reference solvers. Verifies its converter against `read_puzzle`. | `to_symbolic`, `template_scores` |
-| `submit_symbolic_e2e.sh` | Test-split run of the above for both vocabularies. | |
+| `submit_symbolic_e2e.sh` | Test-split run of the above: arms 1–2 prims and rules (scored 2026-10-19), 3–4 rules_cols and rules_cols_ms. | |
 | `submit_symbolic_extra.sh` | Learning curves (10, 30, 1000 puzzles/constellation) and random initial weights (`--init-seed`, 3 seeds). | |
 
 ### Checks and walkthroughs

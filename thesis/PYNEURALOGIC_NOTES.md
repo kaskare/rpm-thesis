@@ -797,6 +797,23 @@ softmax, native PyNeuraLogic training (`iso_value_compression=False` is required
   95.98 / 95.94, distribute_nine 95.46 / 85.44, left/right 99.95 / 99.95, up/down 99.95 / 99.95,
   in/out 99.85 / 99.85, in_distribute_four 97.26 / 93.16. All of the end-to-end loss sits where
   perception is imperfect (puzzles fully perceived: distribute_nine 76.5%, in_distribute_four 71.6%).
+* **Columns and multiset Constant (2026-10-22, jobs 11843018-20):** `rules_cols` also requires
+  Distribute_Three down columns 1 and 2 (as NVSA does); `rules_cols_ms` also accepts Constant as the same
+  per-panel multiset (mixed panels whose objects move with a Position rule). Best unseen val 98.49% / 99.98%
+  (chosen on the same puzzles). Test split, scored once:
+
+| model | XML labels | end to end (ResNet-18) |
+|---|---|---|
+| template, rules + columns | 98.51% | 96.47% |
+| template, rules + columns + multiset | **99.86%** | **97.66%** |
+| reference solver, rules + columns | 98.14% | 96.09% |
+| reference solver, rules + columns + multiset, no Type arithmetic | 99.49% | 97.28% |
+
+  Per constellation (template + multiset, XML / end to end): distribute_nine 99.90 / 89.03,
+  in_distribute_four 99.62 / 95.12, the other five 99.4-100 end to end. NVSA reports 99.0% end to end
+  (frontend trained on attribute labels, fixed backend, trained on RAVEN, one model per constellation) and no
+  I-RAVEN result with ground-truth attributes; the remaining 1.3 points are perception (92.56% of test
+  puzzles fully perceived).
 * **Learning curve** (unseen val; initial weights all 0.1 = non-learned counting): primitives start at
   96.01% and reach 97.13 / 97.35 / 97.49 / 97.58 / 97.58% with 10 / 30 / 100 / 300 / 1000 puzzles per
   constellation; rules start at 97.96%, do not improve with 10 or 30 puzzles (training drifts to 97.6%),
