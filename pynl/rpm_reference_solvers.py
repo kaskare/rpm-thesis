@@ -23,7 +23,8 @@ rules+cols+ms  rules+cols, with Constant also holding when every panel of the ro
              multiset of values. In grids whose objects differ, a Position rule (progression,
              Distribute_Three) moves the objects with their attributes, so no slot-wise match
              exists; these are exactly the Constant attributes I-RAVEN modifies in candidates
-             (SRAN sampling.py, sample_attr_avail).
+             (SRAN sampling.py, sample_attr_avail). Like the generator (SRAN const.py) and the
+             PyNeuraLogic rules template, it has no Arithmetic on Type.
 
 All report expected accuracy (ties share credit) on the validation split.
 
@@ -187,7 +188,8 @@ def solve_rules(panels, columns=False, multiset=False):
     c1, c2 = panels[0:7:3], panels[1:8:3]
     scores = np.zeros(8)
     for ci in range(ncomp):
-        groups = [(a, lambda rule, row, a=a: entity_rule_holds(rule, a, row, ci, multiset), ENTITY_RULES)
+        groups = [(a, lambda rule, row, a=a: entity_rule_holds(rule, a, row, ci, multiset),
+                   [r for r in ENTITY_RULES if not (multiset and a == "type" and r in ("add", "sub"))])
                   for a in ATTR_IDX]
         groups.append(("number", lambda rule, row: number_rule_holds(rule, row, ci), NUMBER_RULES))
         groups.append(("position", lambda rule, row: position_rule_holds(rule, row, ci), POSITION_RULES))
