@@ -555,7 +555,13 @@ def main():
     acc0, per0 = accuracy(scores_of(model, b_va), va)
     print(f"epoch   0  (initial weights)  val {100 * acc0:.2f}%  " +
           "  ".join(f"{k[:6]} {100 * v:.0f}" for k, v in per0.items()), flush=True)
+    def save_best(ep, acc, per):
+        model.save(os.path.join(args.save_dir, "template_best.bin"))
+        json.dump({"epoch": ep, "val_acc": acc, "per_constellation": per, "args": vars(args),
+                   "concat_order": order}, open(os.path.join(args.save_dir, "best.json"), "w"), indent=1)
+
     best, hist = acc0, [{"epoch": 0, "val_acc": acc0, "per": per0}]
+    save_best(0, acc0, per0)          # so a checkpoint exists even if training never beats the start
     for ep in range(1, args.epochs + 1):
         res = model.train(b_tr, epochs=1)
         loss = float(np.mean([float(np.asarray(r[2]).flatten()[0]) for r in res])) if res else float("nan")
@@ -563,9 +569,7 @@ def main():
         hist.append({"epoch": ep, "loss": loss, "val_acc": acc, "per": per})
         if acc > best:
             best = acc
-            model.save(os.path.join(args.save_dir, "template_best.bin"))
-            json.dump({"epoch": ep, "val_acc": acc, "per_constellation": per, "args": vars(args),
-                       "concat_order": order}, open(os.path.join(args.save_dir, "best.json"), "w"), indent=1)
+            save_best(ep, acc, per)
         print(f"epoch {ep:>3}  loss {loss:.4f}  val {100 * acc:.2f}%  best {100 * best:.2f}%  " +
               "  ".join(f"{k[:6]} {100 * v:.0f}" for k, v in per.items()), flush=True)
     json.dump(hist, open(os.path.join(args.save_dir, "history.json"), "w"), indent=1)
