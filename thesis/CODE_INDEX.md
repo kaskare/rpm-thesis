@@ -47,6 +47,8 @@ The frontend itself is torch-only: `frontend/train_frontend.py` and `frontend/pr
 | `pynl_symbolic_e2e.py` | Scores a trained symbolic model end to end (ResNet perception → symbolic facts) and with XML labels, next to the non-learned reference solvers. Verifies its converter against `read_puzzle`. | `to_symbolic`, `template_scores` |
 | `submit_symbolic_e2e.sh` | Test-split run of the above for both vocabularies. | |
 | `submit_symbolic_extra.sh` | Learning curves (10, 30, 1000 puzzles/constellation) and random initial weights (`--init-seed`, 3 seeds). | |
+| `pynl_transfer.py` | Train small, test big: the `prims` vocabulary over row positions (first, second, second-to-last, last, whole-row sums and multisets), so one template reads rows of any length. Trained on I-RAVEN, tested unchanged on I-RAVEN-X (3×10, values 0–999, confounders). `--weights shared` ties one weight per relation across attributes; `per_attr` is `pynl_symbolic`'s. | facts: `puzzle_tuples` :83 · template: `build_template` :150 · Python cross-check: `python_counts` :127 · `main` :271 |
+| `submit_transfer.sh` | Array job (shared, per_attr): check, train on 300/constellation; `TEST=1` scores I-RAVEN test and four I-RAVEN-X files. | |
 
 ### Checks and walkthroughs
 
@@ -67,6 +69,7 @@ The April model, kept for comparison: pure PyNeuraLogic, one binary sample per c
 train_all_constellations.py ──imports──> train_pynl.py (parse, POS_MAP)
 eval_pynl_test.py, sanity_checks.py, pixel_pipeline.py ──import──> train_all_constellations.py
 pynl_symbolic.py, rpm_reference_solvers.py ──import──> rpm_symbolic.py ──> gnn/data.py
+pynl_transfer.py ──imports──> pynl_symbolic.py (vocabulary, set facts, CONCAT probe)
 ```
 
 ## Earlier steps
