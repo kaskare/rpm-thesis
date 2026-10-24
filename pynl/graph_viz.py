@@ -99,28 +99,34 @@ def node_xy_dynamic(pz):
     return xy
 
 
+def _draw_edges(ax, triples, xy, focus=None, shrink=4, lw=1.0):
+    """One curved line per pair of directed edges a -> b, b -> a (both always exist). Returns pairs drawn."""
+    seen = set()
+    for s, d, t in triples:
+        if (focus and focus not in (s, d)) or (d, s) in seen:
+            continue
+        seen.add((s, d))
+        col, ls = _edge_style(t)
+        ax.annotate("", xy[d], xy[s], arrowprops=dict(arrowstyle="-", color=col, lw=lw, ls=ls, alpha=0.85,
+                    shrinkA=shrink, shrinkB=shrink, connectionstyle="arc3,rad=0.15"), zorder=2)
+    return len(seen)
+
+
 def draw_object_graph(pz, facts, focus=None, ax=None, title=None):
     """Object nodes at their place in the puzzle; same-position edges. focus: draw only edges of that node."""
     ax = ax or plt.subplots(figsize=(12, 4.6))[1]
     _frames(ax, pz, answer=False)
     F, xy = parse_facts(facts), node_xy_dynamic(pz)
-    for s, d, t in F.get("edge", []):
-        if focus and focus not in (s, d):
-            continue
-        col, ls = _edge_style(t)
-        (x1, y1), (x2, y2) = xy[s], xy[d]
-        ax.annotate("", (x2, y2), (x1, y1), arrowprops=dict(arrowstyle="-|>", color=col, lw=0.8,
-                    ls=ls, alpha=0.9 if focus else 0.35, shrinkA=4, shrinkB=4,
-                    connectionstyle="arc3,rad=0.08"), zorder=2)
+    n_pairs = _draw_edges(ax, F.get("edge", []), xy, focus)
     for p, objs in enumerate(pz["panels"]):
         for o in objs:
             n = f"o{p}_{o['pos']}"
             draw_shape(ax, *xy[n], o, scale=0.7, z=4)
+            ax.text(xy[n][0], xy[n][1] - 0.17, n, ha="center", fontsize=6, color="0.3", zorder=5)
             if focus == n:
                 ax.add_patch(Circle(xy[n], 0.13, fc="none", ec="red", lw=2, zorder=6))
-    n_e = len(F.get("edge", []))
-    ax.set_title(title or f"object graph: {sum(map(len, pz['panels']))} object nodes, {n_e} same-position edges"
-                 + (f" (showing those of {focus})" if focus else ""), fontsize=9)
+    ax.set_title(title or f"object level: {sum(map(len, pz['panels']))} object nodes, {n_pairs} lines "
+                 f"(each line = edges in both directions)" + (f", only those of {focus}" if focus else ""), fontsize=9)
     _legend(ax)
     return ax
 
@@ -130,22 +136,16 @@ def draw_panel_graph(pz, facts, ax=None, focus=None):
     ax = ax or plt.subplots(figsize=(12, 4.6))[1]
     _frames(ax, pz, answer=False)
     F, xy = parse_facts(facts), node_xy_dynamic(pz)
-    for s, d, t in F.get("pedge", []):
-        if focus and focus not in (s, d):
-            continue
-        col, ls = _edge_style(t)
-        (x1, y1), (x2, y2) = xy[s], xy[d]
-        ax.annotate("", (x2, y2), (x1, y1), arrowprops=dict(arrowstyle="-|>", color=col, lw=1,
-                    ls=ls, alpha=0.8, shrinkA=9, shrinkB=9, connectionstyle="arc3,rad=0.12"), zorder=2)
+    n_pairs = _draw_edges(ax, F.get("pedge", []), xy, focus, shrink=7, lw=1.4)
     for o, q in F.get("in_panel", []):
         (x1, y1), (x2, y2) = xy[o], xy[q]
-        ax.plot([x1, x2], [y1, y2], color="green", lw=0.8, alpha=0.6, zorder=3)
-        ax.plot(x1, y1, "o", ms=3, color="green", zorder=4)
+        ax.plot([x1, x2], [y1, y2], color="green", lw=1, alpha=0.7, zorder=3)
+        ax.plot(x1, y1, "o", ms=4, color="green", zorder=4)
     for p in range(16):
-        ax.plot(*xy[f"q{p}"], "s", ms=9, mfc="gold" if p < 8 else "violet", mec="k", zorder=5)
-    n_e = len(F.get("pedge", []))
-    ax.set_title(f"panel level: 16 panel nodes, {len(F.get('in_panel', []))} in_panel links (green), "
-                 f"{n_e} panel edges" + (f" (showing those of {focus})" if focus else ""), fontsize=9)
+        ax.plot(*xy[f"q{p}"], "s", ms=10, mfc="gold" if p < 8 else "violet", mec="k", zorder=5)
+        ax.text(xy[f"q{p}"][0], xy[f"q{p}"][1] - 0.2, f"q{p}", ha="center", fontsize=7, zorder=5)
+    ax.set_title(f"panel level: 16 panel nodes (square), {len(F.get('in_panel', []))} object -> panel links (green), "
+                 f"{n_pairs} panel lines" + (f", only those of {focus}" if focus else ""), fontsize=9)
     _legend(ax, [Line2D([], [], color="green", label="object -> its panel (SUM)")])
     return ax
 

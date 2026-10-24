@@ -5,6 +5,7 @@ fixed   : 16 panels x 9 slots, empty slots are `absent` nodes, same-slot edges a
           (the structure of train_all_constellations.py, rebuilt per sample).
 fixed_panel : fixed + the panel nodes of `dynamic` (absent slots feed their panel too), to separate
           the effect of the per-puzzle structure from the effect of the panel level.
+objects : the object level of `dynamic` alone (no panel nodes); the head pools objects.
 dynamic : nodes = the objects present + one node per panel. Object edges link objects at the same
           position in two panels (only when both exist); objects feed their panel with SUM (so the
           panel vector carries count and position set); panels exchange messages labelled
@@ -108,6 +109,7 @@ def facts_dynamic(pz):
     return f + panel_facts()
 
 
+PANELS = ("fixed_panel", "dynamic")                  # arms with a panel level
 EDGE_TYPES = [b + t for b in ("cc", "cx", "xc") for t in ("", "_row", "_col")]
 
 
@@ -144,18 +146,18 @@ def template(graph, d, layers, pool="panels"):
     m = Model()
     for t in EDGE_TYPES:
         m += R.edge_emb(t)[d,]
-        if graph != "fixed":
+        if graph in PANELS:
             m += R.pedge_emb(t)[d,]
     embed(m, d)
-    if graph != "dynamic":
+    if graph.startswith("fixed"):
         m += (R.h0(V.O) <= R.absent(V.O)[d, 1])             # learned absent vector
-    if graph != "fixed":
+    if graph in PANELS:
         m += (R.g0(V.P) <= (R.in_panel(V.O, V.P), R.h0(V.O)[d, d])) | Metadata(aggregation=Aggregation.SUM)
         m += (R.g0 / 1) | Metadata(transformation=Transformation.NORM)
     for k in range(1, layers + 1):
         h, hp = f"h{k}", f"h{k-1}"
         mp_layer(m, d, hp, h)
-        if graph != "fixed":
+        if graph in PANELS:
             g, gp = f"g{k}", f"g{k-1}"
             mp_layer(m, d, gp, g, edge="pedge")
             m += (R.get(g)(V.P) <= (R.in_panel(V.O, V.P), R.get(hp)(V.O)[d, d])) | Metadata(aggregation=Aggregation.SUM)
@@ -166,7 +168,7 @@ def template(graph, d, layers, pool="panels"):
     if graph == "fixed":
         head(m, d, (R.in_cand(V.O, V.C), R.get(f"h{L}")(V.O)[d, d]),
              (R.is_context(V.O), R.get(f"h{L}")(V.O)[d, d]))
-    elif pool == "objects":                                   # pool object nodes, as the fixed arm does
+    elif pool == "objects" or graph == "objects":                                   # pool object nodes, as the fixed arm does
         head(m, d, (R.in_panel(V.O, V.P), R.cand_panel(V.P, V.C), R.get(f"h{L}")(V.O)[d, d]),
              (R.in_panel(V.O, V.P), R.ctx_panel(V.P), R.get(f"h{L}")(V.O)[d, d]))
     else:
@@ -181,7 +183,7 @@ def probe():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--graph", choices=["fixed", "fixed_panel", "dynamic"], default="dynamic")
+    ap.add_argument("--graph", choices=["fixed", "fixed_panel", "dynamic", "objects"], default="dynamic")
     ap.add_argument("--n-train", type=int, default=1000)
     ap.add_argument("--n-val", type=int, default=300)
     ap.add_argument("--dim", type=int, default=32)
@@ -193,7 +195,8 @@ def main():
     ap.add_argument("--xmx", default="6g", help="Java heap")
     a = ap.parse_args()
     neuralogic.set_jvm_options(["-Xms1g", f"-Xmx{a.xmx}"])
-    build = {"fixed": facts_fixed, "fixed_panel": facts_fixed_panel, "dynamic": facts_dynamic}[a.graph]
+    build = {"fixed": facts_fixed, "fixed_panel": facts_fixed_panel, "dynamic": facts_dynamic,
+             "objects": facts_dynamic}[a.graph]
     tr, va = dataset(a.n_train, 0), dataset(a.n_val, 1)
     m = template(a.graph, a.dim, a.layers, a.pool)
     m.build(Settings(optimizer=Adam(lr=a.lr), error_function=CrossEntropy(with_logits=True),
