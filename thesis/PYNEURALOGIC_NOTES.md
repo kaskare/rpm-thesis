@@ -166,6 +166,12 @@ Each of these cost real debugging time and none produce a clear error message.
    but the second topology's backward throws
    `Incompatible dimensions … matrix increment by vector` — trainer state binds to
    whichever topology grounded first. This rules out one-module-per-constellation.
+8. **An unweighted body atom adds its value to the rule's sum.** A "selector" such as
+   `obj(P, O)` (value 1.0) in `occ(P, C) :- obj(P, O), ocomp(O, C), pos(O)` adds 1.0 to every
+   component, so under `Aggregation.SUM` each object contributes its one-hot **+ 2 everywhere**.
+   This is LRNN semantics, not a defect; atoms that should only ground the rule must be declared
+   `R.hidden.obj(...)` (safe from 0.9.2 on, which fixed weight misalignment around hidden atoms).
+   It hid the object positions from the facet model; see §17.
 
 ---
 
@@ -819,3 +825,217 @@ equal the old code exactly on the trained checkpoint):
 | `ablate_absentpos` | `--absent-pos`: empty slots carry their position and panel embedding |
 | `ablate_combined` | all three |
 
+
+## 17. Facet model: positions hidden by visible selector atoms (found and fixed 2026-10-25)
+
+**Where.** The generative per-puzzle graph model, `pynl/bench_hub_grounding.py --template facet`
+(objects as nodes, one facet node per attribute, panel-attribute nodes, ordered row relation per
+attribute, positions as a separate occupancy channel).
+
+**Symptom.** Trained on all seven constellations, distribute_four and distribute_nine stayed far below
+in_distribute_four, whose inner component is the same 2×2 grid (val 300–1299, widened model, epoch 5):
+distribute_four 58.5%, distribute_nine 52.1%, in_distribute_four 87.2%. The same widths trained on
+distribute_nine alone reached 90.1%.
+
+**Not the graph.** The grid component is built identically in the three layouts (1000 unseen puzzles each):
+
+| | distribute_four | in_distribute_four (inner) | distribute_nine |
+|---|---|---|---|
+| objects per panel | 2.24 | 2.23 | 4.65 |
+| same-position edges per puzzle | 19.3 | 19.2 | 40.0 |
+| rows with a fixed layout | 18% | 18% | 14% |
+| answers uniform in type / size / colour | 82 / 87 / 86% | 88 / 86 / 88% | 79 / 83 / 85% |
+
+**Diagnosis** (epoch-5 checkpoint, `Modified_attributes` from the XML):
+* Answer preferred over a candidate differing only in one attribute: type / size / colour 97.7–99.6% in
+  every grid; **position 46.4 / 49.6 / 53.8%** (chance) in distribute_four / distribute_nine /
+  in_distribute_four; **number 71.4 / 57.3 / 98.5%**.
+* Generated positions exactly right: **0.0%** in distribute_four and distribute_nine, 20.2% in
+  in_distribute_four.
+* Mean predicted occupancy: distribute_four puts 0.00 on its own slots 1–4 and 0.55 / 0.47 / 0.58 / 0.62
+  on slots 18–21 (in_distribute_four's inner grid); distribute_nine 0.00 on 5–13 and 0.69–0.73 on 18–21.
+* Moving a puzzle's objects to other slot ids (1–4 → 5–8) or permuting them left the predicted positions
+  unchanged to two decimals; left/right components (slots 14, 15) were also predicted at 18–21; only
+  slot 0 (center_single, outer objects) was predicted correctly.
+
+**Cause.** `occ(P, C) :- obj(P, O), ocomp(O, C), pos(O)` with `Aggregation.SUM`: the two unweighted
+structural atoms each add 1.0 to every component (gotcha 8, §3). A panel with objects at slots 1, 3, 4
+reached the model as `[6, 7, 6, 7, 7, 6, 6, …]` instead of `[0, 1, 0, 1, 1, 0, 0, …]`: +2 per object in all
+22 dimensions, up to +18 in distribute_nine. After the row-relation tanh only the object count got
+through, so the decoder could not tell the grid layouts apart and put every grid's objects on one slot
+set, 18–21. The attribute channels were not affected in the same way: they aggregate with AVG, so the
+selectors there add a constant rather than a count-scaled offset.
+
+**Why in_distribute_four still scored 87%.** The one slot set the decoder used is its own, so its
+count-based occupancy landed on the right slots (number decisions 98.5%); and only 21% of its puzzles have
+all three candidate-separating attributes in the grid (the rest involve the easy outer object), against
+92–95% in distribute_four and distribute_nine. The joint-vs-alone gap on distribute_nine has the same
+origin: trained alone, the count-based guesses landed on distribute_nine's own slots 5–13.
+
+**Fix.** `build_facet_template(..., hidden=True)` (the default) declares every structural atom hidden
+(`obj`, `ocomp`, `samepos`, `col`, `row`, `row3`, `full`, `qcomp`: 17 occurrences); the weighted
+`puzzle(G)` bias is unchanged. `--visible-selectors` reproduces the old behaviour. Checked: the occupancy
+of the panel above is now `[0, 1, 0, 1, 1, 0, …]`; in an untrained model, permuting a puzzle's objects
+moves the predicted occupancy by 0.10 against 0.03 before; both versions still memorise 15 grid puzzles.
+PyNeuraLogic's own GNN modules had the same problem with valued edge atoms (fixed upstream in 0.9.2 by
+making them hidden).
+
+**Affected results.** Every facet run before 2026-10-25 21:19: distribute_nine alone 78.0% (dim 32) and
+90.1% (32 → 64 → 128), all constellations 83.8% (dim 32), the cancelled widened all-constellation run
+(84.7% at epoch 5), and the ablations. The hub and ordered templates also have visible selectors, but
+there positions are part of each object's input vector, so they only add constant offsets.
+
+**Re-runs** (started 2026-10-25 21:19): all constellations, widened, hidden (job 11882029,
+`experiments/facet_all_w32-64-128_hidden`); and distribute_four + distribute_nine + in_distribute_four,
+2000 each, hidden vs `--visible-selectors` (jobs 11882030 / 11882031), 40 epochs, widths 32 → 64 → 128,
+lr 3e-4, val 300–1299:
+
+| | distribute_four | distribute_nine | in_distribute_four | all three | exact generation |
+|---|---|---|---|---|---|
+| hidden (fixed), epoch picked on val 0–299 (20) | 94.5 | 86.2 | 96.4 | 92.4 | 20.8 |
+| hidden (fixed), epoch 40 | 93.5 | 88.4 | 96.4 | 92.8 | 22.9 |
+| visible (old), epoch picked on val 0–299 (30) | 71.0 | 73.4 | 86.3 | 76.9 | 2.6 |
+
+The full all-constellation run (11882029) is still training.
+
+## 18. Generative per-puzzle object graphs: the facet model, results and assessment (2026-10-24/25)
+
+### 18.1 Setup
+* **Task.** Generate the missing panel, per component: type / size / colour histograms, object count and
+  occupied positions. Then pick the candidate closest to what was generated. Candidates are never seen in
+  training; the loss is MSE against the true answer's description. Two metrics: *matched* (closest
+  candidate is right; chance 12.5%; the true description matches 99.1% on I-RAVEN, 100% on I-RAVEN-X)
+  and *exact generation* (the decoded panel equals the answer; stricter).
+* **Input.** XML ground-truth attributes (perception assumed perfect).
+* **Protocol.** I-RAVEN: train on train puzzles, pick the epoch on val 0–299, report val 300–1299. I-RAVEN-X:
+  train 0–5999, pick on 6000–6299, report 6300–7299. **Test splits untouched.** Every number below is one
+  seed and one validation run.
+* **Command** (the full run; JVM heap 300 GB; grounding took 30 min):
+  `python3 pynl/bench_hub_grounding.py --template facet --constellation all --widths 32,64,128 --lr 3e-4
+  --n 6000 --n-sel 300 --n-val 1000 --n-train-eval 300 --train-epochs 80 --eval-every 5
+  --save-dir experiments/facet_all_w32-64-128_hidden --jvm-gb 300`. For I-RAVEN-X, add
+  `--iravenx data/iravenx/center_single_shuffle_n_10_maxval_50.json`.
+* **Code.** `pynl/bench_hub_grounding.py --template facet`. Options: `--widths 32,64,128`, `--values`,
+  `--per-attr-weights`, `--no-rows`, `--visible-selectors`, `--iravenx FILE`, `--save-dir`.
+  `configure(n_cols, maxval)` sets row length and value-code length.
+
+### 18.2 The graph (built by grounding, different for every puzzle)
+* **Nodes.**
+  * Facets `f(O, A)`: one per object and attribute (type, size, colour). Values are 10-bit thermometer codes,
+    or maxval bits for I-RAVEN-X.
+  * Panel-component values `vF(P, C, A)`; number is a fourth attribute.
+  * Row relations `rel(Rw, C, A)` for the complete rows.
+  * Answers `ans(C, A)`.
+  * A position channel with the same row structure over the component's occupancy.
+  * No position nodes, no padding.
+* **Edges.**
+  * Facet ↔ facet: same attribute, same position, another column of the row (a weight per column pair).
+  * Facet ↔ its panel node.
+  * Panel nodes → row node: a weight per column.
+  * Rows 1–2 and the question row's panels → answer.
+* **Weights.** Attribute and component are variables, so one weight set serves all of them.
+* **Structural atoms are hidden** (§17).
+* **Priors**, as against "no priors":
+  * attributes are independent, and behave alike (shared weights);
+  * values have an order (thermometer codes);
+  * panels have a column order;
+  * same position means correspondence;
+  * panels and components are units;
+  * with the row relation (level 2), "the same relation holds in every row".
+* **Not given:** rule names, arithmetic facts, rule labels, candidates.
+
+### 18.3 What moved the numbers (distribute_nine, val 300–1299)
+| step | unseen matched |
+|---|---|
+| hub: one mixed vector per object, rows unordered (2000 puzzles) | 24.7 |
+| ordered: a weight per column pair, row-3 decoder | 31.4 |
+| facet: one node per attribute, thermometer values, panel-attribute nodes | 73.6 |
+| facet, 6000 puzzles | 78.0 |
+| facet, widths 32 → 64 → 128, lr 3e-4 (lr 1e-3 was unstable: 70.3) | 90.1 |
+| selector fix, 3 grid layouts trained jointly (2000 each) | 86.2 (d9), 92.4 over the three |
+
+Training-side changes did not help (cross-entropy 23.5, training on all three rows 21.9, chain pruning off
+24.2; all with the ordered template). The gains came from the representation.
+
+**Ablations (before the fix, distribute_nine, 2000 puzzles, dim 32; to be repeated).**
+* One-hot values: 64.4 (thermometer 71.2–75.4). Ordinal codes matter.
+* Separate weights per attribute: 75.4, within noise of shared.
+* No row relation (level 1): 72.1, level with level 2.
+* Run-to-run spread is about ±1–2 points. Picking the epoch on 300 puzzles is noisy (±2.4).
+
+### 18.4 Current results (runs in progress; update when finished)
+* **I-RAVEN, all 7 constellations, fixed, widths 32 → 64 → 128, lr 3e-4, 6000 per constellation** (job
+  11882029, 80 epochs, `experiments/facet_all_w32-64-128_hidden`). Epoch 5: **92.9% matched, 55.5% exact**:
+
+  | center | 2×2 | 3×3 | L-R | U-D | O-IC | O-IG |
+  |---|---|---|---|---|---|---|
+  | 97.9 | 89.0 | 72.3 | 97.9 | 97.5 | 98.8 | 96.8 |
+
+  The same run with visible selectors was at 84.7 / 14.2 at epoch 5. The grid quick check reached
+  86–88 on 3×3, so distribute_nine should still rise.
+* **I-RAVEN-X 3×3, values 0–9** (`experiments/facet_iravenx_n3_m10`). **99.2%** at the epoch picked on
+  val 6000–6299 (epoch 10), **100.0%** from epoch 15 on, 95.4% exact. The GNN-style model got 46% on the
+  same data. Copying the last panel matches 4.7%.
+* **I-RAVEN-X 3×10** (IBM generator, seed 1234, no confounders), jobs 11883234–36. Epoch 5:
+  * maxval 50: 77.4 (exact 6.1)
+  * maxval 100: 76.6 (exact 2.1)
+  * maxval 1000: pending
+
+### 18.5 Where it stands against the literature
+| setting | ours | reference |
+|---|---|---|
+| learned rules, ground-truth attributes, I-RAVEN | 92.9 (epoch 5) | ARLC 92.6 (trained on 2×2 only!), MLP 87.1, GPT-3 86.5, Learn-VRF 79.5 |
+| hand-written rules, same input | – | our symbolic template 98.33 (test), NVSA backend about 97–99 (RAVEN) |
+| pixels, classifying candidates | not run | Triple-CFN 99.1, RS-Tran 98.7, SAViR-T 98.1, DRNet 97.6 (self-reported). Independent re-runs (A-I-RAVEN, IJCAI 2025): DRNet 90.9, PredRNet 88.8, SCL 83.4, CPCNet 70.4, STSN 59.0 |
+| I-RAVEN-X 3×3 | 99.2 / 100 | ARLC learned 98.4, programmed 97.2, GPT-4 93.2, Llama-3 85.0 |
+| I-RAVEN-X 3×10, maxval 50 / 100 / 1000 | pending | ARLC learned 95.0 / 95.0 / 90.6 (trained once at 50, reconfigured), programmed 100 / 100 / 99.7, GPT-4 82.2 / 79.6 / 76.6 |
+
+Protocol differences to state:
+* ARLC trains on 2×2 only and transfers to the other constellations, and from maxval 50 to larger ranges.
+  We train per constellation set and per range; thermometer codes cannot stretch past their length.
+* Image models see candidates during training and classify among them. Ours generates without candidates.
+
+### 18.6 Analyses worth keeping
+* **Grids are hardest across the I-RAVEN literature.** In SRAN's own table (the I-RAVEN paper) and in
+  NVSA's and ARLC's, learned models are weakest on 2×2, 3×3 and O-IG. I-RAVEN-X (Hersche et al., NEURMAD
+  2025; arXiv 2412.05586 and 2510.17496) keeps only center_single on purpose: LLMs did *better* on the grids,
+  and the grids can be solved from the last row alone.
+* **Candidate structure.** Only 21% of in_distribute_four puzzles need all three candidate-separating
+  decisions inside the grid, against 92–95% for distribute_four / distribute_nine. Per-configuration
+  accuracies are therefore not directly comparable.
+* **ARLC's grid scores** follow from "position decisions at chance, everything else right":
+  1 − ½ × (share of puzzles whose candidates differ in position).
+
+  | | predicted | ARLC reported |
+  |---|---|---|
+  | 2×2 | 84.7 | 83.4–84.9 |
+  | 3×3 | 83.2 | 80.0–81.7 |
+  | O-IG | 88.2 | 89.4–90.3 |
+
+  ARLC encodes a panel's positions as one pattern symbol, and its add/subtract rule formula cannot express
+  OR, AND-NOT or cyclic shifts. That is a design limit, not our bug.
+* **Error analysis by attribute** (answer vs a candidate differing only in one attribute) pinpoints failures
+  by attribute and rule. It is how the selector bug was found (§17).
+* **Cost.** Grounding takes 10–165 ms per puzzle, once. Training takes 2–66 ms per puzzle per epoch on CPU;
+  all of I-RAVEN takes about 14 min per epoch at widths 32 → 64 → 128. The GNN-style model through the
+  torch bridge took 6.5–9.6 h per epoch.
+
+### 18.7 Findings for the thesis, ranked
+1. Generative per-puzzle object graphs in PyNeuraLogic: design, headline numbers, and the table in 18.3.
+   This moves the thesis from "PyNeuraLogic matches a torch GNN" (68.5 vs 45) to "the right lifted
+   representation brings a learned model close to hand-written rules".
+2. The prior levels (none / same relation in every row / given rules). This needs the post-fix ablations,
+   and ideally a generative level 3.
+3. Semantic pitfalls of lifted templates: visible selectors (§17), chain pruning dropping transformations,
+   hidden atoms merging identical groundings. Plus how each was diagnosed.
+4. Error analysis and the benchmark observations in 18.6.
+5. Cost (18.6) and the earlier chapters: the GNN port, the pipeline bugs (§10), the symbolic templates (§15),
+   end to end costing almost nothing.
+
+### 18.8 Needed before these are claims
+1. Score the final checkpoint once on the test split, and end to end with the cached ResNet-18 predictions
+   (`experiments/frontend_preds/`). About half a day after the run ends.
+2. Re-run the ablations with hidden selectors: values, weight sharing, level 1 vs 2. About a day, in parallel.
+3. Three seeds of the final configuration.
+4. ARLC's protocol: train on 2×2, test on all seven (unseen slot ids may hurt). About half a day.
+5. Optional: a generative level 3 (symbolic rules as a generator), so all three levels share one setting.

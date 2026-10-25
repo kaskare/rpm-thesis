@@ -1,6 +1,6 @@
 # I-RAVEN solver in PyNeuraLogic — project knowledge
 
-State as of 2026-10-19. Written from the full working history of the project, for use as Claude
+State as of 2026-10-19; §15 (the generative facet model) added 2026-10-25. Written from the full working history of the project, for use as Claude
 project knowledge. Numbers are measured unless marked as estimates.
 
 ---
@@ -17,6 +17,11 @@ I-RAVEN test with XML labels and 68.46% end to end** through a ResNet-18 fronten
 **45.25 ± 12.4** for the torch GNN retrained over 3 seeds (best seed 59.02%). That is level with the old
 published torch number, 68.81%, which was trained on buggy positions and is not reproducible. A separate
 **symbolic** PyNeuraLogic model reaches **97.6–98.4%** on ground-truth attributes.
+
+Since 2026-10-24 the main direction is a **generative** model on a graph grounded differently for every
+puzzle (objects are the nodes, no position nodes). It generates the missing panel and picks the closest
+candidate. On ground-truth attributes it reaches **92.9%** on unseen I-RAVEN validation puzzles (an interim
+number, epoch 5 of 80) and **99.2–100%** on I-RAVEN-X 3×3. See §15.
 
 ---
 
@@ -275,8 +280,16 @@ effect. Predictions cached in `experiments/frontend_preds/`.
    * torch-wrapper inputs need `requires_grad=True`;
    * a built sample's target is read-only (set via `b._java_sample.target = ValueFactory().get_value(...)[1]`);
    * template facts are not learnable in native training; a probe's +1 offset needs `combination=PRODUCT`;
-   * Python `|` vs `<=` precedence in rules needs parentheses.
-5. **Stale files:** `table_406.tex`, `table_i_raven_per_constellation_test.tex`,
+   * Python `|` vs `<=` precedence in rules needs parentheses;
+   * an unweighted body atom adds its value (1.0) to every component of the rule's sum → declare purely
+     structural atoms `R.hidden.x(...)` (safe from 0.9.2).
+5. **Facet model positions hidden by visible selectors** (2026-10-25): in
+   `occ(P, C) :- obj(P, O), ocomp(O, C), pos(O)` (SUM) the two structural atoms added +2 per object to all
+   22 position dimensions ([6,7,6,7,7,6,…] for slots 1, 3, 4), so the position channel saw only the object
+   count: distribute_four/nine positions never right, every grid predicted at in_distribute_four's slots
+   18–21 (d4 58.5%, d9 52.1%, in_d4 87.2%). Fixed with hidden selectors (`build_facet_template(hidden=True)`,
+   default); all earlier facet numbers are affected. Details: `thesis/PYNEURALOGIC_NOTES.md` §17.
+6. **Stale files:** `table_406.tex`, `table_i_raven_per_constellation_test.tex`,
    `scripts/BEST_MODELS_RESULTS.md` still show the invalid 68.81% / 68.83% numbers.
 
 ---
@@ -331,8 +344,10 @@ the ResNet-18 frontend in `frontend/`. Everything runs from the repository root.
 | `submit_max.sh`, `submit_symbolic.sh`, `submit_gnn_fixrel.sh` | SLURM jobs |
 | `pynl_iraven_solver.ipynb` (+ `thesis/pynl_iraven_solver.html`) | compact end-to-end notebook, model inline, verified identical to the training code |
 | `pynl_best_architecture_walkthrough.ipynb`, `pixels_to_answer.ipynb` | longer walkthroughs (HTML in `thesis/`) |
+| `bench_hub_grounding.py` (`--template facet`) | the generative facet model: graph, template, facts, I-RAVEN-X loader, training and generate-then-match evaluation (§15) |
+| `facet_model.ipynb` (+ `thesis/facet_model.html`) | the facet model on one puzzle: graph drawing, rules, generated vs true answer, candidate distances |
 | `thesis/CODE_INDEX.md` | index of the PyNeuraLogic code; superseded experiments in `archive/pyneuralogic_experiments/` |
-| `thesis/PYNEURALOGIC_NOTES.md` | the detailed lab notes (status, bugs §10, pixels §11, files §12, open questions §13, audit §14); status block predates the 3-seed torch and symbolic results |
+| `thesis/PYNEURALOGIC_NOTES.md` | the detailed lab notes (status, bugs §10, pixels §11, files §12, open questions §13, audit §14, facet selector bug §17, facet model results and thesis plan §18); status block predates the 3-seed torch and symbolic results |
 | `thesis/pyneuralogic_report.html` | report, published as https://claude.ai/artifact/JZNH9G6j2DaYVNKG4BUVfn (v3, stale: lacks symbolic + 3-seed numbers) |
 | `archive/pyneuralogic_2026-03-31_to_05-06/` | the April work (`scripts/raven_pyneuralogic.py`) |
 
@@ -383,3 +398,53 @@ candidates.
 * Hybrid GNN + symbolic scores, or the symbolic model as the main end-to-end system (depends on §13).
 * Push `pyneuralogic-thesis` to a private repository of the user's (needs their own credentials; never
   IBM's upstream).
+
+---
+
+## 15. Generative per-puzzle object graphs: the facet model (2026-10-24/25)
+
+Full write-up: `thesis/PYNEURALOGIC_NOTES.md` §17 (the selector bug) and §18 (design, results,
+assessment, thesis plan).
+
+**The user's design.**
+* Three prior levels: (1) none; (2) "the same relation holds in every row"; (3) the full rule set, as in
+  ARLC or NVSA.
+* Generate the answer, then match it to the closest candidate (no 8-way classification).
+* A dynamic graph, different for every puzzle. Objects are the nodes; positions must never be nodes, and
+  there is no padding.
+
+**Model** (`pynl/bench_hub_grounding.py --template facet`, native PyNeuraLogic training, MSE).
+* Nodes: one per object and attribute, with thermometer value codes. Same-position edges link objects in
+  the same row, with a weight per column pair.
+* Panel-component-attribute nodes, a row relation per attribute, and an answer decoded to codes.
+* Object positions go through an occupancy channel with the same row structure.
+* Weights are shared across attributes and components.
+* All structural selector atoms are hidden.
+
+**Interim results** (one seed; epoch picked on val 0–299; unseen val 300–1299; test untouched):
+
+| run | matched | exact |
+|---|---|---|
+| I-RAVEN, all 7 constellations, widths 32 → 64 → 128, lr 3e-4 (epoch 5 of 80) | 92.9 | 55.5 |
+| I-RAVEN-X 3×3, values 0–9 | 99.2 (100 from epoch 15) | 95.4 |
+| I-RAVEN-X 3×10, values 0–49 / 0–99 (epoch 5) | 77.4 / 76.6 | 6.1 / 2.1 |
+
+* By constellation (I-RAVEN, epoch 5): center 97.9, distribute_four 89.0, distribute_nine 72.3,
+  left/right 97.9, up/down 97.5, in/out 98.8, in_distribute_four 96.8.
+* Before the selector fix the same model reached 83.8% (distribute_four 58.0, distribute_nine 50.3).
+* For comparison: the GNN-style model reached 68.49% test on I-RAVEN and 46% on I-RAVEN-X 3×3. ARLC,
+  the best learned-rule model on ground-truth attributes, reports 92.6% on I-RAVEN.
+
+**Main findings.**
+* The representation did it, not the training: one node per attribute, ordinal codes, panel-attribute
+  nodes, hidden selectors.
+* Unweighted selector atoms add 1.0 to every component of a sum. Visible selectors had hidden the
+  object positions in the grid layouts (§6 item 5).
+* ARLC's grid scores match what "position decisions at chance" predicts.
+
+**Needed before these are thesis claims:**
+1. Score the test split once, and end to end.
+2. Ablations with the fix.
+3. Three seeds.
+4. ARLC's protocol (train on 2×2 only).
+5. Optionally, a generative level 3.

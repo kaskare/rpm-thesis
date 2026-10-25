@@ -9,6 +9,7 @@ torch GNN in `torch_gnn/`; run everything from the repository root. Line numbers
 1. `train_all_constellations.py` — the GNN-style model (best result).
 2. `pynl_symbolic.py` — the symbolic models.
 3. `archive/pyneuralogic_2026-03-31_to_05-06/scripts/raven_pyneuralogic.py` — your April model, for comparison.
+4. `bench_hub_grounding.py` — the generative facet model (the current direction, notes §18).
 
 ## Files
 
@@ -47,6 +48,22 @@ The frontend itself is torch-only: `frontend/train_frontend.py` and `frontend/pr
 | `pynl_symbolic_e2e.py` | Scores a trained symbolic model end to end (ResNet perception → symbolic facts) and with XML labels, next to the non-learned reference solvers. Verifies its converter against `read_puzzle`. | `to_symbolic`, `template_scores` |
 | `submit_symbolic_e2e.sh` | Test-split run of the above for both vocabularies. | |
 | `submit_symbolic_extra.sh` | Learning curves (10, 30, 1000 puzzles/constellation) and random initial weights (`--init-seed`, 3 seeds). | |
+
+### The generative facet model (ground-truth attributes; notes §17–§18)
+
+| file | what it is | where to look |
+|---|---|---|
+| `bench_hub_grounding.py` | Generates the missing panel's description on a graph grounded differently for every puzzle, then picks the closest candidate. `--template facet` is the current model; `hub` and `ordered` are the earlier steps. Line numbers as of 2026-10-25. | row length and code length: `configure` :179 · two-part layouts: `COMPONENTS` :198 · value codes and targets: `code` :216, `facet_target` :223, `facet_decode` :236 · template: `build_facet_template` :268 · facts: `facet_facts` :391, `puzzle_facts` :407 · data: `load` :440, `load_iravenx` :450 · generate-then-match metrics: `evaluate` :66 · training and selection: `main` :490 |
+| `facet_model.ipynb` | Loads a facet checkpoint (`template_best.bin`, `best.json`) and shows one puzzle: graph drawing, printed rules, generated vs true answer, candidate distances, accuracy on val 300–399. Executed copy: `thesis/facet_model.html`. | |
+
+Options:
+* `--widths 32,64,128` widens the layers.
+* `--values onehot`, `--per-attr-weights` and `--no-rows` are the ablations.
+* `--visible-selectors` brings back the old, buggy behaviour (§17).
+* `--iravenx FILE` trains on I-RAVEN-X data from IBM's generator.
+* `--save-dir` saves the best checkpoint.
+
+Runs are submitted with `sbatch --wrap` (command in notes §18.1) and write to `experiments/facet_*`.
 
 ### Checks and walkthroughs
 
