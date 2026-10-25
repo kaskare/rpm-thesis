@@ -142,6 +142,7 @@ def main():
     ap.add_argument("--pool-h", choices=["max", "avg"], default="max")
     ap.add_argument("--head", choices=["mlp", "cos"], default="mlp")
     ap.add_argument("--counts", action="store_true", help="add join counts (COUNT aggregation) to the row vector")
+    ap.add_argument("--layout-rule", default=None, help="train and validate on one layout rule only, e.g. pos_prog")
     ap.add_argument("--n-train", type=int, default=1000)
     ap.add_argument("--n-val", type=int, default=300)
     ap.add_argument("--dim", type=int, default=32)
@@ -154,7 +155,11 @@ def main():
     neuralogic.set_jvm_options(["-Xms1g", f"-Xmx{a.xmx}"])
     from neuralogic.logging import clear_handlers
     clear_handlers()
-    tr, va = dataset(a.n_train, 0), dataset(a.n_val, 1)            # same data as dynamic_graph.py
+    if a.layout_rule:     # only puzzles with this layout rule, drawn from the same generator streams
+        pick = lambda n, seed: [p for p in dataset(12 * n, seed) if p["layout_rule"] == a.layout_rule][:n]
+        tr, va = pick(a.n_train, 0), pick(a.n_val, 1)
+    else:
+        tr, va = dataset(a.n_train, 0), dataset(a.n_val, 1)            # same data as dynamic_graph.py
     m = template(a.dim, a.layers, a.pool_h, a.head, a.counts)
     m.build(Settings(optimizer=Adam(lr=a.lr), error_function=CrossEntropy(with_logits=True),
                      iso_value_compression=False))
