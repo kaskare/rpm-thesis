@@ -20,8 +20,8 @@ published torch number, 68.81%, which was trained on buggy positions and is not 
 
 Since 2026-10-24 the main direction is a **generative** model on a graph grounded differently for every
 puzzle (objects are the nodes, no position nodes). It generates the missing panel and picks the closest
-candidate. On ground-truth attributes it reaches **92.9%** on unseen I-RAVEN validation puzzles (an interim
-number, epoch 5 of 80) and **99.2–100%** on I-RAVEN-X 3×3. See §15.
+candidate. On ground-truth attributes it reaches **97.3%** on unseen I-RAVEN validation puzzles (80 epochs;
+test split not yet scored) and **99.2–100%** on I-RAVEN-X 3×3. See §15.
 
 ---
 
@@ -159,7 +159,8 @@ used real objects as nodes (graph shape varies → regrounding per sample), 4 sc
 position grid plus `same_pos` plus right/down neighbour-panel edges, separate weights per relation, a
 learned skip matrix, no normalisation, and **8 binary yes/no samples per puzzle** (one per candidate,
 scored alone; 7 of 8 targets are 0). It trained per constellation on 500 puzzles at D=8 and scored
-9–19.5% test (chance 12.5%); full-data runs ran out of memory (Java heap / 200 GB). The fixes:
+9–19.5% test (chance 12.5%); full-data runs ran out of memory (Java heap / 200 GB): 420,000 per-candidate graphs with up to 1,833
+spatial edge facts each (distribute_nine), all held at once by neuralogic 0.8.0 (notes §19). The fixes:
 a fixed slot graph (ground once), learned embedding tables, whole puzzle with 8-way softmax,
 identity residual + NORM, embeddings/loss/optimiser in torch, more data. Pure PyNeuraLogic stalled at
 ~27% on center_single; moving the numeric parts to torch lifted it to ~53%.
@@ -421,16 +422,16 @@ assessment, thesis plan).
 * Weights are shared across attributes and components.
 * All structural selector atoms are hidden.
 
-**Interim results** (one seed; epoch picked on val 0–299; unseen val 300–1299; test untouched):
+**Results** (one seed; epoch picked on val 0–299; unseen val 300–1299; test untouched):
 
 | run | matched | exact |
 |---|---|---|
-| I-RAVEN, all 7 constellations, widths 32 → 64 → 128, lr 3e-4 (epoch 5 of 80) | 92.9 | 55.5 |
+| I-RAVEN, all 7 constellations, widths 32 → 64 → 128, lr 3e-4 (80 epochs, picked epoch 55) | 97.3 | 69.1 |
 | I-RAVEN-X 3×3, values 0–9 | 99.2 (100 from epoch 15) | 95.4 |
-| I-RAVEN-X 3×10, values 0–49 / 0–99 (epoch 5) | 77.4 / 76.6 | 6.1 / 2.1 |
+| I-RAVEN-X 3×10, values 0–49 / 0–99 / 0–999 (60 epochs, picked epoch) | 85.4 / 84.9 / 81.2 | 15.0 / 6.4 / 0.0 |
 
-* By constellation (I-RAVEN, epoch 5): center 97.9, distribute_four 89.0, distribute_nine 72.3,
-  left/right 97.9, up/down 97.5, in/out 98.8, in_distribute_four 96.8.
+* By constellation (I-RAVEN, epoch 55): center 99.3, distribute_four 95.5, distribute_nine 89.8,
+  left/right 99.5, up/down 99.7, in/out 99.6, in_distribute_four 97.8.
 * Before the selector fix the same model reached 83.8% (distribute_four 58.0, distribute_nine 50.3).
 * For comparison: the GNN-style model reached 68.49% test on I-RAVEN and 46% on I-RAVEN-X 3×3. ARLC,
   the best learned-rule model on ground-truth attributes, reports 92.6% on I-RAVEN.

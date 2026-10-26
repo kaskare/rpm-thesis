@@ -965,30 +965,39 @@ Training-side changes did not help (cross-entropy 23.5, training on all three ro
 
 ### 18.4 Current results (runs in progress; update when finished)
 * **I-RAVEN, all 7 constellations, fixed, widths 32 → 64 → 128, lr 3e-4, 6000 per constellation** (job
-  11882029, 80 epochs, `experiments/facet_all_w32-64-128_hidden`). Epoch 5: **92.9% matched, 55.5% exact**:
+  11882029, 80 epochs, finished 2026-10-26, `experiments/facet_all_w32-64-128_hidden`). At the epoch picked on
+  val 0–299 (epoch 55): **97.3% matched, 69.1% exact** on val 300–1299 (last epoch: 97.0 / 68.4):
 
   | center | 2×2 | 3×3 | L-R | U-D | O-IC | O-IG |
   |---|---|---|---|---|---|---|
-  | 97.9 | 89.0 | 72.3 | 97.9 | 97.5 | 98.8 | 96.8 |
+  | 99.3 | 95.5 | 89.8 | 99.5 | 99.7 | 99.6 | 97.8 |
 
-  The same run with visible selectors was at 84.7 / 14.2 at epoch 5. The grid quick check reached
-  86–88 on 3×3, so distribute_nine should still rise.
+  Progress: 92.9 (epoch 5), 95.2 (10), 96.3 (15), then 96–97.3 from epoch 25 on. The same model with visible
+  selectors was at 84.7 / 14.2 at epoch 5. The notebook (`thesis/facet_model.html`) was re-run on this
+  checkpoint: example distribute_four val 303 is picked correctly, though the generated panel has one object
+  too many; val 300–399 gives 97.6% matched. A 150-epoch repeat is running (job 11887180).
 * **I-RAVEN-X 3×3, values 0–9** (`experiments/facet_iravenx_n3_m10`). **99.2%** at the epoch picked on
   val 6000–6299 (epoch 10), **100.0%** from epoch 15 on, 95.4% exact. The GNN-style model got 46% on the
   same data. Copying the last panel matches 4.7%.
-* **I-RAVEN-X 3×10** (IBM generator, seed 1234, no confounders), jobs 11883234–36. Epoch 5:
-  * maxval 50: 77.4 (exact 6.1)
-  * maxval 100: 76.6 (exact 2.1)
-  * maxval 1000: pending
+* **I-RAVEN-X 3×10** (IBM generator, seed 1234, no confounders), jobs 11883234–36, 60 epochs, finished
+  2026-10-26. Unseen matched at the epoch picked on selection / at the last epoch (exact in brackets):
+  * maxval 50: **85.4** (epoch 35; 15.0) / 87.8 (22.6)
+  * maxval 100: **84.9** (epoch 60; 6.4) / 84.9 (6.4)
+  * maxval 1000: **81.2** (epoch 50; 0.0) / 83.4 (0.0)
+
+  Copy-panel baselines 1.9–2.8%; the true description matches 100%. Positions are always exact, and
+  per-attribute exactness falls with the range (type 68 / 44 / 3% at the last epoch). Still rising at
+  epoch 60, so 150-epoch runs were started (`pynl/submit_facet_long.sh`, jobs 11887180–83,
+  `experiments/facet_ep150_*`), together with the all-constellation I-RAVEN run.
 
 ### 18.5 Where it stands against the literature
 | setting | ours | reference |
 |---|---|---|
-| learned rules, ground-truth attributes, I-RAVEN | 92.9 (epoch 5) | ARLC 92.6 (trained on 2×2 only!), MLP 87.1, GPT-3 86.5, Learn-VRF 79.5 |
+| learned rules, ground-truth attributes, I-RAVEN | 97.3 (val 300–1299; test not yet scored) | ARLC 92.6 (trained on 2×2 only!), MLP 87.1, GPT-3 86.5, Learn-VRF 79.5 |
 | hand-written rules, same input | – | our symbolic template 98.33 (test), NVSA backend about 97–99 (RAVEN) |
 | pixels, classifying candidates | not run | Triple-CFN 99.1, RS-Tran 98.7, SAViR-T 98.1, DRNet 97.6 (self-reported). Independent re-runs (A-I-RAVEN, IJCAI 2025): DRNet 90.9, PredRNet 88.8, SCL 83.4, CPCNet 70.4, STSN 59.0 |
 | I-RAVEN-X 3×3 | 99.2 / 100 | ARLC learned 98.4, programmed 97.2, GPT-4 93.2, Llama-3 85.0 |
-| I-RAVEN-X 3×10, maxval 50 / 100 / 1000 | pending | ARLC learned 95.0 / 95.0 / 90.6 (trained once at 50, reconfigured), programmed 100 / 100 / 99.7, GPT-4 82.2 / 79.6 / 76.6 |
+| I-RAVEN-X 3×10, maxval 50 / 100 / 1000 | 85.4 / 84.9 / 81.2 (60 epochs) | ARLC learned 95.0 / 95.0 / 90.6 (trained once at 50, reconfigured), programmed 100 / 100 / 99.7, GPT-4 82.2 / 79.6 / 76.6 |
 
 Protocol differences to state:
 * ARLC trains on 2×2 only and transfers to the other constellations, and from maxval 50 to larger ranges.
@@ -1039,3 +1048,56 @@ Protocol differences to state:
 3. Three seeds of the final configuration.
 4. ARLC's protocol: train on 2×2, test on all seven (unseen slot ids may hurt). About half a day.
 5. Optional: a generative level 3 (symbolic rules as a generator), so all three levels share one setting.
+
+## 19. Why the April spatial GNN never got past grounding (written up 2026-10-26)
+
+The April 2026 PyNeuraLogic GNN (`archive/pyneuralogic_2026-03-31_to_05-06/scripts/run_pynl_gnn.py`,
+later `raven_pyneuralogic.py`) used objects as nodes with spatial edges, like the torch GNN. Its full-data
+runs never finished grounding. Logs: `archive/…/log/slurm_pynl_gnn_*` and `slurm_raven_pyneuralogic_*`.
+
+| job (2026-04) | grounding | outcome |
+|---|---|---|
+| 10788629, 10788699 | 500 puzzles/constellation, 28,000 queries | grounded in 477–527 s |
+| 10788708 | all 42,000 puzzles, 336,000 queries | cancelled while grounding |
+| 10788797, 10789406 | 420,000 per-candidate graphs, D = 378 | `OutOfMemoryError: Java heap space` |
+| 10794139 | the same | killed by SLURM for exceeding memory; building the dataset alone took 1371 s |
+| 10868907 | 35,000 graphs (500/constellation), D = 128 | Java heap out of memory (64 GB cap) |
+| 10875721 (Apr 29) | `raven_pyneuralogic.py`, D = 378, all data | killed by SLURM for exceeding memory while grounding |
+
+**Causes:**
+1. **One graph per candidate.** Each puzzle became 8 graphs (8 context panels + one candidate), and the
+   right candidate was repeated 3 times (`--oversample-pos 3`): 10 graphs per puzzle, 420,000 in all. The
+   context was grounded 10 times per puzzle.
+2. **Dense spatial edges.** `left_of / right_of / above / below / same_row / same_col` link every object
+   pair *within* a panel, *and every object pair of the neighbouring panels* in the 3×3 matrix (both
+   directions). `same_pos` links same-slot objects across all 9 panels. The neighbour-panel edges grow
+   with the product of the two panels' object counts.
+3. **Every edge grounds 3 times**: 7 edge relations, each with its own rule in each of the 3 layers.
+4. **The library held everything at once.** neuralogic 0.8.0 (`nvsa` env) collects the whole grounded
+   dataset into one Java list (`_groundings.collect(toList())`, where the traces end). The heap was capped
+   at 64 GB (`neuralogic.set_max_memory_size(64)`), and jobs ran on GPU nodes (g01, g05, g08).
+
+**Measured size** (the April fact builder, run on 50 training puzzles per constellation;
+script `scratchpad/count_april.py`, not kept):
+
+| constellation | object facts per graph | edge facts per graph |
+|---|---|---|
+| center_single | 45 | 120 |
+| distribute_four | 102 | 459 |
+| in_distribute_four | 151 | 918 |
+| distribute_nine | 211 | 1,833 |
+
+One distribute_nine graph thus grounds about 5,500 edge rule neurons (1,833 edges × 3 layers), and there
+were 420,000 graphs.
+
+**Against the facet model (§18):**
+* One graph per puzzle; candidates are never in it.
+* Only same-position edges inside a row: at most 126 per distribute_nine puzzle (14 directed pairs per
+  slot × 9 slots), against 1,833 per candidate graph.
+* Attribute and component are rule variables, so one rule set serves all of them.
+
+That is about 15× fewer edges per graph and 10× fewer graphs. All of I-RAVEN (66,000 per-component
+samples) grounds in 30 min with a 300 GB heap (10–165 ms per puzzle).
+
+The GNN-style model (§8) avoided the problem differently: a fixed slot graph grounded once, with the
+values supplied from torch.
