@@ -443,6 +443,51 @@ assessment, thesis plan).
   object positions in the grid layouts (§6 item 5).
 * ARLC's grid scores match what "position decisions at chance" predicts.
 
+**Gated copy links** (`--copy-links`, notes §20, 2026-10-26). The per-rule analysis showed Distribute-n
+(10% exact) and Arithmetic failing on 3×10: the answer could not reach single panels of rows 1–2 (they
+arrive only as an averaged row summary), and values lose precision through tanh layers. Copy links let a
+learned gate per context panel copy that panel's exact code into the output. 3×10 values 0–49:
+85.4 → **97.8% matched** (exact 15 → 60), above ARLC's 95.0. Values 0–99: 84.9 → **96.2**. Values 0–999:
+81.2 → **94.3** (exact 0 → 15), above ARLC's 90.6.
+
+Framing: a weak, domain-general inductive bias ("the answer may reuse a context value"), a prior on
+operations rather than on rules. It was designed after seeing validation errors, so it must be applied
+everywhere with fixed settings, ablated (access vs precision) and tested on I-RAVEN.
+
+**Symmetries and proofs** (notes §21, 2026-10-27).
+- **Theorem.** Renaming constants a template does not name leaves every atom's value unchanged.
+- **Built into the facet model:**
+  - the order of objects in a panel;
+  - swapping rows 1 and 2;
+  - swapping attributes (shared weights);
+  - swapping components;
+  - the order of the candidates.
+- **Checked numerically:** on random weights and on trained checkpoints, by `facet_symmetry_check.py`.
+- **Copy links are a preference bias**, not a restriction:
+  - same data and information;
+  - nested hypothesis spaces;
+  - gains concentrated on Constant and Distribute-n.
+- **Their per-panel gates broke the rows 1↔2 symmetry.** The model learned Distribute-n by address: after
+  the swap, Distribute-n exact generation fell from 86.8% to 1.2%.
+- **Content gates** restore the symmetry: 94.9% matched, unchanged by the row swap, with Distribute-n
+  exact at 59.8%. A **shuffled-source control** reaches only 87.3% (plain 85.4), so the gain is the bias,
+  not the extra weights.
+
+**Symmetries of the data** (notes §22, `dataset_symmetry_check.py`). A transformation can be a task
+symmetry (the rules survive it), a data symmetry (the generator also produces both sides equally often), or
+neither.
+- **Rows 1↔2.** A data symmetry in I-RAVEN: the Distribute direction is 50/50, and with n = 3 the swap maps
+  one direction onto the other. In I-RAVEN-X 3×10 it is not: Distribute leaves the generator's support. That
+  gap is what per-panel gates exploited.
+- **Value reflection.** Holds for Constant, Progression and Distribute; never for Arithmetic.
+- **Grid slots.** Position-Progression rolls slots in reading order, so 2×2 keeps left-right, up-down and
+  180°, and 3×3 only 180°.
+- **Attributes and components.** I-RAVEN-X size↔colour and the L-R / U-D components are exact; O-IC / O-IG
+  are not.
+- **Candidates.** Product sets make the candidates alone uninformative: exactly 12.5%.
+- **Arithmetic.** Its operand-order symmetry is not built into the model. That points to a structural fix:
+  SUM over the operand columns.
+
 **Needed before these are thesis claims:**
 1. Score the test split once, and end to end.
 2. Ablations with the fix.

@@ -265,7 +265,7 @@ def facet_to_description(out, values="therm"):
     return desc
 
 
-def build_facet_template(d, layers, shared=True, rows=True, widths=None, hidden=True):
+def build_facet_template(d, layers, shared=True, rows=True, widths=None, hidden=True, copy=False, gates="panel"):
     """Objects are split into FACETS f(O, A), A in {type, size, color}; with shared=True every rule has
     the attribute as a variable, so one set of weights serves all attributes. Values are codes (code()).
     Everything above the objects is per COMPONENT C (ocomp(O, C)); components share all weights.
@@ -288,7 +288,15 @@ def build_facet_template(d, layers, shared=True, rows=True, widths=None, hidden=
     (+2 per object everywhere), which left the position channel seeing only the object count.
     Ablations: shared=False writes every attribute rule once per attribute, with its own weights;
     rows=False (no row prior, level 1) drops rel/ctx: the answer reads all eight panels, each through
-    its own weight, so a panel's grid position is known only by which weight it gets."""
+    its own weight, so a panel's grid position is known only by which weight it gets.
+    copy=True adds gated copy links: every context panel's code, as a +-COPY_SCALE fact pc(P, C, A), goes
+    straight into the output logits, multiplied (ELPRODUCT) by a sigmoid gate computed from ans with
+    its own weights per panel. A copied value skips the tanh layers, so it keeps full precision; the
+    answer of Constant and Distribute-n is one of the context values.
+    gates="content" (with copy=True): a gate reads the panel's own vF times ans, elementwise, with weights
+    per ROLE (a complete row, the question row) instead of per panel. Naming a panel breaks the symmetry
+    of rows 1 and 2 (notes §21); per-panel gates learned to copy Distribute-n by address, which fails once
+    the rows are swapped."""
     from neuralogic.core import Model, R, V, Transformation, Aggregation, Metadata, Combination
     w = list(widths) if widths else [d] * (layers + 1)
     layers, W = len(w) - 1, w[-1]
@@ -351,6 +359,24 @@ def build_facet_template(d, layers, shared=True, rows=True, widths=None, hidden=
         # one decoder per weight set; the weighted puzzle(G) fact is a learned bias per code bit
         # ("value > k" needs its own threshold for every k; the template has no other bias)
         m += (R.oa(V.G, A) <= (R.puzzle(V.G)[THERM, 1], S.qcomp(V.G, V.C), R.ans(V.C, A)[THERM, W]))
+        if copy:
+            # two rules per gate so chain pruning keeps its sigmoid; the hidden pc atom only binds A. The
+            # gate bias starts at GATE_BIAS0 (gates ~0.0025): open at 0.5, the 3n-1 copies swamped the logits
+            # and memorising 200 3x10 puzzles went from 99% to 60% exact after 150 epochs
+            if gates == "panel":
+                for p in range(N_CTX):
+                    m += (R.gate(f"p{p}", V.C, A) <= R.ans(V.C, A)[THERM, W])
+                    m += (R.gate(f"p{p}", V.C, A) <= (R.puzzle(V.G)[[GATE_BIAS0] * THERM], R.hidden.qcomp(V.G, V.C),
+                                                       R.hidden.pc(f"p{p}", V.C, A)))
+            else:               # the role atoms are always hidden: in an ELPRODUCT a visible 1.0 would join the product
+                for role in ((R.hidden.inrow(V.P, V.Rw), R.hidden.full(V.Rw)), (R.hidden.inrow(V.P, "r3"),)):
+                    m += (R.gate(V.P, V.C, A) <= (R.ans(V.C, A)[THERM, W], R.vF(V.P, V.C, A)[THERM, W]) + role) | Metadata(
+                        combination=Combination.ELPRODUCT)
+                    m += (R.gate(V.P, V.C, A) <= (R.puzzle(V.G)[[GATE_BIAS0] * THERM], R.hidden.qcomp(V.G, V.C),
+                                                  R.hidden.pc(V.P, V.C, A)) + role)
+            m += (R.copy(V.C, A) <= (R.gate(V.P, V.C, A), R.pc(V.P, V.C, A))) | Metadata(
+                combination=Combination.ELPRODUCT, aggregation=Aggregation.SUM)
+            m += (R.oa(V.G, A) <= (S.qcomp(V.G, V.C), R.copy(V.C, A)))
     if rows:
         m += (R.rel / 3) | tanh
         m += (R.ctx / 2) | tanh
@@ -358,6 +384,9 @@ def build_facet_template(d, layers, shared=True, rows=True, widths=None, hidden=
         m += (R.hid / 2) | tanh
     m += (R.ans / 2) | tanh
     m += (R.oa / 2) | ident
+    if copy:
+        m += (R.gate / 3) | Metadata(transformation=Transformation.SIGMOID)
+        m += (R.copy / 2) | ident
 
     m += (R.occ(V.P, V.C) <= mine + (R.pos(V.O),)) | Metadata(aggregation=Aggregation.SUM,
                                                                transformation=Transformation.IDENTITY)
@@ -388,14 +417,24 @@ def build_facet_template(d, layers, shared=True, rows=True, widths=None, hidden=
     return m
 
 
-def facet_facts(panels, values, cfg):
+COPY_SCALE = 4.0                                        # copied code bits enter the output logits as +-4
+GATE_BIAS0 = -6.0                                       # initial bias of the copy gates
+
+
+def facet_facts(panels, values, cfg, copy=False, source=None):
+    """source: the puzzle the copied codes come from (default: this one; the shuffled control passes another)."""
     from neuralogic.core import R
     facts = []
+    src = panels if source is None else source
     for p in range(N_CTX):
         for k in comps(cfg):
             objs = comp_objs(panels[p], cfg, k)
             if objs:
                 facts.append(R.nm(f"p{p}", k)[code(len(objs), values)])
+            if copy:                             # the component's codes as +-COPY_SCALE, for the copy links
+                t = facet_target(comp_objs(src[p], cfg, k), values)
+                facts += [R.pc(f"p{p}", k, a)[(COPY_SCALE * (2 * t[i * THERM:(i + 1) * THERM] - 1)).tolist()]
+                          for i, a in enumerate(NUM_ATTRS)]
         for i, o in enumerate(panels[p]):
             oid = f"p{p}o{i}"
             facts.append(R.ocomp(oid, comp_of(cfg, o["pos"])))
@@ -445,6 +484,14 @@ def load(root, cfgs, split, start, n):
             stem = os.path.join(root, cfg, f"RAVEN_{i}_{split}")
             data.append((parse(stem + ".xml", cfg), int(np.load(stem + ".npz")["target"]), cfg))
     return data
+
+
+def next_same_cfg(s):
+    """index -> the next puzzle of the same constellation in s, cyclically (the shuffled-source control)."""
+    by = defaultdict(list)
+    for j, d in enumerate(s):
+        by[d[2]].append(j)
+    return {a: b for js in by.values() for a, b in zip(js, js[1:] + js[:1])}
 
 
 def load_iravenx(path, start, n):
@@ -522,6 +569,14 @@ def main():
                     help="train/val: report training accuracy on only this many puzzles per constellation")
     ap.add_argument("--visible-selectors", action="store_true",
                     help="facet: structural atoms visible (each adds 1.0 to every rule sum), as in runs before 2026-10-25")
+    ap.add_argument("--copy-links", action="store_true",
+                    help="facet: gated copy links from every context panel's code to the output (copy=True)")
+    ap.add_argument("--copy-gates", choices=["panel", "content"], default="panel",
+                    help="with --copy-links: a gate per panel from the answer (panel), or per row role from the "
+                         "panel's own code times the answer (content; rows 1 and 2 stay interchangeable)")
+    ap.add_argument("--copy-shuffled", action="store_true",
+                    help="with --copy-links, a control: the copied codes come from the next puzzle of the same "
+                         "constellation, so the links carry the same weights but no information")
     ap.add_argument("--no-rows", action="store_true",
                     help="facet: no row relation (level 1); the answer reads all eight panels directly")
     args = ap.parse_args()
@@ -562,7 +617,7 @@ def main():
     values = args.values if facet else None
     widths = [int(x) for x in args.widths.split(',')] if args.widths else None
     model = (build_facet_template(args.dim, args.layers, not args.per_attr_weights, not args.no_rows, widths,
-                                  hidden=not args.visible_selectors) if facet
+                                  hidden=not args.visible_selectors, copy=args.copy_links, gates=args.copy_gates) if facet
              else build_template(args.dim, args.layers, args.derived_samepos, args.template == "ordered"))
     model.build(Settings(optimizer=Adam(lr=args.lr), error_function=MSE(), iso_value_compression=False))
     heap0 = jvm_used_mb()
@@ -573,13 +628,15 @@ def main():
     units = [(name, i, k) for name, s in sets.items() for i, (_, _, cfg) in enumerate(s)
              for k in (comps(cfg) if facet else [None])]
     samples = []
+    nxt = {name: next_same_cfg(s) for name, s in sets.items()} if args.copy_shuffled else None
     for name, i, k in units:
         panels, y, cfg = sets[name][i]
         gid = f"{name}{i}{k or ''}"
         facts = puzzle_facts(panels, gid, args.derived_samepos, with_feat=not facet)
         if facet:
             target = facet_target(comp_objs(panels[N_CTX + y], cfg, k), values)
-            facts += facet_facts(panels, values, cfg) + [R.qcomp(gid, k)]
+            src = sets[name][nxt[name][i]][0] if nxt else None
+            facts += facet_facts(panels, values, cfg, args.copy_links, src) + [R.qcomp(gid, k)]
         else:
             target = describe(panels[N_CTX + y])
         samples.append(Sample(R.out(gid)[target.tolist()], facts))
@@ -614,7 +671,9 @@ def main():
               f"{args.n_val} unseen (val 300..{299 + args.n_val}) puzzles per constellation ({what}); "
               f"{len(b_tr)} training samples; template {args.template}"
               + (f" (values {args.values}, {'per-attribute' if args.per_attr_weights else 'shared'} weights, "
-                 f"{'no row relation' if args.no_rows else 'row relation'})" if facet else "")
+                 f"{'no row relation' if args.no_rows else 'row relation'}"
+                 + (f", copy links ({args.copy_gates} gates{', shuffled sources' if args.copy_shuffled else ''})"
+                    if args.copy_links else "") + ")" if facet else "")
               + (f", widths {args.widths}" if args.widths else f", dim {args.dim}, layers {args.layers}")
               + f", lr {args.lr}; "
               f"grounded in {t_ground:.0f}s", flush=True)

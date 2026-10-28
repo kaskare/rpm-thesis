@@ -54,12 +54,18 @@ The frontend itself is torch-only: `frontend/train_frontend.py` and `frontend/pr
 | file | what it is | where to look |
 |---|---|---|
 | `bench_hub_grounding.py` | Generates the missing panel's description on a graph grounded differently for every puzzle, then picks the closest candidate. `--template facet` is the current model; `hub` and `ordered` are the earlier steps. Line numbers as of 2026-10-25. | row length and code length: `configure` :179 · two-part layouts: `COMPONENTS` :198 · value codes and targets: `code` :216, `facet_target` :223, `facet_decode` :236 · template: `build_facet_template` :268 · facts: `facet_facts` :391, `puzzle_facts` :407 · data: `load` :440, `load_iravenx` :450 · generate-then-match metrics: `evaluate` :66 · training and selection: `main` :490 |
-| `facet_model.ipynb` | Loads a facet checkpoint (`template_best.bin`, `best.json`) and shows one puzzle: graph drawing, printed rules, generated vs true answer, candidate distances, accuracy on val 300–399. Executed copy: `thesis/facet_model.html`. | |
+| `facet_model.ipynb` | Loads a facet checkpoint (`template_best.bin`, `best.json`) and shows one puzzle: the grounded network, printed rules, generated vs true answer, candidate distances, accuracy on val 300–399. Section 6: copy links on I-RAVEN-X 3×10 next to the plain model: the network with copy links, the trained gates of one puzzle, accuracy and exact generation per rule on 300 unseen puzzles. Executed copy: `thesis/facet_model.html`. |
+| `facet_viz.py` | Drawings for the notebook. `ground_graph` reads the network PyNeuraLogic grounds for one sample (built without chain pruning, so every ground atom has a named neuron) as atom-to-atom edges; `draw_network` puts one attribute of it on the puzzle grid; `gate_means` reads a sample's trained copy gates. | |
 
 Options:
 * `--widths 32,64,128` widens the layers.
 * `--values onehot`, `--per-attr-weights` and `--no-rows` are the ablations.
 * `--visible-selectors` brings back the old, buggy behaviour (§17).
+* `--copy-links` adds gated copy links from every context panel's code to the output (§20; `COPY_SCALE`, `GATE_BIAS0`).
+  * `--copy-gates content` chooses the gates by content and row role instead of one per panel, which keeps rows 1 and 2 interchangeable (§21).
+  * `--copy-shuffled` is the control: the copied codes come from another puzzle.
+* `facet_symmetry_check.py` checks which symmetries each template variant has. It runs on random weights, and on the trained checkpoints with `--trained` (§21).
+* `dataset_symmetry_check.py` checks which symmetries the I-RAVEN and I-RAVEN-X data have: which rules survive each transformation, the generators' statistics, and the structure of the candidate sets (§22).
 * `--iravenx FILE` trains on I-RAVEN-X data from IBM's generator.
 * `--save-dir` saves the best checkpoint.
 

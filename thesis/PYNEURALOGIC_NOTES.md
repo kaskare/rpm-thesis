@@ -975,7 +975,8 @@ Training-side changes did not help (cross-entropy 23.5, training on all three ro
   Progress: 92.9 (epoch 5), 95.2 (10), 96.3 (15), then 96–97.3 from epoch 25 on. The same model with visible
   selectors was at 84.7 / 14.2 at epoch 5. The notebook (`thesis/facet_model.html`) was re-run on this
   checkpoint: example distribute_four val 303 is picked correctly, though the generated panel has one object
-  too many; val 300–399 gives 97.6% matched. A 150-epoch repeat is running (job 11887180).
+  too many; val 300–399 gives 97.6% matched. The 150-epoch repeat (job 11887180, `experiments/facet_ep150_all`)
+  peaked at epoch 65 with 97.4% matched / 69.3% exact: no gain over 60 epochs.
 * **I-RAVEN-X 3×3, values 0–9** (`experiments/facet_iravenx_n3_m10`). **99.2%** at the epoch picked on
   val 6000–6299 (epoch 10), **100.0%** from epoch 15 on, 95.4% exact. The GNN-style model got 46% on the
   same data. Copying the last panel matches 4.7%.
@@ -1101,3 +1102,410 @@ samples) grounds in 30 min with a 300 GB heap (10–165 ms per puzzle).
 
 The GNN-style model (§8) avoided the problem differently: a fixed slot graph grounded once, with the
 values supplied from torch.
+
+## 20. I-RAVEN-X 3×10: why the facet model fell short, and gated copy links (2026-10-26)
+
+### 20.1 Error analysis by rule
+The 60-epoch 3×10 checkpoints, on unseen puzzles 6300–7299. For each attribute, the generated value
+(= the number of thermometer bits on) is compared with the true one, grouped by that attribute's rule
+label. Script and output: `experiments/facet_iravenx_analysis/` (`rule_errors.py`, job 11897470).
+
+| rule | values 0–49: exact | mean error (% of range) | values 0–99: exact | values 0–999: exact | mean error (% of range) |
+|---|---|---|---|---|---|
+| Constant | 93% | 0.3 | 72% | 5% | 0.6 |
+| Progression | 77% | 0.7 | 58% | 5% | 0.7 |
+| Arithmetic | 19% | 3.3 | 11% | 1% | 2.6 |
+| Distribute-n | 10% | 7.6 | 4% | 0.5% | 6.6 |
+
+Two separate problems:
+* **Distribute-n is a limit of the structure.** The missing panel is one specific panel of row 1 or 2
+  (the rows are cyclic shifts of the same n values). The answer node sees rows 1–2 only through `ctx`,
+  the AVERAGE of two tanh row summaries, so the single panel is gone. The only remaining route is
+  arithmetic (the row-1 sum minus the 9 known row-3 values), which needs 1-in-10,000 precision through
+  tanh layers. In the one puzzle inspected, the wrong candidates reused another value of the same row, so
+  an approximate answer lands near a distractor.
+* **Precision is a limit of the value code.** Constant and Progression are almost right (under 1% of the
+  range off), but a 1000-bit thermometer squeezed into 128 tanh units cannot keep single-value resolution,
+  and an off-by-5 error changes the per-bit-averaged MSE by about 0.001. The values 0–999 run's training
+  MSE stayed at 0.0010 from epoch 5 to 60.
+
+Memorisation is not the problem: without copy links the model memorises 200 3×10 puzzles (values 0–49)
+to 198/200 exact in 50 epochs. The model learns rules that do not carry over to unseen puzzles.
+
+### 20.2 Gated copy links (`--copy-links`, `build_facet_template(copy=True)`)
+* **Facts.** Every context panel P (all 3n−1) gets `pc(P, C, A)`: its component's value code, scaled
+  to ±`COPY_SCALE` (4), for type, size, colour and number.
+* **Gates.** `gate(P, C, A)` is a sigmoid of `ans`, with its own weights per panel. Its bias starts at
+  `GATE_BIAS0` = −6, so gates start at about 0.0025. It is written as two rules so chain pruning keeps
+  the sigmoid; a hidden `pc` atom only binds A.
+* **Copy.** `copy(C, A) <= gate(P, C, A), pc(P, C, A)` with ELPRODUCT, summed over panels, then added to
+  the output logits `oa` beside the existing decoder.
+* **Unchanged without the flag.** The flag-off template is byte-identical to the committed one
+  (checked: I-RAVEN, 3×10 values 0–49, 3×3 values 0–9; default, visible selectors, per-attribute
+  weights, no rows).
+* **Gate initialisation matters.** With gates starting at 0.5, the 29 copies swamped the logits:
+  memorising 200 puzzles reached only 34/200 exact at epoch 50 (121/200 at epoch 150). With the −6
+  bias it reached 195/200 at epoch 50, and MSE 0.00029 against 0.00086 without copy links.
+* **Gotcha.** A weight given as values must be a flat list (`[b] * THERM`) to act as a vector. A
+  THERM×1 nested list is read as a matrix and fails with "Incompatible summation of matrix plus vector".
+
+### 20.3 Results (3×10, unseen 6300–7299, epoch picked on 6000–6299)
+| values | facet, 60 epochs | facet, 150 epochs | **facet + copy links, 60 epochs** | ARLC learned | best LLM/LRM |
+|---|---|---|---|---|---|
+| 0–49 | 85.4 (exact 15.0) | 89.1 (23.8) | **97.8 (60.0)**, job 11899232 | 95.0 | – |
+| 0–99 | 84.9 (6.4) | 86.3 (6.5) | **96.2 (30.8)**, epoch 45, job 11901474 | 95.0 | DeepSeek R1 84.0 |
+| 0–999 | 81.2 (0.0) | 85.4 (0.1) | **94.3 (15.0)**, epoch 45, job 11904250 (11901475 ran out of memory at 180 GB while grounding; 420 GB worked) | 90.6 | DeepSeek R1 82.8 |
+
+At values 0–49, copy links beat 150 epochs of the plain model already at epoch 5 (94.6%). Type became
+almost always exact (96% against 60%), size and colour 79% (against 51–52%). There is a slight overfit:
+99.3% matched on training puzzles. LLM/LRM numbers are from arXiv 2510.17496 (Table 1, no
+confounders); o1 reached 86.0 on a 100-puzzle subset.
+
+**Notebook (2026-10-28).** `notebooks/facet_model.ipynb` §6 shows the copy-link model next to the plain one
+on unseen puzzles 6300–6599: 86.3 → 98.0% matched; exact generation per rule: Distribute 11.5 → 96.9,
+Constant 94.1 → 100, Progression 79.5 → 89.3, Arithmetic 25.2 → 31.9. On puzzle 6300 (size Distribute,
+shift +1, answer 43), the four open size gates (0.92–0.97) are the panels that hold the answer under either
+shift: (1,8) and (2,9) hold 43, (1,2) and (2,1) hold 24 and 22 (shift −1). The gates do not pick the
+direction; the copied codes cancel between 22 and 43 and the plain path decides those bits. The notebook's
+graph picture is now read from the grounded network (`pynl/facet_viz.py`). The earlier picture drew only the
+facets and same-position edges, although the model always had its panel, row, context and answer nodes.
+
+### 20.4 What the copy links are, as an inductive bias
+Copy links add an inductive bias, a weak and domain-general one:
+
+| built in | still learned |
+|---|---|
+| the answer's value MAY be one of the context values | WHETHER to copy (gates start closed) |
+| any single context panel can be read directly, not only through the row summary | WHICH panel to copy (a gate per panel) |
+| a copied value passes through unchanged (exact precision) | WHEN to copy (gates depend on `ans`, where the rule is represented) |
+
+* **No rule is named.** Arithmetic and Progression still go through the old path. The assumption
+  "outputs often reuse inputs" is the same one behind pointer networks (Vinyals et al. 2015) and the copy
+  mechanism in summarisation (Gu et al. 2016; See et al. 2017).
+* **Algorithmic alignment.** In the terms of Xu et al. (ICLR 2020), two of the four rules ARE copies, so
+  the model now has a path shaped like the solution.
+* **Placement among the prior levels.** It is neither level 3 (no rule set is given) nor level 2, which
+  constrains *relations* ("the same relation holds in every row"). The copy links constrain *what the
+  answer is built from*. Present it as a separate axis: **priors on operations** (copy) vs **priors on
+  rules**.
+* **Claim it supports:** a generic operation prior closes most of the gap to ARLC without telling the
+  model any rule.
+
+**Caveats to address before claiming it:**
+1. **It was designed after looking at the errors** on validation puzzles (Distribute-n failing). Apply it
+   everywhere with fixed settings, score the untouched test split once, and justify it as a general
+   mechanism (pointer networks), not as "the fix for Distribute".
+2. **It bundles two effects:** access to individual panels and exact precision. Ablation: copy through
+   the tanh panel nodes `vF` instead of the raw codes. If accuracy holds, access was the key; if it drops,
+   precision was.
+3. **Test it on I-RAVEN too.** It must at least hold 97.3% there (distribute_nine may gain). A bias that
+   helps only the dataset it was designed for is weaker evidence.
+
+Reading list on inductive bias: `thesis/READING_LIST_inductive_bias.md`.
+
+## 21. Symmetries and the copy-link bias, with proofs (2026-10-27)
+
+Questions: are the copy links really an inductive bias? Which symmetries does the facet model have built in,
+where, and how?
+
+Files:
+- Check script: `pynl/facet_symmetry_check.py`.
+- Outputs: `experiments/facet_symmetry_check_11904305.out`;
+  `experiments/facet_iravenx_analysis/rule_errors_copy_11904259.out` and `rows_swap_11904346.out`.
+
+### 21.1 Definitions
+* **Symmetry.** A transformation g of a puzzle whose effect on the answer is known:
+  - *invariance*: f(g·x) = f(x);
+  - *equivariance*: f(g·x) = g·f(x).
+
+  A model has it **built in** when it holds for every weight setting. Then training cannot lose it, and the
+  data need not teach it.
+* **Inductive bias.** Anything other than the data that decides which hypothesis the learner ends with
+  (Mitchell 1980). It comes in two kinds:
+  - *restriction*: which functions the model can represent at all;
+  - *preference*: which of them training reaches, through parameterisation, initialisation and the optimiser.
+
+  A built-in symmetry is a restriction.
+
+### 21.2 Theorem: a template is blind to constants it does not name
+Let T be a template and F the facts of one sample. Let σ be a one-to-one renaming of constants that leaves
+every constant written in T unchanged. Then every atom a keeps its value:
+
+  val over σ(F) of σ(a) = val over F of a.
+
+*Proof.*
+1. A ground rule is a rule r of T with its variables substituted by θ.
+2. σ leaves T's constants alone, so σ(rθ) = r(σ∘θ): a ground rule of the same r. Its body holds in σ(F)
+   exactly when rθ's body holds in F.
+3. σ⁻¹ also leaves T's constants alone, so this pairs the ground rules of the two networks one to one.
+4. Weights belong to rules, not to groundings, so paired ground rules have the same weights.
+5. The aggregations (AVG, SUM) see a multiset of body values, which σ maps one to one. ELPRODUCT and CONCAT
+   combine the atoms of a single body, which σ maps atom by atom.
+6. Base case, the facts: val over σ(F) of σ(f) = val over F of f, by the definition of σ(F). Induction over
+   the depth of the acyclic ground network then carries this to every atom. ∎
+
+A change to the puzzle is therefore a built-in symmetry whenever:
+- it can be written as such a renaming, that is, σ(F) equals the facts of g(puzzle); and
+- T names none of the renamed constants.
+
+This is the logic-program form of a GNN's permutation equivariance. Two limits:
+- The condition is sufficient, not necessary.
+- A named constant only *allows* the symmetry to break. The random-weight checks show that it does break.
+
+Floating-point summation order leaves differences of about 1e-16.
+
+### 21.3 Where the facet model's symmetries come from
+Random weights: N(0, 1/fan-in), 3 draws, 70 I-RAVEN val puzzles (300+). The last column is the max |change
+in the output|.
+
+| change to the puzzle | as a renaming of | named in T by | built in for | broken by | random weights |
+|---|---|---|---|---|---|
+| order of objects in a panel | object names `p3o1` | nothing | all variants | – | ≤ 8e-16 |
+| rows 1 ↔ 2 | panels `p0..p{n−1}` ↔ `p{n}..p{2n−1}`, rows `r1` ↔ `r2` | per-panel copy gates `gate("p{p}")`; level 1 `vF("p{p}")` | level 2, per-attribute weights, content gates | panel copy gates (0.99), level 1 (0.46) | 3e-16 |
+| type ↔ colour (output blocks swap) | `type` ↔ `color` | per-attribute weights only | shared weights (`V.A`) | per-attribute weights (0.83) | 0 |
+| components swapped (L-R mirror), attribute outputs | `k0` ↔ `k1` | nothing | all | – | 0 |
+| the same, position outputs | not a renaming: the slots are *values* of the one-hot `pos` | – | none | dense occupancy weights | 0.37–0.73 |
+| order of the candidates | candidates are not in the facts | – | all (generate, then match) | – | 0 |
+| control: columns 1 ↔ 2 | not a renaming: `col(P, "c1")` is named, and row arguments are ordered | – | none | per-column weights | 0.49–0.96 |
+
+Trained checkpoints. "Answers changed" counts puzzles whose chosen candidate changes; "right" is before →
+after.
+* **I-RAVEN, level 2 (70 puzzles).** Every built-in check: 0 answers changed. Columns 1 ↔ 2: 33 changed,
+  68 → 36 right; that swap also changes the true answer under Progression and Arithmetic. Mirrored positions:
+  1e-4. This symmetry is not built in, but it was *learned*.
+* **I-RAVEN-X 3×10, values 0–49 (300 unseen).**
+  - plain model: 0 changed under the row swap;
+  - per-panel copy gates: **101/300 changed, 294 → 194 right** (§21.5).
+
+Also invariant by input design: orientation. The facts carry only type, size, colour and position.
+
+### 21.4 Copy links are an inductive bias: a preference, not a restriction
+1. **Same data and protocol.** The two runs' `best.json` arguments differ only in `copy_links` and
+   `save_dir`. Same 6000 puzzles, targets, MSE, Adam 3e-4, epochs and epoch selection.
+2. **No new information.** `pc(P, C, A)` = 4·(2·pt(P, C, A) − 1). `pt` (the AVG of the `fv` codes; number
+   from `nm`) is already an atom of the plain model. The links add a path, not information. No rule label is
+   used.
+3. **Nested hypothesis spaces.** The copy term is Σ_P gate_P ⊙ pc_P, bounded by 4·(3n−1)·max gate. As the
+   gate biases go to −∞, the copy model's outputs converge to the plain model's with the same other weights.
+   Nothing the plain model can express is excluded, so this is a **preference** bias.
+4. **What it prefers** (a sketch, not a proof). "The answer is panel P's value" is reached exactly, for any
+   value range, by opening one gate: O(1) weights.
+
+   Through the plain path the value must cross 128 tanh units and a per-bit decoder. Holding v/m in one unit
+   and thresholding it at every integer needs slopes of order m. This fits the scaling:
+   - plain: 85.4 / 84.9 / 81.2 at values 0–49 / 0–99 / 0–999;
+   - copy links: 97.8 / 96.2 / 94.3 (run 11904250 for 0–999).
+5. **The gains land where the bias says.** Exact generation per rule on 1000 unseen puzzles, plain → copy:
+
+   | rule | values 0–49 | values 0–99 |
+   |---|---|---|
+   | Constant | 93.4 → **100.0** | 72.1 → **98.7** |
+   | Distribute-n | 9.8 → **86.8** | 4.3 → **71.6** |
+   | Progression | 77.4 → 92.9 | 57.8 → 53.0 |
+   | Arithmetic | 18.6 → 30.2 | 10.5 → 15.9 |
+
+   At 0–49, puzzles without Arithmetic now match 100.0% (556); with Arithmetic, 95.0% (444).
+6. **Not yet excluded: capacity.** Panel gates add 187k weights, 29 × (50·128 + 50): +13% on 1,410k. The
+   0–49 gains on Progression and Arithmetic (+15.5, +11.6) are not copies. They may come from:
+   - the extra weights;
+   - the main path no longer carrying the copy rules;
+   - seed variance (one run each).
+
+   Control running (§21.6).
+7. **Not a symmetry.** The copy path commutes with any relabelling of the values only while the gates stay
+   fixed. The gates read thermometer codes, so the model as a whole is not relabelling-equivariant.
+
+### 21.5 The cost: per-panel gates learned Distribute-n by address
+The theorem predicts the break: `gate("p{p}")` names panels. Swapping rows 1 and 2 leaves the correct answer
+unchanged under all four rules: for Distribute-n, the answer is the value of row 1 that row 3 lacks. Result
+on 1000 unseen puzzles:
+
+| copy model, before → after the swap | matched | exact value |
+|---|---|---|
+| puzzles with a Distribute attribute (646) | 98.3 → **39.5** | |
+| puzzles without one (354) | 96.9 → 97.5 | |
+| Distribute-n values | | 86.8 → **1.2** |
+| Constant / Progression / Arithmetic values | | 100 → 99.9 / 92.9 → 92.8 / 30.2 → 28.9 |
+
+The plain model is identical before and after.
+
+**What the model learned.** The per-panel gates learned "copy the panel at the address set by the shift
+step". They did not learn "copy the value row 3 lacks".
+- Why the address does not move: `ctx` is an AVG over the two rows, so `ans` and the gates do not change
+  under the swap.
+- Why the address rule now fails: the swap also breaks the generator's constant step. Row 3 would be row 2
+  shifted by the step from row 1 to row 2 only if 3s ≡ 0 (mod n), which never holds for n = 10.
+- So the address rule is right in distribution and wrong off it: a shortcut in Geirhos et al.'s sense, not an
+  in-distribution error.
+
+### 21.6 Content gates and the shuffled control (2026-10-27, values 0–49, 60 epochs)
+Both flags are off by default; the flag-off and panel-gate templates are byte-identical to before.
+* **`--copy-gates content`** (job 11905907):
+  - `gate(P, C, A) <= ans(C, A) ⊙ vF(P, C, A)`, with weights per row role (complete row via
+    `inrow` + `full`; question row via `inrow(P, "r3")`).
+  - The template names no panel and no complete row, so swapping rows 1 and 2 is built in again: 4.4e-16 on
+    random weights.
+  - Copying becomes choice by content (as in attention), not by address. It has 1/7 of the gate weights.
+* **`--copy-shuffled`** (job 11905908): the copied codes come from the next puzzle of the same
+  constellation. Only `pc` facts differ (checked). Same weights, no information.
+
+Results, 1000 unseen puzzles, epoch picked on selection (45 for both new runs):
+
+| run | matched | exact, all three attributes |
+|---|---|---|
+| plain | 85.4 | 15.0 |
+| copy links, per-panel gates | 97.8 | 60.0 |
+| copy links, content gates | **94.9** | 51.7 |
+| shuffled control | **87.3** | 21.5 |
+
+* **The gain is the bias, not the capacity.** The control has the same weights as the copy model and gains
+  only 1.9 points over plain. Copy links with real codes gain 12.4.
+* **Content gates keep most of the gain and lose the shortcut.** Row swap, per rule
+  (`rows_swap_content_11908129.out`):
+
+  | | before → after the swap |
+  |---|---|
+  | matched, puzzles with a Distribute attribute (646) | 94.0 → 94.0 |
+  | matched, puzzles without one (354) | 96.6 → 96.6 |
+  | exact: Constant / Progression / Arithmetic | 100 / 98.2 / 30.0, unchanged |
+  | exact: Distribute-n | 59.8 → 59.8 |
+
+  - Every number is unchanged, as the theorem guarantees.
+  - Distribute-n exact: plain 9.8, panel gates 86.8 (1.2 after the swap), content gates 59.8. Most of the
+    Distribute gain survives without addresses, so the model does choose by content.
+  - Progression is higher than with panel gates: 98.2 vs 92.9.
+  - Arithmetic stays at 30: no copy rule covers it (§22.4).
+
+## 22. Symmetries of the data: I-RAVEN and I-RAVEN-X (2026-10-27)
+
+Question: which symmetries do the datasets themselves have? §21 asked the same of the model.
+
+Files:
+- Check script: `pynl/dataset_symmetry_check.py`. Outputs: `experiments/dataset_symmetry_check_iraven.out`
+  (1000 train puzzles per I-RAVEN constellation) and `experiments/dataset_symmetry_check.out` (6000 per I-RAVEN-X
+  file; its I-RAVEN candidate line predates the fixed candidate test).
+- Generators read: I-RAVEN `~/SRAN/I-RAVEN` (`Rule.py`, `main.py`, `build_tree.py`, `const.py`); I-RAVEN-X
+  `~/raven-large-language-models/src/datasets/generation/iravenx_task.py`.
+
+### 22.1 Three levels
+Take a transformation g of a complete matrix (answer filled in) that keeps the missing cell in place.
+1. **Task symmetry.** Every row still obeys a rule of the same family, possibly with another parameter, so the
+   answer moves with g: f(g·x) = g·f(x). Building g into a model costs nothing on the right solution.
+2. **Data symmetry.** Also P(g·x) = P(x): the generator produces g·x as often as x. The training data then
+   already shows both, so even a model without g sees no reason to tell them apart.
+3. **Neither.**
+
+The gap between 1 and 2 is where shortcuts live. A rule that is right on everything the generator produces can
+still be wrong on g·x when g·x never occurs. That is §21.5: the per-panel gates found such a rule.
+
+### 22.2 Which rules survive which transformation
+The share of rule instances (one attribute of one puzzle) that still satisfy a rule of the same family after g.
+Order of the columns: Constant / Progression / Arithmetic / Distribute.
+0 instances fail their own label. Non-uniform panels in grids are excluded: there the attribute is noise.
+
+| g | I-RAVEN (type, size, colour, number) | I-RAVEN-X 3×10 (all three value ranges) | I-RAVEN-X 3×3, values 0–9 |
+|---|---|---|---|
+| rows 1 ↔ 2 | 100 / 100 / 100 / 100 | 100 / 100 / 100 / **0** (0 even with any shift step) | 100 / 100 / 100 / 100 |
+| columns 1 ↔ 2 | 100 / 0 / 51 (plus only) / 100 | 100 / 0 / 50 (plus only) / 0 | 100 / 0 / 55 / 100 |
+| columns 2 ↔ 3 (operands only) | – | 100 / 0 / **100** / 0 | – |
+| matrix transposed | 58 / 3 / 1 / 100 | – | – |
+| values reflected, v → max − v | 100 / 100 / **0** / 100 | 100 / 100 / **0** / 100 | 100 / 100 / 0 / 100 |
+| columns reversed (moves the missing cell) | 100 / 100 / 100 / 100 | 100 / 100 / 100 / 100 | 100 / 100 / 100 / 100 |
+
+Positions in the grid layouts, 2×2 / 3×3. Constant, union/difference and Distribute are set rules, and they
+survive every slot permutation: 100%. Progression on Position survives only some:
+
+| slots mapped by | left-right | up-down | 180° | 90° | diagonal |
+|---|---|---|---|---|---|
+| Progression on Position | 100 / 0.7 | 100 / 0.7 | **100 / 100** | 0.6 / 0 | 0.6 / 0 |
+
+Union and difference do not survive column reversal (2.5 / 0): a union cannot be undone.
+
+### 22.3 What the generators decide
+1. **Rows 1 ↔ 2.**
+   - *I-RAVEN: a data symmetry, with one small exception.* Each row starts from an independent resample, and
+     the same rule objects build it. Distribute_Three picks its direction 50/50 (`np.random.uniform() >= 0.5`;
+     4920 left vs 5023 right over all attributes). For n = 3, the swap maps one direction onto the other.
+     - The exception is colour Arithmetic. C12 and C22 may not both be 0 (so + and − stay distinguishable),
+       and the generator enforces this by resampling row 2. C12 = 0 in 28.9% (644/2228), C22 = 0 in 20.4%.
+   - *I-RAVEN-X 3×10: not even a task symmetry for Distribute.* Constant, Progression and Arithmetic rows
+     are i.i.d. Distribute rows are `np.roll(row 1, kδ)` with δ = ±1 (2437 vs 2551). After the swap no step
+     fits, because that needs 3s ≡ 0 (mod 10).
+     - The answer is still "the value row 3 lacks". So the swap is a symmetry of that weaker rule ("every row
+       holds the same n values"), but it leaves the generator's support.
+     - 3×3 is different: 3δ ≡ 0 (mod 3), so the swap survives there.
+     - This is the gap §21.5's address rule lived in.
+2. **Columns are not a symmetry.** Progression dies under any column swap. What survives is the order-free
+   part of Arithmetic, which is a task symmetry but not a data symmetry:
+   - **I-RAVEN-X.** A row holds 9 operands and their sum (plus: sum last; minus: sum first). Any permutation
+     of the operand columns keeps the rule. But the generator draws the operands one after another from a
+     shrinking range, shuffles them, then swaps a zero out of the last operand slot. Result (values 0–49,
+     plus), share of zero operands by column: c1 78%, c2 67%, …, c8 55%, c9 0%. Rows are mostly zeros: the
+     mean Arithmetic value is 7.4 against about 24.5 for the other rules.
+   - **I-RAVEN.** c2 is drawn from what c1 leaves. Means for plus: c1 1.99 vs c2 1.10 (size); 4.41 vs 2.29
+     (colour).
+3. **Time reversal (columns reversed)** maps Progression d → −d, plus ↔ minus, and the Distribute
+   direction. In complete matrices it is a data symmetry of both generators. I-RAVEN-X even builds δ < 0 as
+   the mirror of δ > 0, starting from the right. It moves the missing cell, though, so it relates puzzles
+   with different blanks: a symmetry for a "fill any cell" model, not for ours.
+4. **Value relabelling follows the structure each rule uses.**
+   - Constant and Distribute use only equality, so any one-to-one relabelling keeps them.
+   - Progression uses order and successor, so it keeps reflection, and translation inside the range.
+   - Arithmetic uses addition with 0, so it keeps nothing: reflection 0%.
+
+   In the data, reflection is exact for the first three rules. I-RAVEN-X Progression values average
+   24.3–24.7, against a range midpoint of 24.5.
+   - Quirk: Distribute draws with Python's `random.randint(0, maxval)`, which includes maxval. Its values
+     reach 50 at "values 0–49"; the other rules stop at 49.
+5. **Grid positions.** Position-Progression is `(slot + d) mod 4 | 9` in reading order (`Rule.py`). Only the
+   grid symmetries that map the reading-order cycle onto itself survive:
+   - 2×2: left-right, up-down and 180°;
+   - 3×3: 180° only.
+
+   d is ±1/±2 with balanced signs, so these are data symmetries.
+6. **Attributes.**
+   - *I-RAVEN-X:* size and colour come from the same function, rule list and range. Size ↔ colour is
+     therefore exact (1451–1543 per rule each). Type has no Arithmetic, so type ↔ size or colour holds only on
+     the non-Arithmetic part.
+   - *I-RAVEN:* there is no exact attribute swap. The attributes have 5, 6 and 10 values, size's Arithmetic
+     has a +1, and type has no Arithmetic.
+7. **Components.**
+   - L-R and U-D have identical constraints, and both components show matching rule counts and means: an
+     exact symmetry.
+   - O-IC and O-IG are not exchangeable. The outer object is always white (colour Constant, 1000/1000) and
+     size ≥ 3 (mean 4.0 vs 2.4).
+   - Rules act per component, so swapping components is still a task symmetry in every layout.
+8. **Candidates.**
+   - The answer index is uniform in both datasets.
+   - I-RAVEN-X candidate sets are 100% products {a, a′} × {b, b′} × {c, c′}. I-RAVEN's are products in 100%
+     of the single-object layouts and 81–89% of the grids.
+   - On a product set, flipping any attribute between its two values permutes the set. Such flips reach
+     every candidate from every other (a transitive group action), so any function of the candidates alone
+     treats all eight alike. Measured, the mode guess gives exactly 12.5% on product sets.
+   - On the other grid sets it gives 14.5–15.7%: changing Number resamples positions per candidate. This is a
+     small leak.
+   - In I-RAVEN-X, the answer holds the larger value of its pair in 50.5–54.2% of attributes.
+9. **Nuisance.** Angle is random and rule-free in both generators, and our facts drop it. This invariance is
+   exact by input design.
+
+### 22.4 What this means for the models
+| symmetry | data symmetry? | facet model |
+|---|---|---|
+| objects in a panel; candidate order | yes | built in |
+| rows 1 ↔ 2 | I-RAVEN yes (but colour Arithmetic); 3×10 no (Distribute leaves the support) | built in, except per-panel gates |
+| L-R / U-D components | yes | built in (attributes); learned for positions (1e-4, §21.3) |
+| O-IC / O-IG components | task only | built in, harmless |
+| size ↔ colour (I-RAVEN-X); type ↔ colour | yes; task only (no type Arithmetic) | built in (shared `V.A`) |
+| value reflection / translation | Constant, Progression, Distribute only | not built in (thermometer codes) |
+| grid slots: L-R, U-D, 180° (2×2); 180° (3×3) | yes | not built in (dense occupancy weights) |
+| Arithmetic operand order | task only (zero pattern) | not built in (per-column weights) |
+| columns reversed | complete matrices only | unused |
+| columns; transposition; 90° grid rotation | no | correctly not built in |
+
+* Where the model builds in a symmetry the generator also has, the bias is free: the data would teach it anyway.
+* Where it builds in a task symmetry the generator lacks (rows in 3×10), the bias removes shortcuts the data
+  would allow. Per-panel gates gave that bias up, and §21.5 shows the price.
+* The I-RAVEN-X weak spot, Arithmetic (30% exact with copy links), follows a symmetry the model does not
+  have. The answer is a sum over operand columns, whatever their order. A structural fix in that direction:
+  aggregate the middle columns 2..n−1 with SUM instead of giving each its own weights. That builds the
+  symmetry over columns 2..n−1 in for both plus and minus, and treats columns 1 and n as their own roles.
