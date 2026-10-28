@@ -1,36 +1,26 @@
 #!/usr/bin/env python3
-"""End-to-end I-RAVEN from pixels: ResNet-18 perception -> PyNeuraLogic reasoning.
-
-The PyNeuraLogic solver (train_all_constellations.py --level 2) was trained on ground-truth
-object attributes read from the XML. This pipeline replaces the XML with what the ResNet-18
-frontend (train_frontend.py) *sees* in the panel images, so the reported accuracy is from
-pixels to answer.
-
-Two stages, because they need different environments:
+"""I-RAVEN from pixels: the ResNet-18 frontend's view of every panel, for the end-to-end runs.
 
   perceive  (conda env nvsa, GPU)   Run the frontend(s) over every panel image of a split and
                                     store, per panel and universal position, the best attribute
-                                    match and its cosine. Also scores perception against the
-                                    ground truth, per constellation.
-  solve     (conda env pynl, CPU)   Decode those detections into objects, feed them to the
-                                    trained PyNeuraLogic model, and report pixel-input accuracy
-                                    next to ground-truth-input accuracy on the same puzzles and
-                                    the same checkpoint.
+                                    match and its cosine (experiments/frontend_preds/). Also scores
+                                    perception against the ground truth, per constellation.
 
-Decoding (identical in both stages, `panels_from_preds`): for each position the constellation
+Decoding (`panels_from_preds`, used by pynl_symbolic_e2e.py): for each position the constellation
 can use, take the best of its 300 attribute codebook rows; the object exists iff that cosine
 exceeds tau (0.23, the frontend's training threshold). One object per position by construction.
 The constellation is taken from the dataset folder -- the ground-truth pipeline uses it too.
 
 Position IDs need no remapping: the frontend's universal codebook positions, train_pynl.POS_MAP
-and gnn.config.CONFIG_POS_MAP are identical (checked).
+and gnn.config.CONFIG_POS_MAP are identical (checked). The second stage, which fed these
+detections to the GNN-style PyNeuraLogic model, is archived with that model
+(archive/superseded_2026-10-28/).
 
 Usage:
     python pynl/pixel_pipeline.py perceive --splits val,test \
         --frontends log/universal_frontend_correct_proportional_mean1,log/universal_frontend_correct_proportional_mean3
-    python pynl/pixel_pipeline.py solve --run-dir experiments/max_data_L2 --frontend auto --split test
 """
-import argparse, glob, json, os, shutil, sys, tempfile, time
+import argparse, glob, json, os, sys, time
 from collections import defaultdict
 
 import numpy as np
@@ -217,91 +207,6 @@ def print_stats(name, split, stats):
                                                           s["puzzles_all16_ok"], s["off_constellation_detections"]))
 
 
-# ── stage 2: solve ─────────────────────────────────────────────────────────────
-def solve(args):
-    import torch
-    import neuralogic
-    neuralogic.set_max_memory_size(args.jvm_gb)
-    from train_pynl import parse
-    from train_all_constellations import encode_puzzle
-    from eval_pynl_test import load_model
-
-    summary = json.load(open(os.path.join(args.preds_dir, "summary.json")))
-    front = args.frontend
-    if front == "auto":                       # choose on VALIDATION perception, never on test
-        cands = [n for n in summary if n != "tau" and "val" in summary[n]]
-        if not cands:
-            raise SystemExit("--frontend auto needs val perception stats; run perceive --splits val,...")
-        front = max(cands, key=lambda n: summary[n]["val"]["OVERALL"]["panel_acc"])
-        print("frontend (best val perception): %s  %.2f%%" % (front, summary[front]["val"]["OVERALL"]["panel_acc"]))
-    d = np.load(os.path.join(args.preds_dir, "%s_%s.npz" % (front, args.split)))
-    tau = float(d["tau"]) if args.tau is None else args.tau
-
-    tmp = tempfile.mkdtemp()                  # run dir may be written by a live job
-    for n in ("model_best.pt", "template_best.bin"):
-        shutil.copy(os.path.join(args.run_dir, n), tmp)
-    model, ck, a = load_model(tmp)
-    print("reasoner: %s  epoch %s, val %.2f%%" % (args.run_dir, ck["epoch"], 100 * ck["val_acc"]))
-
-    # the stored ground truth must be exactly what the reasoner was trained on
-    seen = defaultdict(int)
-    for i in range(len(d["cfgs"])):
-        cfg = str(d["cfgs"][i])
-        if seen[cfg] < 20:
-            seen[cfg] += 1
-            ref = parse(os.path.join(ROOT, str(d["files"][i])).replace(".npz", ".xml"), cfg)
-            assert [key(p) for p in ref] == [key(p) for p in gt_panels_from_array(d["gt"][i])], d["files"][i]
-    print("stored ground truth == train_pynl.parse on %d spot-checked puzzles" % sum(seen.values()))
-
-    per = defaultdict(lambda: defaultdict(int))
-    count = defaultdict(int)
-    t0 = time.time()
-    with torch.no_grad():
-        for i in range(len(d["cfgs"])):
-            cfg = str(d["cfgs"][i])
-            if args.n and count[cfg] >= args.n:
-                continue
-            count[cfg] += 1
-            y = int(d["targets"][i])
-            pix = panels_from_preds(d["maxcos"][i], d["argidx"][i], active_positions(cfg), tau)
-            gt = gt_panels_from_array(d["gt"][i])
-            perfect = all(key(pix[p]) == key(gt[p]) for p in range(16))
-            hit_pix = int(model(*encode_puzzle(pix, cfg)).argmax()) == y
-            hit_gt = int(model(*encode_puzzle(gt, cfg)).argmax()) == y
-            for b in (cfg, "OVERALL"):
-                r = per[b]
-                r["n"] += 1
-                r["pix"] += hit_pix
-                r["gt"] += hit_gt
-                r["perfect"] += perfect
-                r["pix_perfect"] += hit_pix and perfect
-                r["pix_imperfect"] += hit_pix and not perfect
-            if sum(count.values()) % 2000 == 0:
-                print("  %d puzzles, %.0fs" % (sum(count.values()), time.time() - t0), flush=True)
-
-    print("\nI-RAVEN %s, %s frontend (tau %.2f) -> PyNeuraLogic, epoch %s\n" % (args.split, front, tau, ck["epoch"]))
-    print("%-40s %7s %13s %12s %10s %8s %16s" % ("constellation", "n", "all 16 seen", "from pixels",
-                                                 "from XML", "delta", "pix | imperfect"))
-    res = {}
-    for b in CONSTELLATIONS + ["OVERALL"]:
-        r = per.get(b)
-        if not r:
-            continue
-        n, imp = r["n"], r["n"] - r["perfect"]
-        row = {"n": n, "all16_perceived": 100.0 * r["perfect"] / n, "pixels": 100.0 * r["pix"] / n,
-               "xml": 100.0 * r["gt"] / n,
-               "pixels_on_imperfect": (100.0 * r["pix_imperfect"] / imp) if imp else None}
-        res[b] = row
-        print("%-40s %7d %12.1f%% %11.2f%% %9.2f%% %+7.2f %15s" % (
-            b, n, row["all16_perceived"], row["pixels"], row["xml"], row["pixels"] - row["xml"],
-            ("%.1f%%" % row["pixels_on_imperfect"]) if imp else "-"))
-    print("\nchance 12.5%. 'pix | imperfect' = pixel accuracy on puzzles with >=1 misperceived panel.")
-    out = args.json_out or os.path.join(args.preds_dir, "solve_%s_%s.json" % (front, args.split))
-    json.dump({"frontend": front, "tau": tau, "split": args.split, "run_dir": args.run_dir,
-               "epoch": ck["epoch"], "val_acc": ck["val_acc"], "results": res}, open(out, "w"), indent=1)
-    print("wrote", out)
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="stage", required=True)
@@ -316,17 +221,8 @@ def main():
     p.add_argument("--batch", type=int, default=16, help="puzzles per GPU batch (x16 panels)")
     p.add_argument("--workers", type=int, default=12)
     p.add_argument("--device", default="cuda:0")
-    s = sub.add_parser("solve")
-    s.add_argument("--run-dir", default=os.path.join(ROOT, "experiments/max_data_L2"))
-    s.add_argument("--preds-dir", default=os.path.join(ROOT, "experiments/frontend_preds"))
-    s.add_argument("--frontend", default="auto")
-    s.add_argument("--split", default="test")
-    s.add_argument("--tau", type=float, default=None, help="override the stored threshold")
-    s.add_argument("--n", type=int, default=0, help="puzzles per constellation (0 = all)")
-    s.add_argument("--jvm-gb", type=int, default=40)
-    s.add_argument("--json-out", default="")
     args = ap.parse_args()
-    {"perceive": perceive, "solve": solve}[args.stage](args)
+    {"perceive": perceive}[args.stage](args)
 
 
 if __name__ == "__main__":

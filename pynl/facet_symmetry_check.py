@@ -11,6 +11,8 @@ attributes) maps the network onto itself, with the same weight on every correspo
 
     python3 pynl/facet_symmetry_check.py              # random weights, four template variants (I-RAVEN)
     python3 pynl/facet_symmetry_check.py --trained    # + I-RAVEN and I-RAVEN-X 3x10 (values 0..49) checkpoints
+The I-RAVEN-X table checks the column roles (--columns roles, notes §24): columns 2 and 3 exchanged in every
+row, both middle columns for n = 10.
 """
 import argparse, json, os, sys
 
@@ -36,6 +38,13 @@ def cols12(pz):                     # columns 1 and 2 exchanged in every row (co
     n, out = len(B.COLS), list(pz)
     for r in range(3):
         out[r * n], out[r * n + 1] = pz[r * n + 1], pz[r * n]
+    return out
+
+
+def cols23(pz):                     # columns 2 and 3 exchanged in every row: both middle columns when n >= 4
+    n, out = len(B.COLS), list(pz)
+    for r in range(3):
+        out[r * n + 1], out[r * n + 2] = pz[r * n + 2], pz[r * n + 1]
     return out
 
 
@@ -78,6 +87,7 @@ CHECKS = {
     "components (mirror L-R), positions": (mirror, lambda cfg: cfg == LR,
                                            lambda out, i, k: swap_slots(out[(i, other[k])]), "pos"),
     "candidates (order)": (candidates, lambda cfg: True, lambda out, i, k: out[(i, k)], "all"),
+    "middle columns 2 <-> 3 (n >= 4)": (cols23, lambda cfg: len(B.COLS) >= 4, lambda out, i, k: out[(i, k)], "all"),
     "control: columns 1 <-> 2": (cols12, lambda cfg: True, lambda out, i, k: out[(i, k)], "all"),
 }
 
@@ -88,7 +98,7 @@ def predict(outs, i, pz, cfg):
                               for k in B.comps(cfg)) for c in range(8)]))
 
 
-def run(model, puzzles, copy, draws):
+def run(model, puzzles, copy, draws, roles=False):
     """Per check: the max |output difference| over `draws` random weight settings, or (draws=None) on the
     model's current weights, where it also counts the puzzles whose chosen candidate changes and the
     puzzles answered right before and after the transformation."""
@@ -102,7 +112,7 @@ def run(model, puzzles, copy, draws):
         for i, (pz, y, cfg) in enumerate(ps):
             for k in B.comps(cfg):
                 gid = f"g{len(units)}"
-                facts = (B.puzzle_facts(pz, gid, with_feat=False) + B.facet_facts(pz, "therm", cfg, copy)
+                facts = (B.puzzle_facts(pz, gid, with_feat=False, col_roles=roles) + B.facet_facts(pz, "therm", cfg, copy)
                          + [R.qcomp(gid, k)])
                 units.append((s, i, k))
                 samples.append(Sample(R.out(gid)[B.facet_target(B.comp_objs(pz[B.N_CTX + y], cfg, k)).tolist()],
@@ -167,8 +177,8 @@ def main():
     from neuralogic.core import Settings
     from neuralogic.nn import Adam, MSE
 
-    def build(copy=False, rows=True, shared=True, gates="panel", ckpt=None):
-        m = B.build_facet_template(32, 2, shared, rows, [32, 64, 128], copy=copy, gates=gates)
+    def build(copy=False, rows=True, shared=True, gates="panel", cols="named", ckpt=None):
+        m = B.build_facet_template(32, 2, shared, rows, [32, 64, 128], copy=copy, gates=gates, cols=cols)
         m.build(Settings(optimizer=Adam(lr=3e-4), error_function=MSE(), iso_value_compression=False))
         if ckpt:
             m.load(os.path.join(ckpt, "template_best.bin"))
@@ -189,22 +199,36 @@ def main():
         m, n = build(**kw)
         cols[f"{label}, {n // 1000}k w"] = fmt_rand(run(m, puzzles, kw.get("copy", False), args.draws))
     table(cols)
-    if not args.trained:
-        return
+    if args.trained:
+        print("\ntrained checkpoints (moved: puzzles whose chosen candidate changes; right: puzzles answered "
+              "right before -> after the transformation)\n")
+        m, _ = build(ckpt="experiments/facet_all_w32-64-128_hidden")
+        table({"I-RAVEN, level 2": fmt_tr(run(m, puzzles, False, None))})
 
-    print("\ntrained checkpoints (moved: puzzles whose chosen candidate changes; right: puzzles answered "
-          "right before -> after the transformation)\n")
-    m, _ = build(ckpt="experiments/facet_all_w32-64-128_hidden")
-    table({"I-RAVEN, level 2": fmt_tr(run(m, puzzles, False, None))})
     path = "data/iravenx/center_single_shuffle_n_10_maxval_50.json"
     B.configure(n_cols=10, maxval=50)
     px = B.load_iravenx(path, 6300, args.n_iravenx)
+    print(f"\nI-RAVEN-X 3x10, values 0..49: {len(px)} unseen puzzles (6300..; one object per panel, one "
+          f"component); random weights\n")
     cols = {}
-    for label, copy, ckpt in [("3x10 m50, level 2", False, "experiments/facet_iravenx_n10_m50"),
-                              ("3x10 m50, copy links", True, "experiments/facet_iravenx_n10_m50_copy")]:
-        m, n = build(copy=copy, ckpt=ckpt)
-        cols[f"{label}, {n // 1000}k w"] = fmt_tr(run(m, px, copy, None))
-    print(f"\nI-RAVEN-X ({len(px)} unseen puzzles, 6300..; one object per panel, one component)\n")
+    for label, kw in [("named columns", {}), ("column roles", {"cols": "roles"}),
+                      ("roles, content gates", {"cols": "roles", "copy": True, "gates": "content"}),
+                      ("roles, panel gates", {"cols": "roles", "copy": True})]:
+        m, n = build(**kw)
+        cols[f"{label}, {n // 1000}k w"] = fmt_rand(run(m, px, kw.get("copy", False), args.draws, kw.get("cols") == "roles"))
+    table(cols)
+    if not args.trained:
+        return
+    cols = {}
+    for label, kw, ckpt in [("level 2", {}, "facet_iravenx_n10_m50"),
+                            ("copy links", {"copy": True}, "facet_iravenx_n10_m50_copy"),
+                            ("column roles", {"cols": "roles"}, "facet_iravenx_n10_m50_roles"),
+                            ("roles, content gates", {"cols": "roles", "copy": True, "gates": "content"},
+                             "facet_iravenx_n10_m50_roles_content")]:
+        if os.path.exists(f"experiments/{ckpt}/template_best.bin"):
+            m, n = build(ckpt=f"experiments/{ckpt}", **kw)
+            cols[f"{label}, {n // 1000}k w"] = fmt_tr(run(m, px, kw.get("copy", False), None, kw.get("cols") == "roles"))
+    print(f"\nI-RAVEN-X, trained checkpoints\n")
     table(cols)
 
 

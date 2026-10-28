@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Checks that the PyNeuraLogic I-RAVEN result is not an artefact.
+"""Checks that I-RAVEN results are not artefacts of the data.
 
 Each check targets one specific way a high accuracy could be fake:
 
@@ -13,20 +13,17 @@ Each check targets one specific way a high accuracy could be fake:
             candidate panels as well as context panels? Uses the per-object pixel masks
             stored in the XML: every non-white pixel must lie on some labelled object,
             and each object's fill must match its labelled Color.
-  model     On the trained checkpoint: (a) permuting the candidates must permute the
-            scores exactly (no candidate-index leakage, CONCAT order handled right);
-            (b) giving a puzzle the CONTEXT of another puzzle must collapse accuracy to
-            chance -- if it did not, the model would be answering without the context;
-            (c) blanking the context entirely must do the same.
+(The `model` check of the GNN-style PyNeuraLogic model is archived with it,
+archive/superseded_2026-10-28/. The facet model's own invariances are checked by
+facet_symmetry_check.py.)
 
 Usage:
     python pynl/sanity_checks.py splits
     python pynl/sanity_checks.py shortcut
     python pynl/sanity_checks.py images --n 200
     python pynl/sanity_checks.py images --n 200 --mismatch     # negative control: must FAIL
-    python pynl/sanity_checks.py model --run-dir experiments/max_data_L2 --n 250
 """
-import argparse, glob, os, random, shutil, sys, tempfile, xml.etree.ElementTree as ET
+import argparse, glob, os, sys, xml.etree.ElementTree as ET
 from collections import Counter
 from multiprocessing import Pool
 
@@ -197,68 +194,14 @@ def check_images(args):
 
 
 # ── model ───────────────────────────────────────────────────────────────────────
-def check_model(args):
-    import torch
-    import neuralogic
-    neuralogic.set_max_memory_size(args.jvm_gb)
-    from train_all_constellations import encode_puzzle, SLOTS
-    from eval_pynl_test import load_model
-
-    # the run dir may be written by a live job: load from a copy
-    tmp = tempfile.mkdtemp()
-    for n in ("model_best.pt", "template_best.bin"):
-        shutil.copy(os.path.join(args.run_dir, n), tmp)
-    model, ck, a = load_model(tmp)
-    print(f"checkpoint: {args.run_dir}  epoch {ck['epoch']}, val {100*ck['val_acc']:.2f}%\n")
-
-    rng = random.Random(0)
-    score = lambda panels, cfg: model(*encode_puzzle(panels, cfg))
-    rows, worst_diff = [], 0.0
-    tot = Counter()
-    with torch.no_grad():
-        for cfg in CONSTELLATIONS:
-            fs = files(IRAVEN, cfg, "test", args.n)
-            P = [parse(f.replace(".npz", ".xml"), cfg) for f in fs]
-            Y = [int(np.load(f)["target"]) for f in fs]
-            c = Counter()
-            for i, (panels, y) in enumerate(zip(P, Y)):
-                base = score(panels, cfg)
-                c["base"] += int(base.argmax()) == y
-
-                perm = list(range(8)); rng.shuffle(perm)            # (a) equivariance
-                pp = panels[:8] + [panels[8 + perm[j]] for j in range(8)]
-                out = score(pp, cfg)
-                worst_diff = max(worst_diff, float((out - base[perm]).abs().max()))
-                c["perm"] += int(out.argmax()) == perm.index(y)
-
-                other = P[(i + 1) % len(P)]                          # (b) foreign context
-                c["shuf"] += int(score(other[:8] + panels[8:], cfg).argmax()) == y
-
-                at, ac = encode_puzzle(panels, cfg)                  # (c) no context
-                ac = ac.clone(); ac[:8 * SLOTS] = False
-                c["blank"] += int(model(at, ac).argmax()) == y
-                c["n"] += 1
-            rows.append((cfg, c)); tot += c
-
-    print(f"{'constellation':<40} {'normal':>8} {'cands permuted':>15} {'foreign context':>16} {'no context':>11}")
-    for cfg, c in rows + [("OVERALL", tot)]:
-        n = c["n"]
-        print(f"{cfg:<40} {100*c['base']/n:>7.1f}% {100*c['perm']/n:>14.1f}% "
-              f"{100*c['shuf']/n:>15.1f}% {100*c['blank']/n:>10.1f}%")
-    print(f"\nlargest |score change| under candidate permutation: {worst_diff:.2e}  (0 = exactly equivariant)")
-    print("chance = 12.5%")
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("check", choices=["splits", "shortcut", "images", "model"])
-    ap.add_argument("--n", type=int, default=200, help="test puzzles per constellation (images, model)")
-    ap.add_argument("--run-dir", default="experiments/max_data_L2")
-    ap.add_argument("--jvm-gb", type=int, default=30)
+    ap.add_argument("check", choices=["splits", "shortcut", "images"])
+    ap.add_argument("--n", type=int, default=200, help="test puzzles per constellation (images)")
     ap.add_argument("--mismatch", action="store_true", help="images: negative control with wrong labels")
     args = ap.parse_args()
     {"splits": check_splits, "shortcut": check_shortcut,
-     "images": check_images, "model": check_model}[args.check](args)
+     "images": check_images}[args.check](args)
 
 
 if __name__ == "__main__":

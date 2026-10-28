@@ -1,69 +1,18 @@
-# Porting the RAVEN GNN solver to PyNeuraLogic — findings
+# I-RAVEN and I-RAVEN-X with PyNeuraLogic — lab notes
 
-Working notes from rebuilding the PyNeuraLogic strand of this project from scratch,
-with the goal of matching the torch GNN's I-RAVEN accuracy.
+Working notes, kept as a record of what was measured and how. The findings that still hold, in the order
+they were made: `thesis/FINDINGS.md`. The thesis plan: `thesis/THESIS_PLAN_symmetry.md`.
 
-**Status (2026-10-19) — supersedes every number further down.**
-
-| I-RAVEN test, all 7 constellations, 2000 each | accuracy |
-|---|---|
-| **PyNeuraLogic level 2, final** (`experiments/max_data_L2`, epoch 126 of 130), with XML labels | **68.49%** |
-| same checkpoint, **end to end** through the ResNet-18 frontend (§11) | **68.46%** |
-| PyNeuraLogic level 2 at epoch 62 (earlier milestone) | 64.00% (63.96% end to end) |
-| torch GNN, both position fixes, 3 seeds (`experiments/gnn_FIXREL_s{42,43,44}`) | 45.25% ± 12.4 (41.74 / 35.01 / 59.02) |
-| torch GNN, published (wrong positions, not reproducible) | 68.81% |
-| PyNeuraLogic level 2 at 2000/constellation (`allcons_v2_L2`) | 51.78% |
-| **symbolic PyNeuraLogic, rules** (§15): test, with XML labels / end to end | **98.33% / 96.31%** |
-
-* **Final run:** 130 epochs in chained 3-day links, finished 2026-10-19; best validation 70.86% at
-  epoch 126; the test split was scored once on that checkpoint. Per constellation (XML / end to end):
-  center_single 85.70 / 85.70, distribute_four 40.85 / 40.85, distribute_nine 38.20 / 38.05,
-  left/right 83.10 / 83.10, up/down 84.00 / 84.00, in/out 90.25 / 90.25, in_distribute_four
-  57.30 / 57.30. LaTeX: `table_iraven_final_test.tex`.
-* **Against the published torch model:** level overall (68.49 vs 68.81) and +6 to +10 on the four
-  constellations the position bug never touched (85.70 vs 75.40, 83.10 vs 73.40, 84.00 vs 74.20,
-  90.25 vs 84.45). Its numbers on the other three come from corrupted inputs.
-* **Data was the binding constraint:** 2000/constellation saturates near 54.4% validation. The full-data
-  model is a warm start from that run ("epoch 62" = 38 epochs at 2000 + 24 at 6000); no from-scratch
-  full-data run at dim 128 exists. Validation was still creeping up at the end (10-epoch means
-  68.5 → 69.4% over epochs 91–130) while the training loss kept falling.
-* **One seed.** The torch GNN varies 35–59% across seeds; PyNeuraLogic has a single run.
-* Checked not to be an artefact (`sanity_checks.py`, each check with a control that proves it can fail):
-  0 train/test duplicates, uniform answer index, the candidates-only shortcut at chance on I-RAVEN
-  (90–100% on RAVEN), XML labels match the rendered images, the model is exactly invariant to candidate
-  order, and a foreign or blank context collapses it to chance. Full audit list: §14.
-* **Running (launched 2026-10-19):** GNN ablations for the layout weak spot (§16).
-
-**Bottom line (porting stage, center_single only).** The relational structure transfers
-cleanly; the optimisation machinery does not. A pure PyNeuraLogic port reaches 27.2% on `center_single`; moving the numerical
-parts (embeddings, normalisation, loss, optimiser) into PyTorch while keeping the same
-logic template reaches 52.9%. Along the way, a **position-decoding bug in the original
-torch data pipeline** turned up that makes ~32% of puzzles in three constellations
-literally unanswerable.
+**Pruned 2026-10-28.** Sections on superseded models were removed: the porting-stage PyNeuraLogic models
+(§4–§8), the GNN-style PyNeuraLogic model (§9, §11.4–11.5, §12–§14, §16), the original torch GNN (most of §1,
+the spatial-relation bug in §10) and the April spatial GNN (§19). They are in git history (commit 4380e83);
+their code is in `archive/`. Section numbers are kept so references stay valid.
 
 ---
 
-## 1. The torch baseline — what actually won
+## 1. RAVEN's answer-set leakage
 
-Numbers pulled directly from `best_val_acc` inside each `experiments/*/model_best.pt`,
-not from the summary doc.
-
-| | best config | val | test |
-|---|---|---|---|
-| RAVEN | `gnn` + `object_only` + `unified` | 96.45% | 96.41% |
-| **I-RAVEN** | `gnn` + `granular` + `object_only` | **68.83%** | **68.81%** |
-
-`gnn` = `RelGNLayer`, plain relational message passing, **no attention**.
-
-* **GAT failed outright** — every variant landed 15.17–26.53% against a 12.5% chance
-  floor. Several runs stopped at epoch 1/15/16/54, so read this as "did not train",
-  not "attention doesn't help".
-* **GCN was mid**: 87.49% RAVEN, 64.49% I-RAVEN.
-* **`object_only` is the single biggest factor**: dropping panel super-nodes moves RAVEN
-  38.40% → 81.09% and I-RAVEN 34.38% → 68.44%. The `same_pos_cross_panel` edges that
-  replace the panel scaffolding do the real work.
-
-### 1.1 RAVEN's answer-set leakage, measured
+### 1.1 Measured with the original torch GNN (since archived)
 
 | | `object_only` | `+ unified` | Δ |
 |---|---|---|---|
@@ -77,34 +26,8 @@ all 8 candidates in one graph where they exchange messages, which is exactly the
 mechanism needed to exploit that. I-RAVEN kills the bias, and there the same mechanism
 costs 20 points.
 
-**Consequence: 96.4% is not a real number.** Any port should target the I-RAVEN config and
-keep candidates from seeing each other. *(Correction, later: the I-RAVEN 68.8% was trained on
-the corrupted positions of §10 and is not valid either. The fixed-position retrain scores
-55.09% test.)*
-
-### 1.2 The winning architecture
-
-`emb 256 / hidden 384 / 3 layers / lr 1e-3 / dropout 0.1 / batch 8 / AdamW wd 1e-4`
-
-* **Graph** (`gnn/graph.py:47`, per candidate — 8 separate graphs per puzzle): 8 context
-  panels + 1 candidate. Objects only. With `granular`, each object also gets 4 satellite
-  attribute nodes. **17 typed relations** (`gnn/config.py:14`).
-* **Encoder** (`gnn/model.py:68`): plain **sum** of `nn.Embedding` lookups over pos,
-  color, shape, size, kind, role, panel-grid.
-* **Layer** (`gnn/model.py:150`), ×3:
-  ```
-  msg   = W([x_src + rel_emb ; x_dst ; rel_emb])
-  agg   = scatter_mean over incoming edges, per destination
-  x_out = LayerNorm(x + dropout(out_proj(agg)))
-  ```
-* **Readout** (`gnn/model.py:381`): mean-pool context, mean-pool candidate,
-  `MLP([ctx ; cand]) → 1 logit`.
-* **Loss** (`gnn/train.py:102`): `F.cross_entropy(logits[batch, 8], target)` — one
-  **8-way softmax ranking** the candidates. Note the non-unified path still scores each
-  candidate on its *own* graph then stacks (`gnn/model.py:409`): independent scoring,
-  joint normalisation.
-
----
+**Consequence:** RAVEN numbers from models that see all candidates together are not real; work on
+I-RAVEN, and keep candidates from seeing each other. The generative models never see them at all.
 
 ## 2. Environment
 
@@ -175,205 +98,7 @@ Each of these cost real debugging time and none produce a clear error message.
 
 ---
 
-## 4. What failed, and the elimination
-
-Five hypotheses for why the pure port underperforms. **Four were real defects; none was
-the main cause.**
-
-| hypothesis | test | verdict |
-|---|---|---|
-| Class imbalance (1 pos : 7 neg) | plateau loss 0.3810 ≈ 0.3768, the constant base-rate optimum. Retrained on a **balanced** 1-pos/1-neg set | **rejected** — pairwise acc stayed 49–53% for 12 epochs |
-| Additive readout | body atoms combine by `SUM`, so `score = W₁·ctx + W₂·cand` with **no interaction term**; `ctx` is identical across a puzzle's candidates so it cancels under argmax | **real, minor**: SUM 13.8% → ELPRODUCT 18.8% → **CONCAT 20.0%** |
-| `tanh` saturation / no LayerNorm | each layer sums 8 terms with nothing renormalising; `out std` decayed to ~1e-8 | **real**: TANH collapsed (1.7e-08), NORM 1.4e-01, LEAKY_RELU 1.6e-01 — but acc only 16.2 → 18.8% |
-| Binary vs 8-way softmax | built the softmax version (below); loss started at ln(8)=2.0794 and reached 2.0785 after 300 epochs | **rejected** — flat at the uniform floor for 5.5 hours |
-| Capacity / scale | 300 epochs at dim 64, 2000 puzzles | **rejected** — peaked 27.2% at epoch 89 then *degraded*; last-50-epoch mean 20.6% vs first-50 19.2% |
-
-Fixing the three real defects moved a toy from 13.8% → 21.2%. Scaling moved it to 27.2%.
-The gap to 75.4% stayed ~48 points.
-
-### 4.1 Expressing 8-way softmax in PyNeuraLogic
-
-It *is* possible, and worth recording:
-
-```python
-m += (R.answer(V.G) <= (R.cand_of(V.B, V.G), R.score(V.B))) \
-     | Metadata(aggregation=Aggregation.CONCAT)      # 8 scalars -> one 8-vector
-Sample(R.answer(gid)[onehot], facts)                  # target as one-hot
-Settings(error_function=CrossEntropy(with_logits=True))   # softmaxes internally
-```
-
-One sample = one puzzle, with all 8 candidate sub-graphs present but **fully disjoint**
-(context duplicated per branch, no candidate-candidate edges). That reproduces torch's
-`forward_one` + `stack` exactly and avoids the leakage. Total work is unchanged:
-8 samples × 9 objects becomes 1 sample × 72.
-
-At full scale it never learned — loss 2.0785 vs the 2.0794 floor after 300 epochs.
-
----
-
-## 5. Structural differences torch vs PyNeuraLogic
-
-"Same GNN structure" is true only of the *relational* part.
-
-| # | torch | naive pynl port | why it matters |
-|---|---|---|---|
-| 1 | `LayerNorm` every layer | **nothing** | at hidden 384 the loss diverged to **3643** in 2 epochs |
-| 2 | batch size 8, AdamW | `build_dataset(batch_size=1)`, the default | 16 000 noisy Adam steps/epoch instead of 2 000 |
-| 3 | `x + f(agg)` — **identity** skip | `h_k(X) :- h_{k-1}(X)[d,d]` — a **learned matrix** in the skip path | not a residual at all; destroys the gradient-flow property |
-| 4 | one `scatter_mean` over **all** incoming edges | AVG *within* each relation, then SUM across relations | with 3 active relation types the magnitude is ~3× torch's, feeding #1 |
-| 5 | **one shared `W`** for all 17 relations, identity via additive `rel_emb` | separate `[d,d]` per relation | **3.7× the parameters** (6.64M vs 1.79M at hidden 384), zero sharing |
-| 6 | 2-layer `score_head`, xavier gain 0.1, zeroed bias | single `Linear(2D→1)` | no hidden layer in the readout |
-| 7 | dropout 0.1, weight decay 1e-4 | none | no regularisation |
-
-Fixing #1–#5 (`train_pynl_aligned.py`) moved the 10-puzzle overfit from 60–70% to **90%**.
-
-Also: at hidden 384 with lr 1e-3 the loss goes **2.52 → 3643 → 43.4**. lr 1e-4 is stable
-but plateaus fast; lr 1e-5 is stable and still descending. Needing a 100× smaller LR is
-itself the missing-normalisation symptom.
-
----
-
-## 6. The decisive diagnostic: can it overfit 10 puzzles?
-
-A model with >1M parameters should memorise 10 examples to 100% in tens of epochs.
-
-| variant | best TRAIN acc on 10 puzzles |
-|---|---|
-| pure PyNeuraLogic, as first written | 60–70% after 120 epochs (still 50% at epoch 200 of 800) |
-| pure PyNeuraLogic, structurally aligned | 90% after 400 epochs |
-| **hybrid with torch head** | **100% at epoch 14** (~15 seconds) |
-
-This is the cleanest result in the whole exercise. **The template was always expressive
-enough; optimisation was the entire gap.** Ruling out overfitting, data volume and
-generalisation, since none can explain a failure to fit the training set itself.
-
----
-
-## 7. The ablation ladder
-
-`train_ladder.py`, one script with `--level N` so hyperparameters cannot drift.
-Identical settings throughout: `emb 64 / hidden 64 / 2 layers / lr 1e-3 / nl-lr 1e-4 /
-batch 8 / 80 epochs / 2000 train / 500 val`, `center_single`.
-
-| level | torch owns | PyNeuraLogic owns | best val | min train loss |
-|---|---|---|---|---|
-| 1 | emb, proj, **head**, loss, opt | message passing | 32.6% | 0.180 |
-| **2** | emb, proj, loss, opt | MP + **head** | **39.0%** | 0.255 |
-| 3 | loss, opt only (**0 torch params**) | **emb** + MP + head | 20.8% | 0.636 |
-| 4 | — | **everything** | 15.4% | 1.402 |
-
-**The drop is localised, and not where expected.**
-
-* **Moving the scoring head into PyNeuraLogic *helped*** (+6.4). Readout, context pooling
-  and per-candidate scoring are all learnable as rules.
-* **The collapse is entirely 2 → 3: −18.2 points.** That step moves *only* the attribute
-  embeddings from `nn.Embedding` into a `[d, n_values]` matrix over a one-hot —
-  mathematically the same operation.
-* **3 → 4 costs a further 5.4**, isolating the training loop (`CrossEntropy` + `Adam` +
-  batching) as real but secondary.
-* Train loss tells it more sharply: L1–L2 reach ~0.2; **L4 never fits the training set**
-  (1.402 against a 2.079 uniform floor).
-
-**So the narrow failure is: learning input embeddings inside the differentiable-logic
-framework.** That points at initialisation and gradient scale on fact-weight matrices,
-not at anything about logic or graph structure.
-
-*Caveat: single seed per level. The 18-point 2→3 gap is unlikely to be noise; the 6.4-point
-1↔2 ordering could plausibly flip. Worth 3 seeds before citing.*
-
----
-
-## 8. The hybrid
-
-`train_pynl_torch.py` — PyNeuraLogic for relational message passing, PyTorch for
-everything numeric (embeddings, LayerNorm, scoring head, 8-way softmax CE, AdamW,
-gradient accumulation).
-
-All 8 context panels and all 8 candidates in **one graph, one forward pass**. Candidates
-connect to the context but **not to each other**, preserving the no-leakage property.
-
-Full scale (`center_single`, 6000/2000, emb 128 / hidden 128, 3 layers, 150 epochs,
-12h48m, 24.5 GB peak):
-
-```
-epoch    loss    val acc
-    1  2.0301     16.0%
-   20  1.4773     26.0%
-   60  0.8854     47.5%
-  121  0.3899     52.9%   <- best
-  150  0.3055     51.2%
-```
-
-**52.9%**, monotone loss 2.03 → 0.305, no divergence or collapse. Mean val went 22.7%
-(first 20 epochs) → 51.3% (last 20). **Not converged** — loss was still falling at
-epoch 150, minimum at 147.
-
-| approach | best val, I-RAVEN `center_single` |
-|---|---|
-| pure PyNeuraLogic, binary | 27.2% |
-| pure PyNeuraLogic, 8-way softmax | 16.0% |
-| **hybrid** | **52.9%** |
-| torch GNN (test split) | 75.4% |
-| chance | 12.5% |
-
-### 8.1 The uncomfortable implication
-
-In the hybrid the symbolic component is reduced to **pure topology** — a message-passing
-schedule over a fixed graph. No attribute constants, no grounding over attribute values,
-no logical embeddings. All semantic content lives in torch. **And that is the version
-that works.**
-
-The more of the symbolic machinery moved out of PyNeuraLogic, the better it performed.
-A reviewer will ask what the logic is buying; for the 52.9% model the honest answer is
-"the graph topology, and not much else". The pure version is the one that actually does
-neurosymbolic reasoning — and it is stuck at 27.2%. **That contrast is the result.**
-
----
-
-## 9. All seven constellations
-
-Earlier work was `center_single` only — one of seven, and the easiest.
-
-**Object counts vary**, which breaks the static-graph requirement:
-
-| constellation | objects/panel | slots |
-|---|---|---|
-| `center_single` | always 1 | 1 |
-| `left/right`, `up/down`, `in/out` | always 2 | 2 |
-| `distribute_four` | **1–4** | 4 |
-| `in_distribute_four_out_center_single` | **2–5** | 5 |
-| `distribute_nine` | **1–9** | 9 |
-
-One-module-per-constellation with shared weights **fails on backward** (§3.7). The working
-approach is a **common 9-slot topology** — 16 panels × 9 slots = 144 nodes, 2808 edges,
-measured 484 ms/puzzle at hidden 128 (8.8× `center_single`), with a learned pad embedding
-for inactive slots.
-
-**Slot semantics matter:** slot *k* is the *k*-th **universal position** of that
-constellation, not the *k*-th object present. A puzzle is entirely one constellation, so
-slot *k* denotes the same position in all 16 panels and same-slot cross-panel edges link
-matching positions. Verified: 4243 objects, zero mismatches.
-
-`train_all_constellations.py --level {1,2}`, 500 train / 200 val per constellation.
-
-### 9.1 Overfit probe, all 7 at once (level 2)
-
-**92.9% — 13 of 14 puzzles memorised**, six constellations at 100% including
-`distribute_nine`. Only `distribute_four` stuck at 50%, with loss pinned at exactly
-**0.0496** for 50 epochs.
-
-Isolating `distribute_four` (5 puzzles): saturates at **80%**, loss flat at **0.4159** for
-150 epochs. And `ln(8)/5 = 0.4159` exactly — so four puzzles are fit perfectly and one
-sits at *precisely* uniform. The model emits identical logits for all 8 candidates on it.
-
-That signature led to the next section.
-
----
-
-## 10. The position bugs (torch pipeline)
-
-Two decoding bugs: the slot bug below (I-RAVEN only) and a spatial-relation bug (both
-datasets, third subsection).
+## 10. The slot bug in the inherited data pipeline
 
 **`gnn/data.py::parse_ground_truth` derived an object's slot from
 `all_positions.index(bbox)`, where `all_positions` is the layout's XML `Position`
@@ -405,21 +130,18 @@ distribute_nine   Position-list lengths seen: {1 … 9}        true distinct bbo
 center_single     always length 1                            1
 ```
 
-### Measured impact on the **torch** data pipeline
+### Measured impact
 
-| constellation | puzzles with indistinguishable candidates | torch test acc |
-|---|---|---|
-| `center_single` | 0/40 | 75.40% |
-| `left/right` | 0/40 | 73.40% |
-| `up/down` | 0/40 | 74.20% |
-| `in/out` | 0/40 | 84.45% |
-| **`distribute_four`** | **13/40** | **55.85%** |
-| **`distribute_nine`** | **13/40** | **47.25%** |
-| **`in_distribute_four_out`** | **12/40** | **71.15%** |
+| constellation | puzzles with indistinguishable candidates |
+|---|---|
+| `center_single`, `left/right`, `up/down`, `in/out` | 0/40 each |
+| **`distribute_four`** | **13/40** |
+| **`distribute_nine`** | **13/40** |
+| **`in_distribute_four_out`** | **12/40** |
 
-Affected constellations average **58.1%**; unaffected **76.9%**. The three worst results
-are exactly the three broken ones. Roughly a third of those puzzles are **unanswerable** —
-two or more candidates encode identically and one of them is the answer.
+Roughly a third of the puzzles in the three variable layouts are **unanswerable** with the old parser:
+two or more candidates encode identically and one of them is the answer. The original torch GNN's results
+on those layouts came from these corrupted inputs.
 
 ### The fix
 
@@ -438,13 +160,7 @@ Regression check — panels whose parse changed:
 | `in_distribute_four_out` | 369/480 (77%) | 0 |
 
 Zero change where counts are fixed (the old code was accidentally right there), and all
-duplicates gone. `center_single` is untouched, so every PyNeuraLogic-vs-torch comparison
-above remains valid.
-
-**Your torch I-RAVEN results predate this fix.** Re-running
-`train_object_vsa_gnn_frontend.py` is the cheapest high-value experiment available.
-*(Done: the fixed-position retrain, `experiments/gnn_FIXEDPOS_granular_object_only`, scores
-55.09% test.)*
+duplicates gone.
 
 ### Second sweep (2026-09-29): the ResNet frontend and its tools
 
@@ -486,42 +202,6 @@ on I-RAVEN they change exactly where the bug bites and agree with the already-fi
 **Rule for new code:** never derive a slot from `Position.index(bbox)`. Use
 `gnn.data.canonical_positions(config, dataset_root)[(component_index, tuple(bbox))]`.
 
-### Third bug (2026-09-30): wrong spatial relations in the torch graph
-
-The torch graph adds within-panel edges typed by spatial relation (`left_of`, `above`,
-`same_row`, `overlap`, …) via `gnn/graph.py::infer_relations(pi, pj, centers)`, which looks
-centres up by the objects' **universal position id**. But `gnn/data.py::build_position_centers`
-keyed centres by the **rank** of each bbox in a sorted list of all distinct bboxes — a
-different numbering — and also treated the centre-based bboxes as corner-based. Universal
-position 0 (the panel centre, true (0.5, 0.5)) was given (0.33, 0.33).
-
-Measured against exact bbox centres, first 200 test puzzles per constellation:
-
-| constellation | within-panel relations wrong | example: labelled vs true |
-|---|---|---|
-| distribute_four | 33.4% | 4→2: below, **left_of** vs below, same_col |
-| distribute_nine | 75.1% | 7→10: above, **left_of** vs above, same_col |
-| left/right | 0.0% | correct by coincidence |
-| up/down | **100%** | upper→lower: **left_of, same_row** vs above, same_col |
-| in/out | **100%** | outer→inner: **above, left_of** vs overlap |
-| in_distribute_four | 79.5% | 0→19: **above, same_col** vs below, left_of |
-
-**Scope:** every torch GNN run, RAVEN and I-RAVEN, published and retrained. The labels are
-wrong but *consistent* (a fixed function of the position pair), so the GNN could still use
-them as arbitrary edge types — but distinct geometric relations get merged, and nothing
-about "spatial reasoning" can be claimed from those models. The PyNeuraLogic model uses no
-spatial relations and is unaffected.
-
-**Fix:** `gnn.data.universal_position_centers(dataset_root)` returns the true centre of each
-universal position from bbox geometry (`(bbox[1], bbox[0])`, checked against the pixel masks).
-`train_object_vsa_gnn_frontend.py` uses it by default (`--legacy-centers` restores the old
-behaviour), and `eval_gnn_test.py` now evaluates with the centres **stored in the checkpoint**,
-so every old checkpoint reproduces its reported number exactly (verified: stored centres equal
-the legacy function's output). With the fix, 0 relations are wrong in every constellation.
-
-Retrain with both fixes, three seeds: `submit_gnn_fixrel.sh` → `experiments/gnn_FIXREL_s42`,
-`_s43`, `_s44`.
-
 ### Rotation is *not* a missing attribute
 
 `Angle` is on every `<Entity>` and captured by neither pipeline. Across 420 puzzles in all
@@ -561,24 +241,17 @@ Its labels were correct despite the §10 bug, because the bug is dormant on RAVE
 
 ### 11.2 The pipeline (`pixel_pipeline.py`, `submit_pixels.sh`)
 
-Two chained jobs, because the stages need different environments:
+`perceive` (GPU, env `nvsa`) runs both frontends over every I-RAVEN val + test panel (448,000), stores per
+panel and position the best attribute match and its cosine (`experiments/frontend_preds/`), and scores
+perception against the ground truth. The end-to-end runs (`pynl_symbolic_e2e.py`) decode these.
 
-| stage | where | does |
-|---|---|---|
-| `perceive` | GPU, env `nvsa` | runs both frontends over every I-RAVEN val + test panel (448,000); stores per panel and position the best attribute match and its cosine; scores perception against the ground truth |
-| `solve` | CPU, env `pynl` | picks the frontend with the better **val** perception (never test), decodes its test detections, and scores the same puzzles from pixels and from XML with the same PyNeuraLogic checkpoint |
-
-* **Decoding**, identical in both stages: at each position the constellation can use, take the
-  best of its 300 attribute rows; the object exists iff that cosine > τ = 0.23. One object per
-  position by construction. The constellation label comes from the dataset folder, as in the
-  XML pipeline.
+* **Decoding:** at each position the constellation can use, take the best of its 300 attribute rows; the
+  object exists iff that cosine > τ = 0.23. One object per position by construction. The constellation
+  label comes from the dataset folder, as in the XML pipeline.
 * **No remapping needed:** the frontend's codebook positions, `train_pynl.POS_MAP` and
-  `gnn.config.CONFIG_POS_MAP` are identical, and the two ground-truth parsers agree on every
-  panel checked.
-* **Built-in checks:** the decoder is asserted equal to the frontend's own `decode_w_index`;
-  the stored ground truth is asserted equal to `train_pynl.parse` on 140 puzzles.
-* **Cost:** perception 10 min on one A100 (outputs cached in `experiments/frontend_preds/`);
-  solving ~90 min on CPU. Re-scoring a newer reasoner only needs the `solve` stage.
+  `gnn.config.CONFIG_POS_MAP` are identical, and the two ground-truth parsers agree on every panel checked.
+* **Built-in check:** the decoder is asserted equal to the frontend's own `decode_w_index`.
+* **Cost:** perception 10 min on one A100.
 
 ### 11.3 Perception on I-RAVEN (test, `mean3`)
 
@@ -594,172 +267,6 @@ Higher than the 95.3% the frontend reported during training, because the decodin
 the training eval counts every row above threshold (two hits at one position = wrong), the
 pipeline takes the single best row per position among the constellation's positions. Only
 474 of 224,000 panels had a detection outside the constellation's positions.
-
-### 11.4 Result: pixels cost nothing
-
-| constellation | all 16 perceived | from pixels | from XML | Δ |
-|---|---|---|---|---|
-| center_single | 100.0% | 78.80 | 78.80 | 0.00 |
-| distribute_four | 99.9% | 35.25 | 35.25 | 0.00 |
-| distribute_nine | 76.5% | 35.95 | 35.65 | +0.30 |
-| left/right | 100.0% | 79.70 | 79.70 | 0.00 |
-| up/down | 100.0% | 78.70 | 78.70 | 0.00 |
-| in/out | 100.0% | 86.65 | 86.65 | 0.00 |
-| in_distribute_four | 71.5% | 52.70 | 53.25 | −0.55 |
-| **overall** | **92.6%** | **63.96** | **64.00** | **−0.04** |
-
-(`experiments/max_data_L2` at epoch 62, I-RAVEN test.)
-
-Why it is robust: when all 16 panels are perceived correctly the input is identical to the
-XML, so the answer is too — the whole difference comes from the ~1,040 puzzles with at least
-one misperceived panel. On those, pixels and XML stay within 2 points (distribute_nine
-32.9% vs 31.7%, in_distribute_four 53.3% vs 55.3%). A typical error is one small object in
-one crowded panel, which rarely changes the winning candidate, in puzzles the reasoner
-already finds hard.
-
-**Caveat — image overlap.** The frontend was trained on RAVEN, which shares images with
-I-RAVEN test: 8% of distribute_nine panels (0 whole contexts), 33% of in_distribute_four
-panels (51% of whole contexts), and every center_single panel. Perception on **unseen**
-panels is 95.7% / 95.4% versus 98–100% on seen ones, so perception is inflated by under a
-point where it matters, and the end-to-end number barely moves. center_single cannot be
-separated (no unseen panels) but is the easiest case, one large object per panel. The
-reasoner never saw RAVEN, so this does not touch it.
-
-### 11.5 Can the whole thing be trained end to end?
-
-**Technically yes.** Exactly one step blocks gradients:
-
-```
-pixels → ResNet → cosine vs codebook → [threshold + argmax → integer IDs] → embedding lookup → PyNeuraLogic → 8 logits
-                                              ↑ the only non-differentiable step
-```
-
-The fix is to replace the hard decode with **soft attribute probabilities**: per position, a
-softmax over the 300 codebook similarities, marginalised into P(type), P(size), P(color), plus
-a soft existence probability. The node embedding becomes the probability-weighted sum of the
-embedding rows, blended with the pad token by the existence probability. With one-hot
-probabilities this reproduces the current model exactly, which gives a clean regression
-test. It is the same trick NVSA's own end-to-end training uses (`raven/main_nvsa_marg.py`:
-`metric_fc` turns the ResNet output into marginal probabilities, `marg_prob`, and the loss
-backpropagates into the ResNet).
-
-Everything downstream already passes gradients: level 2 trains its torch embeddings
-*through* the PyNeuraLogic layer, and the training loop runs backward once per puzzle, so the
-gradient would continue into the ResNet. A GPU node (A100, 128 CPUs, 1 TB RAM) holds the
-ResNet and the JVM side by side. Speed would be set by the reasoner (~6.3 h per full-data
-epoch); the ResNet should add only a small overhead.
-
-**The catch: it cannot help accuracy much.** Perception costs 0.04 points (§11.4), and joint
-training can at best recover what perception loses. The limit is the reasoner — 64% even
-with perfect inputs, ~35% on distribute_four/nine. End-to-end training buys a methodological
-claim ("fully differentiable, trained from pixels to answer"), not a better number.
-
-Two versions, with very different risk:
-
-1. **Joint fine-tuning from the trained parts** (ResNet `mean3` + reasoner `max_data_L2`),
-   keeping the attribute loss as an auxiliary term so the ResNet's "colour 3" does not drift
-   away from actual colour 3. Low risk; same accuracy expected; earns the end-to-end claim.
-   Estimated a day to build and test, then 2–3 days of GPU training.
-2. **Perception learned only from the answer**, with no attribute labels — can a logic
-   reasoner *teach* perception? High risk. NVSA gets away with it because its reasoner is a
-   fixed rule executor with no learnable parts, so its gradients are meaningful from step one;
-   here both sides would learn from one weak signal (which of 8 candidates is right), which
-   tends to collapse or stall.
-
-**Recommendation:** version 1 if the thesis narrative needs "end to end", presented as
-confirming the pipeline trains jointly without loss. For a higher number, the effort
-belongs in the reasoner. *Not built yet.*
-
----
-
-## 12. Files
-
-| file | what |
-|---|---|
-| `train_pynl.py` | pure PyNeuraLogic, per-candidate binary scoring (27.2%). Also hosts `parse()`, `POS_MAP`, `canonical_positions` |
-| `train_pynl_softmax.py` | pure PyNeuraLogic, 8-way softmax (16.0%) |
-| `train_pynl_aligned.py` | pure, structurally corrected — shared `W` via `edge/3`, identity residual, 2-layer head |
-| `train_pynl_torch.py` | hybrid, `center_single` (52.9%) |
-| `train_ladder.py` | the 4-level ablation, `--level N` |
-| `train_all_constellations.py` | all 7 jointly, `--level {1,2}`, 9-slot padded topology |
-| `pynl_iraven_minimal.ipynb` | annotated minimal notebook with executed outputs |
-| `pynl_best_architecture_walkthrough.ipynb` | walkthrough of the best model (`max_data_L2`), importing the real training code |
-| `eval_pynl_test.py` | full test-split evaluation of a PyNeuraLogic run (reference column: fixed-position torch GNN) |
-| `sanity_checks.py` | `splits` / `shortcut` / `images` / `model` checks that the result is not an artefact |
-| `pixel_pipeline.py` | end-to-end from pixels: `perceive` (ResNet, GPU) and `solve` (PyNeuraLogic, CPU) — §11 |
-| `train_frontend.py`, `predict_frontend.py`, `extract_objects.py` | ResNet-18 perception frontend and its tools (position parse fixed, §10) |
-| `gnn/data.py` | **both torch bugs fixed here**: `canonical_positions` (slot decoder) and `universal_position_centers` (spatial-relation centres) |
-| `analyze_constellation.py` | per-rule / per-object-count failure analysis (two-component rule keys fixed 2026-09-30) |
-| `archive/pyneuralogic_2026-03-31_to_05-06/` | the previous PyNeuraLogic attempt, with MANIFEST |
-
-Moved on 2026-10-20 to `archive/pyneuralogic_experiments/`: `train_pynl_softmax.py`,
-`train_pynl_aligned.py`, `train_pynl_torch.py`, `train_ladder.py`, `pynl_iraven_minimal.ipynb` and the
-submit scripts `submit_pynl*.sh`, `submit_ladder*.sh`, `submit_full.sh`, `submit_sweep.sh`,
-`submit_layout_grid.sh`, `submit_all_constellations.sh`. LaTeX tables are in `thesis/tables/`.
-The current code then moved into folders: `pynl/` (PyNeuraLogic scripts and jobs), `notebooks/`,
-`frontend/` (ResNet-18), `torch_gnn/` (torch GNN). File names in earlier sections are unchanged.
-
-Submit scripts: `submit_pynl*.sh`, `submit_ladder*.sh`, `submit_all_constellations.sh`,
-`submit_max.sh` (chained resumable jobs behind `max_data_L2`), `submit_pixels.sh` (§11),
-`submit_gnn_fixrel.sh` (torch retrain with both fixes, three seeds).
-
-**Stale, do not cite:** `table_i_raven_per_constellation_test.tex`, `table_406.tex` and
-`scripts/BEST_MODELS_RESULTS.md` still report the invalid 68.81% / 68.83% I-RAVEN numbers.
-Regenerate them from the three-seed retrain and the final PyNeuraLogic checkpoint.
-PyNeuraLogic jobs are CPU-only on `amdlong`, `JAVA_HOME` pinned, `PYTHONNOUSERSITE=1`.
-
----
-
-## 13. Open questions
-
-1. **A trustworthy torch baseline.** The 55.09% retrain is 10–13 points below the published
-   model even where the position bug never applied — but the published run is itself not
-   reproducible (§14), and both used wrong spatial relations (§10). The three-seed retrain
-   with both fixes (`gnn_FIXREL_s*`) settles the baseline and its spread.
-2. **Why can't PyNeuraLogic learn input embeddings?** The narrow, localised failure from
-   §7. Initialisation and gradient scale on `[d, n_values]` fact-weight matrices are the
-   place to look.
-3. ~~The hybrid was never converged / generalisation gap.~~ **Answered:** it was data. At
-   6000/constellation the level-2 model reaches 64.0% test; at 2000 it saturates near 54%.
-   Open detail: the full-data model is a warm start; no from-scratch full-data run at dim 128.
-4. **The reasoner is now the bottleneck, not perception** (§11.4). Re-measured on the epoch-62
-   checkpoint: distribute_four / distribute_nine score 66–69% when the layout stays constant
-   and ~30% otherwise; Number rules 26–29%, Position-Progression worst at 18–22%; in
-   distribute_four's inner grid, Position-Progression 25.5%. The model handles attribute rules
-   and fixed layouts and fails when the set of occupied slots changes. Panel layout features
-   and within-panel edges both hurt when tried; this is where accuracy is left.
-5. **End-to-end training** (§11.5): version 1 is low-risk and earns the claim; version 2
-   (perception from the answer alone) is the research question.
-6. **Seeds.** Every PyNeuraLogic number here is a single run; the torch baseline now gets three.
-
-### A framing that fits the evidence
-
-*Expressiveness is not trainability.* GNNs are provably a special case of differentiable
-logic programming, and that equivalence invites the assumption that anything a GNN learns,
-a template can learn. These experiments show that is false in practice and localise why:
-the declarative part transfers cleanly, while normalisation, skip topology, batching and
-embedding optimisation — none of which the framework gives you vocabulary for — are what
-make deep GNNs trainable.
-
-The RAVEN leakage ablation (§1.1) and the position bug (§10) are independently
-publishable observations about the benchmark and its standard tooling.
-
----
-
-## 14. Audit (2026-09-30)
-
-Everything found while checking this work for gaps and inconsistencies, with its status.
-
-| finding | impact | status |
-|---|---|---|
-| **Wrong spatial relations in the torch graph** (§10, third bug): centres keyed by bbox rank, looked up by universal id; 33–100% of within-panel relations wrong in 5 of 6 multi-object constellations | every torch GNN run; not PyNeuraLogic | **fixed**; old checkpoints still reproduce; three-seed retrain running |
-| **Published torch 68.8% not reproducible.** `ep405` and `ep406` have identical recorded arguments and seed 42, yet finished at **27.35%** and **68.83%**; `ep405` ran ~10× faster per epoch, pointing to different code. `ep406`'s first 88 epochs have no surviving log, and the training code was edited after it finished | the "old model" comparison rests on one unreproducible run | disclosed; baseline replaced by the three-seed retrain |
-| **Warm start.** "Epoch 62" = 38 epochs at 2000/constellation (identical to `allcons_v2`) + 24 at 6000 | wording of the headline | disclosed in the status table |
-| **Repeated test evaluation.** Test scored at epoch 56, epoch 62 and in the pixel run; never used to pick a checkpoint | mild | done: the final checkpoint (epoch 126) was scored once on 2026-10-19 |
-| **Stale result files** with the invalid 68.81% / 68.83% (§12) | thesis tables | new `table_iraven_final_test.tex` (2026-10-19); the old files are left unchanged |
-| **Sanity checks ran on epoch 56**, headline on 62 | consistency | re-run on epoch 62, same outcome |
-| **Weak-spot claim came from the 2000/constellation model** via an analysis script that merged the two components' rules in in_distribute_four | the claim in §13.4 | script fixed; re-measured on epoch 62, claim holds (§13.4) |
-| **`train_pynl.parse` treated centre-based bboxes as corner-based** | spatial relations of the early pure-PyNeuraLogic scripts only; their reported numbers are center_single, which has no object pairs | fixed; no reported number changes |
 
 ## 15. Symbolic templates (`pynl_symbolic.py`)
 
@@ -810,21 +317,6 @@ softmax, native PyNeuraLogic training (`iso_value_compression=False` is required
 * **Random initial weights** (uniform 0–0.2, 3 seeds, 300/constellation): every seed converges to the same
   validation accuracy as the equal start (97.58% primitives, 98.44% rules) from starts of 95.7–96.4% and
   97.6–97.9%. The result does not depend on the initialisation.
-
-## 16. GNN ablations for the layout weak spot (running, 2026-10-19)
-
-`submit_ablations.sh`, same budget as `laygrid_nosp_off` (2000/constellation, 12 epochs, 45.1% validation),
-new switches in `train_all_constellations.py`, all off by default (verified: with defaults the outputs
-equal the old code exactly on the trained checkpoint):
-
-| arm | change |
-|---|---|
-| `ablate_control` | the best configuration again (seed noise against `laygrid_nosp_off`) |
-| `ablate_rowcol` | `--edge-labels rowcol`: cross-panel edges tagged same-row / same-column (same 1,656 edges) |
-| `ablate_sp_pertype` | within-panel edges on, `--per-type-weights`: one message matrix per edge type, each type averaged separately |
-| `ablate_absentpos` | `--absent-pos`: empty slots carry their position and panel embedding |
-| `ablate_combined` | all three |
-
 
 ## 17. Facet model: positions hidden by visible selector atoms (found and fixed 2026-10-25)
 
@@ -879,11 +371,6 @@ of the panel above is now `[0, 1, 0, 1, 1, 0, …]`; in an untrained model, perm
 moves the predicted occupancy by 0.10 against 0.03 before; both versions still memorise 15 grid puzzles.
 PyNeuraLogic's own GNN modules had the same problem with valued edge atoms (fixed upstream in 0.9.2 by
 making them hidden).
-
-**Affected results.** Every facet run before 2026-10-25 21:19: distribute_nine alone 78.0% (dim 32) and
-90.1% (32 → 64 → 128), all constellations 83.8% (dim 32), the cancelled widened all-constellation run
-(84.7% at epoch 5), and the ablations. The hub and ordered templates also have visible selectors, but
-there positions are part of each object's input vector, so they only add constant offsets.
 
 **Re-runs** (started 2026-10-25 21:19): all constellations, widened, hidden (job 11882029,
 `experiments/facet_all_w32-64-128_hidden`); and distribute_four + distribute_nine + in_distribute_four,
@@ -957,12 +444,6 @@ The full all-constellation run (11882029) is still training.
 Training-side changes did not help (cross-entropy 23.5, training on all three rows 21.9, chain pruning off
 24.2; all with the ordered template). The gains came from the representation.
 
-**Ablations (before the fix, distribute_nine, 2000 puzzles, dim 32; to be repeated).**
-* One-hot values: 64.4 (thermometer 71.2–75.4). Ordinal codes matter.
-* Separate weights per attribute: 75.4, within noise of shared.
-* No row relation (level 1): 72.1, level with level 2.
-* Run-to-run spread is about ±1–2 points. Picking the epoch on 300 puzzles is noisy (±2.4).
-
 ### 18.4 Current results (runs in progress; update when finished)
 * **I-RAVEN, all 7 constellations, fixed, widths 32 → 64 → 128, lr 3e-4, 6000 per constellation** (job
   11882029, 80 epochs, finished 2026-10-26, `experiments/facet_all_w32-64-128_hidden`). At the epoch picked on
@@ -978,8 +459,7 @@ Training-side changes did not help (cross-entropy 23.5, training on all three ro
   too many; val 300–399 gives 97.6% matched. The 150-epoch repeat (job 11887180, `experiments/facet_ep150_all`)
   peaked at epoch 65 with 97.4% matched / 69.3% exact: no gain over 60 epochs.
 * **I-RAVEN-X 3×3, values 0–9** (`experiments/facet_iravenx_n3_m10`). **99.2%** at the epoch picked on
-  val 6000–6299 (epoch 10), **100.0%** from epoch 15 on, 95.4% exact. The GNN-style model got 46% on the
-  same data. Copying the last panel matches 4.7%.
+  val 6000–6299 (epoch 10), **100.0%** from epoch 15 on, 95.4% exact. Copying the last panel matches 4.7%.
 * **I-RAVEN-X 3×10** (IBM generator, seed 1234, no confounders), jobs 11883234–36, 60 epochs, finished
   2026-10-26. Unseen matched at the epoch picked on selection / at the last epoch (exact in brackets):
   * maxval 50: **85.4** (epoch 35; 15.0) / 87.8 (22.6)
@@ -1027,20 +507,18 @@ Protocol differences to state:
 * **Error analysis by attribute** (answer vs a candidate differing only in one attribute) pinpoints failures
   by attribute and rule. It is how the selector bug was found (§17).
 * **Cost.** Grounding takes 10–165 ms per puzzle, once. Training takes 2–66 ms per puzzle per epoch on CPU;
-  all of I-RAVEN takes about 14 min per epoch at widths 32 → 64 → 128. The GNN-style model through the
-  torch bridge took 6.5–9.6 h per epoch.
+  all of I-RAVEN takes about 14 min per epoch at widths 32 → 64 → 128.
 
 ### 18.7 Findings for the thesis, ranked
-1. Generative per-puzzle object graphs in PyNeuraLogic: design, headline numbers, and the table in 18.3.
-   This moves the thesis from "PyNeuraLogic matches a torch GNN" (68.5 vs 45) to "the right lifted
-   representation brings a learned model close to hand-written rules".
+1. Generative per-puzzle object graphs in PyNeuraLogic: design, headline numbers, and the table in 18.3:
+   the right lifted representation brings a learned model close to hand-written rules.
 2. The prior levels (none / same relation in every row / given rules). This needs the post-fix ablations,
    and ideally a generative level 3.
 3. Semantic pitfalls of lifted templates: visible selectors (§17), chain pruning dropping transformations,
    hidden atoms merging identical groundings. Plus how each was diagnosed.
 4. Error analysis and the benchmark observations in 18.6.
-5. Cost (18.6) and the earlier chapters: the GNN port, the pipeline bugs (§10), the symbolic templates (§15),
-   end to end costing almost nothing.
+5. Cost (18.6), the slot bug (§10), the symbolic templates (§15) and their end-to-end cost.
+(Superseded on 2026-10-28 by the symmetry framing: `thesis/THESIS_PLAN_symmetry.md`.)
 
 ### 18.8 Needed before these are claims
 1. Score the final checkpoint once on the test split, and end to end with the cached ResNet-18 predictions
@@ -1049,59 +527,6 @@ Protocol differences to state:
 3. Three seeds of the final configuration.
 4. ARLC's protocol: train on 2×2, test on all seven (unseen slot ids may hurt). About half a day.
 5. Optional: a generative level 3 (symbolic rules as a generator), so all three levels share one setting.
-
-## 19. Why the April spatial GNN never got past grounding (written up 2026-10-26)
-
-The April 2026 PyNeuraLogic GNN (`archive/pyneuralogic_2026-03-31_to_05-06/scripts/run_pynl_gnn.py`,
-later `raven_pyneuralogic.py`) used objects as nodes with spatial edges, like the torch GNN. Its full-data
-runs never finished grounding. Logs: `archive/…/log/slurm_pynl_gnn_*` and `slurm_raven_pyneuralogic_*`.
-
-| job (2026-04) | grounding | outcome |
-|---|---|---|
-| 10788629, 10788699 | 500 puzzles/constellation, 28,000 queries | grounded in 477–527 s |
-| 10788708 | all 42,000 puzzles, 336,000 queries | cancelled while grounding |
-| 10788797, 10789406 | 420,000 per-candidate graphs, D = 378 | `OutOfMemoryError: Java heap space` |
-| 10794139 | the same | killed by SLURM for exceeding memory; building the dataset alone took 1371 s |
-| 10868907 | 35,000 graphs (500/constellation), D = 128 | Java heap out of memory (64 GB cap) |
-| 10875721 (Apr 29) | `raven_pyneuralogic.py`, D = 378, all data | killed by SLURM for exceeding memory while grounding |
-
-**Causes:**
-1. **One graph per candidate.** Each puzzle became 8 graphs (8 context panels + one candidate), and the
-   right candidate was repeated 3 times (`--oversample-pos 3`): 10 graphs per puzzle, 420,000 in all. The
-   context was grounded 10 times per puzzle.
-2. **Dense spatial edges.** `left_of / right_of / above / below / same_row / same_col` link every object
-   pair *within* a panel, *and every object pair of the neighbouring panels* in the 3×3 matrix (both
-   directions). `same_pos` links same-slot objects across all 9 panels. The neighbour-panel edges grow
-   with the product of the two panels' object counts.
-3. **Every edge grounds 3 times**: 7 edge relations, each with its own rule in each of the 3 layers.
-4. **The library held everything at once.** neuralogic 0.8.0 (`nvsa` env) collects the whole grounded
-   dataset into one Java list (`_groundings.collect(toList())`, where the traces end). The heap was capped
-   at 64 GB (`neuralogic.set_max_memory_size(64)`), and jobs ran on GPU nodes (g01, g05, g08).
-
-**Measured size** (the April fact builder, run on 50 training puzzles per constellation;
-script `scratchpad/count_april.py`, not kept):
-
-| constellation | object facts per graph | edge facts per graph |
-|---|---|---|
-| center_single | 45 | 120 |
-| distribute_four | 102 | 459 |
-| in_distribute_four | 151 | 918 |
-| distribute_nine | 211 | 1,833 |
-
-One distribute_nine graph thus grounds about 5,500 edge rule neurons (1,833 edges × 3 layers), and there
-were 420,000 graphs.
-
-**Against the facet model (§18):**
-* One graph per puzzle; candidates are never in it.
-* Only same-position edges inside a row: at most 126 per distribute_nine puzzle (14 directed pairs per
-  slot × 9 slots), against 1,833 per candidate graph.
-* Attribute and component are rule variables, so one rule set serves all of them.
-
-That is about 15× fewer edges per graph and 10× fewer graphs. All of I-RAVEN (66,000 per-component
-samples) grounds in 30 min with a 300 GB heap (10–165 ms per puzzle).
-
-The GNN-style model (§8) avoided the problem differently: a fixed slot graph grounded once, with the
-values supplied from torch.
 
 ## 20. I-RAVEN-X 3×10: why the facet model fell short, and gated copy links (2026-10-26)
 
@@ -1509,3 +934,174 @@ Union and difference do not survive column reversal (2.5 / 0): a union cannot be
   have. The answer is a sum over operand columns, whatever their order. A structural fix in that direction:
   aggregate the middle columns 2..n−1 with SUM instead of giving each its own weights. That builds the
   symmetry over columns 2..n−1 in for both plus and minus, and treats columns 1 and n as their own roles.
+
+## 23. Torch baselines: an MLP and an all-to-all GNN on the facet model's task (2026-10-28)
+Two plain torch models, trained on a GPU, on everything the facet model gets except its architecture:
+- the same puzzles and splits;
+- thermometer codes as inputs and one sample per component;
+- the generated target (mean code per attribute, count code, occupied positions), sigmoid outputs with MSE;
+- the epoch picked on the selection split;
+- the same metrics: matched (closest candidate, ties wrong) and exact (decoded panel = decoded answer).
+
+Candidates are never seen in training. Before training, the trainer reproduces `bench_hub_grounding.py`'s
+targets and decoded answers for the first 20 puzzles of every split.
+
+Code in `baselines/`:
+- `prepare_baseline_data.py` (pynl env) writes the puzzles as arrays;
+- `train_baseline.py` (nvsa env, GPU) trains;
+- `submit_baselines.sh`, `submit_sweep.sh` and `submit_regularized.sh` are the jobs;
+- `summarize_baselines.py` prints the tables.
+
+The models:
+- **MLP.** The context panels flattened: per panel and position slot, an occupancy bit and three attribute
+  codes, plus the component asked for. Three hidden ReLU layers of width H.
+- **All-to-all GNN.** One node per context object plus a query node. A node's input is its row, column,
+  slot and component one-hots, its three codes and a query flag. Every node sends to every other:
+  m_ij = ReLU(W_i h_i + W_j h_j), averaged over j, then h_i = LayerNorm(h_i + ReLU(U [h_i; m̄_i])). Three
+  layers; the query node is decoded.
+
+H is the width whose weight count is closest to the facet model's: 264k on I-RAVEN, 1.6M on I-RAVEN-X 3×10
+(the copy-link model).
+
+Caveat on exact scores. I-RAVEN-X Distribute draws values up to maxval inclusive, one more than the codes
+hold. The baselines score exact generation against the decoded true code, so they are unaffected. The facet
+model's I-RAVEN-X exact scores are slightly off, most at 3×3 with values 0–9.
+
+### 23.1 At the facet model's weight count (2 seeds, unseen puzzles, matched % (exact %))
+| dataset | facet | facet + copy links | MLP | all-to-all GNN |
+|---|---|---|---|---|
+| I-RAVEN | **97.3** (69.1) | – | 60.6 ± 0.8 (17.1) | 87.2 ± 1.1 (51.5) |
+| I-RAVEN-X 3×3, values 0–9 | **99.2** (92.7) | – | 92.8 ± 0.2 (64.8) | 92.0 ± 0.4 (58.5) |
+| 3×10, values 0–49 | 85.4 (15.0) | **97.8** (60.0) | 83.5 ± 0.4 (3.9) | 71.6 ± 0.1 (1.2) |
+| 3×10, values 0–99 | 84.9 (6.4) | **96.2** (30.8) | 80.0 ± 2.3 (0.5) | 64.7 ± 5.4 (0.0) |
+| 3×10, values 0–999 | 81.2 (0.0) | **94.3** (15.0) | 74.3 ± 3.2 (0.0) | 54.1 ± 3.1 (0.0) |
+
+I-RAVEN by layout, matched %, seed 0 (seed 1 within 3 points, except the MLP on up-down: 72.1):
+
+| model | center | 2×2 | 3×3 | L-R | U-D | in-out | in-out grid |
+|---|---|---|---|---|---|---|---|
+| facet | 99.3 | 95.5 | 89.8 | 99.5 | 99.7 | 99.6 | 97.8 |
+| GNN | 98.7 | 73.3 | 64.6 | 99.0 | 98.7 | 99.7 | 82.0 |
+| MLP | 87.8 | 32.7 | 20.3 | 74.0 | 63.0 | 90.5 | 52.1 |
+
+* The GNN shares weights across objects. It matches the facet model wherever a component holds one object,
+  and loses 22–25 points on the grids, where Number and Position need same-slot objects compared across
+  panels; all-to-all averaging mixes every object with every other.
+* The MLP has its own weights per slot: it must learn every slot and both halves of L-R and U-D separately.
+* On I-RAVEN-X 3×10 the candidates of an attribute differ between two values, so a rough answer often picks
+  the right one: the MLP comes within 2 points of the plain facet model on matching (83.5 vs 85.4). Exact
+  generation tells them apart (3.9 vs 15.0, 60.0 with copy links). Exact per rule at values 0–49, MLP / GNN:
+  Constant 45 / 36, Progression 43 / 27, Distribute 26 / 11, Arithmetic 6 / 7 (facet: 93 / 77 / 10 / 19,
+  with copy links 100 / 93 / 87 / 30). The baselines do not even copy a constant value exactly.
+
+### 23.2 More weights: 4×, 16×, 64× the facet model's (seed 0)
+| | weights | I-RAVEN MLP | I-RAVEN GNN | 3×10 0–49 MLP | 3×10 0–49 GNN |
+|---|---|---|---|---|---|
+| 1× (2 seeds) | 264k / 1.6M | 60.6 (17.1) | 87.2 (51.5) | 83.5 (3.9) | 71.6 (1.2) |
+| 4× | 1.1M / 6.4M | 68.9 (25.2) | 86.3 (50.9) | **87.2** (2.5) | **72.3** (1.2) |
+| 16× | 4.3M / 26M | **71.0** (27.3) | **88.5** (58.8) | 86.4 (2.1) | 64.9 (1.3) |
+| 64× | 17M / 102M | 69.9 (26.0) | 86.5 (54.9) | 84.6 (2.4), lr 1e-4 | 63.3 (0.3) |
+
+* Weights do not close the gap: the MLP levels off near 70% on I-RAVEN (2×2 and 3×3 grids at 37–41 and
+  29–34%), the GNN near 88%. Neither reaches the facet model's 97.3% at 64 times its weights.
+* The larger models peak earlier (I-RAVEN MLP: epoch 131, 58, 44 at 4×, 16×, 64×): they fit the training
+  puzzles faster, not the rules.
+* On I-RAVEN-X 3×10 the MLP at 4× matches slightly better than the plain facet model (87.2 vs 85.4), 10
+  points below copy links. Its exact generation does not improve with size; the GNN gets worse.
+* The I-RAVEN-X MLP at 64× did not move from its first epoch at learning rate 1e-3 (11.5% throughout; run kept
+  in `experiments/baselines/runs_failed/`); rerun at 1e-4.
+
+### 23.3 Regularization
+Seed 0, at the facet model's weight count (`submit_regularized.sh`, job 11913187, 40 runs).
+- **Every run:** LayerNorm after each hidden layer of the MLP, cosine learning rate after 5 warm-up epochs,
+  gradient norm clipped at 1.
+- **Grid:** dropout 0 / 0.1 / 0.3 × weight decay 0 / 0.05 / 0.5 (AdamW, weight matrices only).
+- **Extra runs at dropout 0.1, weight decay 0.05:** GNN message dropout 0.2; row-swap augmentation, I-RAVEN
+  only.
+- The setting is picked on the selection split.
+
+| | unregularized (2 seeds) | best on selection | setting |
+|---|---|---|---|
+| I-RAVEN MLP | 60.6 (17.1) | **72.8** (29.9) | weight decay 0.5, no dropout |
+| I-RAVEN GNN | 87.2 (51.5) | **91.3** (56.5) | weight decay 0.5, no dropout |
+| 3×10, values 0–49, MLP | 83.5 (3.9) | 84.4 (2.6) | weight decay 0.5, dropout 0.3 |
+| 3×10, values 0–49, GNN | 71.6 (1.2) | **84.0** (3.3) | weight decay 0.5, dropout 0.3 |
+
+I-RAVEN by layout, best settings:
+
+| model | center | 2×2 | 3×3 | L-R | U-D | in-out | in-out grid |
+|---|---|---|---|---|---|---|---|
+| facet | 99.3 | 95.5 | 89.8 | 99.5 | 99.7 | 99.6 | 97.8 |
+| GNN | 99.3 | 80.6 | 72.9 | 99.1 | 99.3 | 99.6 | 88.4 |
+| MLP | 95.2 | 46.6 | 37.8 | 86.7 | 86.8 | 95.3 | 61.3 |
+
+* **Weight decay did the work.** The largest value in the grid, 0.5, won all four cells, so a larger one
+  might gain more.
+* **Dropout 0.3 ruins the I-RAVEN MLP** (21–28%). GNN message dropout hurts on both datasets at the same
+  setting: I-RAVEN 89.3 → 86.1, I-RAVEN-X 66.0 → 62.6.
+* **Row-swap augmentation helps a little:** MLP 67.5 → 70.4, GNN 89.3 → 90.5 (same setting without it). The
+  facet model has this symmetry built in.
+* **The gap narrows but stays.**
+  - I-RAVEN: 91.3 vs 97.3, with the grids still 15–17 points behind.
+  - 3×10: the regularized GNN matches nearly as often as the plain facet model (84.0 vs 85.4), but generates
+    exactly in 3.3% vs 15.0% (60.0 with copy links).
+  - Exact per rule, MLP / GNN: Constant 53 / 61, Progression 36 / 42, Distribute 21 / 25, Arithmetic 11 / 10.
+    The plain facet model: 93 / 77 / 10 / 19. So the baselines generate Distribute better than the plain facet
+    model; copy links reach 87, content gates 60.
+
+## 24. Column roles: the operand-order symmetry of I-RAVEN-X Arithmetic (2026-10-28)
+The prediction from §22.4, tested as plan item E4 (`thesis/THESIS_PLAN_symmetry.md`). I-RAVEN-X Arithmetic is
+c_n = c_1 + … + c_{n−1} (plus) or c_1 = c_2 + … + c_n (minus). In both, columns 2..n−1 are interchangeable
+operands, while the named-column template gives each column its own weights.
+
+**`--columns roles`** (`bench_hub_grounding.py`):
+- The col(P, ·) facts say first / mid / last instead of c1..cn (`col_names`).
+- The facet layers get one weight set per role pair: 7 pairs instead of n(n−1) = 90 column pairs.
+- `rel`, `ans`, `relp` and `ansp` read the first and the last column through one rule each, and the middle
+  columns through ONE rule with the panel as a variable, averaged.
+- The template then names no middle column, so permuting columns 2..n−1 is built in.
+- For n = 3 the roles are the columns. With the flag off, templates and facts are identical to before
+  (checked for all five variants, n = 3 and n = 10).
+
+**Costs nothing for the other rules.** The swap of two middle columns keeps Constant and Arithmetic (§22.2:
+100%) and sends Progression and Distribute puzzles out of the support (0%). A model with the symmetry
+therefore loses no answer it needs (plan §1, "out of support"). Progression stays computable: the answer is
+linear in c_1 and the sum of the middle columns.
+
+**Random weights** (`facet_symmetry_check.py`, 6 unseen puzzles, 2 draws), max |output difference|:
+
+| transformation | named columns, 1,411k w | column roles, 288k w | roles + content gates, 314k w | roles + panel gates, 475k w |
+|---|---|---|---|---|
+| middle columns 2 ↔ 3 | 0.38 | **4.4e-16** | **1.0e-15** | 0.87 |
+| rows 1 ↔ 2 | 0.0 | 3.3e-16 | 1.0e-15 | 1.0 |
+| control: columns 1 ↔ 2 | 0.46 | 0.48 | 0.81 | 0.95 |
+
+Per-panel gates name panels and break both symmetries, so the copy variant uses content gates.
+
+**Runs** (`pynl/submit_column_roles.sh`, 60 epochs, the settings of the runs they are compared with; per-rule
+evaluation by `pynl/facet_rule_eval.py`, also on the transformed puzzles):
+- `facet_iravenx_n10_m50_roles` (288k weights), job 11913673;
+- `facet_iravenx_n10_m50_roles_content` (314k), job 11913674;
+- `_roles_wide` and `_roles_wide_content`, widths 64,144,288: 1,390k and 1,448k weights, matched to the
+  named-column models (1,411k and 1,436k), jobs 11913675–76.
+
+The narrow runs answer "does the symmetry help with a fifth of the weights?", the wide ones "at equal weights?".
+Same-script reference on the named-column checkpoints: job 11913677.
+
+Prediction: Arithmetic exact rises (named columns: 18.6 plain, 30.0 with content gates); Constant,
+Progression and Distribute stay where they are.
+
+**Reference, named columns** (job 11913677; reproduces §20.4 and §21.6 exactly, which checks
+`facet_rule_eval.py`). Unseen puzzles, before → after exchanging middle columns 2 and 3 in every row:
+
+| checkpoint | matched | exact | Constant | Progression | Distribute | Arithmetic |
+|---|---|---|---|---|---|---|
+| plain, 1,411k w | 85.4 → 70.2 | 15.0 → 11.6 | 93.4 → 93.4 | 77.4 → 73.2 | 9.8 → 4.3 | 18.6 → 17.4 |
+| content gates, 1,436k w | 94.9 → 74.9 | 51.7 → 23.9 | 100 → 100 | 98.2 → 84.3 | 59.8 → 13.8 | 30.0 → 30.2 |
+
+The last four columns give the exact value per rule. After the swap, Progression and Distribute puzzles are
+out of the generator's support. Their answer by the weaker rule is unchanged: Distribute's value is still the
+one row 3 lacks, and Progression's answer is still determined by c_1 and the sum. The named models lose 15–20
+points of matching there, which a model with roles cannot lose, by construction.
+
+ROLES_RESULTS_PENDING

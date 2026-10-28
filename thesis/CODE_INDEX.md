@@ -1,100 +1,83 @@
-# PyNeuraLogic code index
+# Code index
 
-Where the code behind the current PyNeuraLogic models lives and how it connects. Scripts and job
-files below are in `pynl/`, notebooks in `notebooks/`, the ResNet-18 frontend in `frontend/` and the
-torch GNN in `torch_gnn/`; run everything from the repository root. Line numbers are as of 2026-10-19.
+Where the code behind the current models lives and how it connects. Scripts and job files are in `pynl/`
+(PyNeuraLogic) and `baselines/` (torch), the notebook in `notebooks/`, the ResNet-18 frontend in `frontend/`;
+run everything from the repository root. Superseded code is in `archive/` (bottom of this page). Findings:
+`thesis/FINDINGS.md`; plan: `thesis/THESIS_PLAN_symmetry.md`; lab notes: `thesis/PYNEURALOGIC_NOTES.md`.
 
 ## Reading order
 
-1. `train_all_constellations.py` — the GNN-style model (best result).
-2. `pynl_symbolic.py` — the symbolic models.
-3. `archive/pyneuralogic_2026-03-31_to_05-06/scripts/raven_pyneuralogic.py` — your April model, for comparison.
-4. `bench_hub_grounding.py` — the generative facet model (the current direction, notes §18).
+1. `pynl/bench_hub_grounding.py`: the generative facet model, the main model (notes §17–§18, §20–§24).
+2. `pynl/facet_symmetry_check.py` and `pynl/dataset_symmetry_check.py`: the symmetries of the model and of
+   the data (§21–§22).
+3. `baselines/train_baseline.py`: the torch baselines on the same task (§23).
+4. `pynl/pynl_symbolic.py`: the symbolic models, the "rules given" level (§15).
 
-## Files
-
-### The GNN-style model (64.00% I-RAVEN test)
-
-| file | what it is | where to look |
-|---|---|---|
-| `train_all_constellations.py` | One model for all 7 constellations: torch embeddings feed a PyNeuraLogic message-passing template, and torch computes the loss and steps its optimiser. | graph: `edges` :56, `structural_facts` :75 · template: `build_template` :82 (3 layers :90, head :101) · torch side + bridge: `AllConstellations` :121 · CONCAT order probe: `_recover_order` :149 · node embedding: `forward` :175, `encode_puzzle` :191 · training loop: `main` :227 (loss :364) |
-| `train_pynl.py` | XML parser and position map used by the model above (`parse` :78, `POS_MAP` :19). It also holds the earlier pure-PyNeuraLogic center_single trainer. | |
-| `submit_max.sh` | SLURM chain that trains it: `ARM=conv` (2000/constellation) or `ARM=data` (6000), dim 128, 3 layers, `--no-same-panel`. | |
-| `submit_ablations.sh` | Five 12-epoch arms at 2000/constellation: control, `--edge-labels rowcol`, `--per-type-weights` (with within-panel edges), `--absent-pos`, all three. These switches in `train_all_constellations.py` are off by default. | |
-| `eval_pynl_test.py` | Test-split evaluation per constellation, next to the 3-seed torch GNN means. | `load_model` :48 |
-
-Run: `experiments/max_data_L2`. Best validation is 68.52% (epoch 78); the 64.00% test figure is from the epoch-62 checkpoint.
-
-The torch ↔ PyNeuraLogic bridge is library code, not ours:
-`~/.conda/envs/pynl/lib/python3.11/site-packages/neuralogic/nn/torch_function.py`.
-
-### From pixels (63.96% test)
-
-| file | what it is |
-|---|---|
-| `pixel_pipeline.py` | `perceive` (env `nvsa`, GPU): the ResNet-18 frontend reads attributes from every panel. `solve` (env `pynl`): the model above answers from those predictions. |
-| `submit_pixels.sh` | `STAGE=perceive` or `STAGE=solve`. |
-
-The frontend itself is torch-only: `frontend/train_frontend.py` and `frontend/predict_frontend.py`.
-
-### The symbolic models (ground-truth attributes)
+## The generative facet model (ground-truth attributes)
 
 | file | what it is | where to look |
 |---|---|---|
-| `pynl_symbolic.py` | Attribute values, rows and slot sets as symbols. Crisp relations (equal, successor ±1/±2, sum/difference, set union/difference/shift) are scored with learned weights. `--model prims` uses generic building blocks: 97.58% val. `--model rules` uses RAVEN's rule types: 98.44% val. | facts: `puzzle_tuples` :64, `background_tuples` :110 · template: `build_template` :248 · CONCAT order: `probe_sample` :385, `read_order` :393 · Python cross-check of the template: `python_counts` :131, `python_rule_counts` :209 · training: `main` :435 |
-| `rpm_symbolic.py` | Puzzle reader for the above: numbers, slot sets and per-slot attributes per component. | `read_puzzle` :41 |
-| `rpm_reference_solvers.py` | The same two vocabularies as plain, non-learned Python solvers: 96.34% and 97.75% val. | `solve_primitives` :109, `solve_rules` :171 |
-| `submit_symbolic.sh` | Array job: 100/300 puzzles per constellation × lr 0.01/0.003, `MODEL=prims` or `MODEL=rules`. | |
-| `pynl_symbolic_e2e.py` | Scores a trained symbolic model end to end (ResNet perception → symbolic facts) and with XML labels, next to the non-learned reference solvers. Verifies its converter against `read_puzzle`. | `to_symbolic`, `template_scores` |
-| `submit_symbolic_e2e.sh` | Test-split run of the above for both vocabularies. | |
-| `submit_symbolic_extra.sh` | Learning curves (10, 30, 1000 puzzles/constellation) and random initial weights (`--init-seed`, 3 seeds). | |
+| `bench_hub_grounding.py` | Generates the missing panel's description on a graph grounded differently for every puzzle, then picks the closest candidate. | row length and code length: `configure` · two-part layouts: `COMPONENTS` · column roles: `col_names` · value codes and targets: `code`, `facet_target`, `facet_decode` · template: `build_facet_template` · facts: `facet_facts`, `puzzle_facts` · data: `load`, `load_iravenx` · generate-then-match metrics: `evaluate` · training and selection: `main` |
+| `train_pynl.py` | The I-RAVEN XML parser and position map the facet model imports (`parse`, `POS_MAP`). It also still holds the first pure-PyNeuraLogic center_single trainer. | |
+| `facet_model.ipynb` | Loads a facet checkpoint (`template_best.bin`, `best.json`) and shows one puzzle: the grounded network, printed rules, generated vs true answer, candidate distances, accuracy on val 300–399. Section 6: copy links on I-RAVEN-X 3×10 next to the plain model, with the trained gates of one puzzle and exact generation per rule. Executed copy: `thesis/facet_model.html`. | |
+| `facet_viz.py` | Drawings for the notebook. `ground_graph` reads the network PyNeuraLogic grounds for one sample (built without chain pruning) as atom-to-atom edges; `draw_network` puts one attribute of it on the puzzle grid; `gate_means` reads a sample's trained copy gates. | |
+| `facet_symmetry_check.py` | Which symmetries each template variant has, on random weights and (`--trained`) on checkpoints (§21, §24). | |
+| `dataset_symmetry_check.py` | Which symmetries the I-RAVEN and I-RAVEN-X data have: which rules survive each transformation, the generators' statistics, the structure of the candidate sets (§22). | |
+| `facet_rule_eval.py` | Rebuilds any I-RAVEN-X checkpoint from its `best.json`; matched, exact and exact value per rule on the unseen puzzles, optionally with rows 1 ↔ 2 or middle columns 2 ↔ 3 swapped. | |
+| `submit_facet_long.sh`, `submit_column_roles.sh` | 150-epoch runs; the column-role runs (§24). Other runs used `sbatch --wrap` (command in notes §18.1). | |
 
-### The generative facet model (ground-truth attributes; notes §17–§18)
-
-| file | what it is | where to look |
-|---|---|---|
-| `bench_hub_grounding.py` | Generates the missing panel's description on a graph grounded differently for every puzzle, then picks the closest candidate. `--template facet` is the current model; `hub` and `ordered` are the earlier steps. Line numbers as of 2026-10-25. | row length and code length: `configure` :179 · two-part layouts: `COMPONENTS` :198 · value codes and targets: `code` :216, `facet_target` :223, `facet_decode` :236 · template: `build_facet_template` :268 · facts: `facet_facts` :391, `puzzle_facts` :407 · data: `load` :440, `load_iravenx` :450 · generate-then-match metrics: `evaluate` :66 · training and selection: `main` :490 |
-| `facet_model.ipynb` | Loads a facet checkpoint (`template_best.bin`, `best.json`) and shows one puzzle: the grounded network, printed rules, generated vs true answer, candidate distances, accuracy on val 300–399. Section 6: copy links on I-RAVEN-X 3×10 next to the plain model: the network with copy links, the trained gates of one puzzle, accuracy and exact generation per rule on 300 unseen puzzles. Executed copy: `thesis/facet_model.html`. |
-| `facet_viz.py` | Drawings for the notebook. `ground_graph` reads the network PyNeuraLogic grounds for one sample (built without chain pruning, so every ground atom has a named neuron) as atom-to-atom edges; `draw_network` puts one attribute of it on the puzzle grid; `gate_means` reads a sample's trained copy gates. | |
-
-Options:
-* `--widths 32,64,128` widens the layers.
-* `--values onehot`, `--per-attr-weights` and `--no-rows` are the ablations.
-* `--visible-selectors` brings back the old, buggy behaviour (§17).
-* `--copy-links` adds gated copy links from every context panel's code to the output (§20; `COPY_SCALE`, `GATE_BIAS0`).
-  * `--copy-gates content` chooses the gates by content and row role instead of one per panel, which keeps rows 1 and 2 interchangeable (§21).
+Options of `bench_hub_grounding.py --template facet`:
+* `--widths 32,64,128` widens the layers; `--iravenx FILE` trains on I-RAVEN-X; `--save-dir` saves the best
+  checkpoint (`template_best.bin` + `best.json`).
+* `--copy-links` adds gated copy links from every context panel's code to the output (§20).
+  * `--copy-gates content` chooses gates by content and row role, which keeps rows 1 and 2 interchangeable (§21).
   * `--copy-shuffled` is the control: the copied codes come from another puzzle.
-* `facet_symmetry_check.py` checks which symmetries each template variant has. It runs on random weights, and on the trained checkpoints with `--trained` (§21).
-* `dataset_symmetry_check.py` checks which symmetries the I-RAVEN and I-RAVEN-X data have: which rules survive each transformation, the generators' statistics, and the structure of the candidate sets (§22).
-* `--iravenx FILE` trains on I-RAVEN-X data from IBM's generator.
-* `--save-dir` saves the best checkpoint.
+* `--columns roles`: first / middle / last columns, so the operands of Arithmetic are interchangeable (§24).
+* Ablations: `--values onehot`, `--per-attr-weights`, `--no-rows`; `--visible-selectors` restores the bug of §17.
 
-Runs are submitted with `sbatch --wrap` (command in notes §18.1) and write to `experiments/facet_*`.
-
-### Checks and walkthroughs
+## Torch baselines (`baselines/`, notes §23)
 
 | file | what it is |
 |---|---|
-| `sanity_checks.py` | `splits` (no train/test duplicates), `shortcut` (candidates-only baseline), `images` (XML labels match the pixels), `model` (candidate-order invariance; foreign/blank context). Each check has a negative control. |
-| `pynl_best_architecture_walkthrough.ipynb` | Step-by-step walkthrough of the GNN-style model. Executed copy: `thesis/pynl_best_architecture_walkthrough.html`. |
-| `pynl_iraven_solver.ipynb` | End to end with few comments: puzzle images, the ResNet-18 perception, then the reasoner defined inline, through to accuracy end to end and with XML labels. Includes an exact-match check against `train_all_constellations.py`. Executed copy: `thesis/pynl_iraven_solver.html`. |
-| `pixels_to_answer.ipynb` | One puzzle from images to answer. Executed copy: `thesis/pixels_to_answer.html`. |
+| `prepare_baseline_data.py` | pynl env: writes the facet model's puzzles, splits and weight counts as arrays (`experiments/baselines/data/<dataset>.npz`), plus `bench_hub_grounding`'s own targets for a check. |
+| `train_baseline.py` | nvsa env, GPU: on the facet model's task (same targets, selection and metrics), sized to the facet model's weights (`--scale` for more). Architectures: `mlp`, `gnn` (all-to-all over objects), `attr-abs` and `attr-rel` (all-to-all over object attributes, absolute or relative labels: plan models A and B). Regularization: `--norm`, `--dropout`, `--drop-edge`, `--wd`, `--schedule cosine`, `--warmup`, `--clip`, `--augment rows`. `--check-symmetry`, and transformed test sets after training or with `--eval-only`. |
+| `submit_baselines.sh`, `submit_sweep.sh`, `submit_regularized.sh`, `submit_attr_gnn.sh` | equal weights (2 seeds); 4×, 16×, 64×; the regularization grid; models A and B. |
+| `summarize_baselines.py` | the table, next to the facet model; `--per-rule`. |
 
-### `archive/pyneuralogic_2026-03-31_to_05-06/scripts/raven_pyneuralogic.py`
+## The symbolic models (ground-truth attributes, notes §15)
 
-The April model, kept for comparison: pure PyNeuraLogic, one binary sample per candidate, objects as nodes. It scored near chance (9–19.5% test per constellation). Template at :405, dataset at :364, evaluation at :455.
+| file | what it is |
+|---|---|
+| `pynl_symbolic.py` | Attribute values, rows and slot sets as symbols; crisp relations scored with learned weights. `--model prims` (generic building blocks) or `--model rules` (RAVEN's rule types). |
+| `rpm_symbolic.py` | Puzzle reader for the above: numbers, slot sets and per-slot attributes per component. |
+| `rpm_reference_solvers.py` | The same two vocabularies as plain, non-learned Python solvers. |
+| `pynl_symbolic_e2e.py` | Scores a trained symbolic model end to end (ResNet perception → symbolic facts) and with XML labels. |
+| `submit_symbolic.sh`, `submit_symbolic_e2e.sh`, `submit_symbolic_extra.sh` | training grid; test split end to end; learning curves and random initial weights. |
+
+## Perception and data checks
+
+| file | what it is |
+|---|---|
+| `frontend/train_frontend.py`, `predict_frontend.py`, `extract_objects.py` | The ResNet-18 perception frontend (torch, trained on RAVEN). Checkpoints: `log/universal_frontend_correct_proportional_mean1`, `_mean3`. |
+| `pynl/pixel_pipeline.py`, `submit_pixels.sh` | `perceive` (env `nvsa`, GPU): runs the frontend over every I-RAVEN panel into `experiments/frontend_preds/`; `panels_from_preds` decodes them for the end-to-end runs. |
+| `torch_gnn/gnn_solver.py` | Kept for `load_frontend`, which `pixel_pipeline.py` uses. |
+| `gnn/` | The inherited data package: `gnn.data.canonical_positions` (the slot fix of §10) and `CONFIG_POS_MAP`, used by the symbolic reader, the frontend and the data checks. |
+| `pynl/sanity_checks.py` | `splits` (no train/test duplicates), `shortcut` (candidates-only baseline), `images` (XML labels match the pixels). Each check has a negative control. |
 
 ## How the files connect
 
 ```
-train_all_constellations.py ──imports──> train_pynl.py (parse, POS_MAP)
-eval_pynl_test.py, sanity_checks.py, pixel_pipeline.py ──import──> train_all_constellations.py
+bench_hub_grounding.py ──imports──> train_pynl.py (parse, POS_MAP)
+facet_symmetry_check.py, facet_rule_eval.py, facet_viz.py, prepare_baseline_data.py ──import──> bench_hub_grounding.py
 pynl_symbolic.py, rpm_reference_solvers.py ──import──> rpm_symbolic.py ──> gnn/data.py
+pynl_symbolic_e2e.py ──imports──> pixel_pipeline.py (panels_from_preds) ──> torch_gnn/gnn_solver.py, frontend/
 ```
 
-## Earlier steps
+## Archive
 
-- `archive/pyneuralogic_experiments/`: `train_pynl_softmax.py`, `train_pynl_torch.py`, `train_pynl_aligned.py`, `train_ladder.py` and their job scripts: the porting steps and the 4-level ablation behind the hybrid design (notes §4–§8).
-- Torch GNN baseline: `torch_gnn/train_object_vsa_gnn_frontend.py` and the `gnn/` package.
-
-The full story, numbers and bugs are in `thesis/PYNEURALOGIC_NOTES.md`.
+- `archive/superseded_2026-10-28/`: the GNN-style PyNeuraLogic model (`train_all_constellations.py` and its
+  jobs, evaluation and notebooks), the original torch GNN (`torch_gnn/` training and evaluation scripts,
+  `scripts/` GNN jobs) and stale LaTeX tables. See its `MANIFEST.md`.
+- `archive/pyneuralogic_experiments/`: the porting-stage PyNeuraLogic models (pure, softmax, aligned, hybrid,
+  ladder).
+- `archive/pyneuralogic_2026-03-31_to_05-06/`: the April 2026 spatial PyNeuraLogic GNN.
