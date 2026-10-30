@@ -90,7 +90,8 @@ To credit a gain to symmetry rather than to the facet model's sparser graph, cro
     Prediction: about 50% exact on Constant, Progression and Distribute values; Arithmetic unaffected.
 
 ## 4. Order of work
-1. E4 operand order for Arithmetic (requested 2026-10-28; running, notes §24).
+1. E4 operand order for Arithmetic (notes §24): plain run done, Arithmetic exact 18.6 → 40.5%; the rest
+   running. E4b, the recursive row fold (§25), is running too, with row-length transfer (E3).
 2. E3 transformed test sets on the existing checkpoints.
 3. A and B, the facet-level torch GNNs.
 4. C, the facet model with symmetries named.

@@ -205,7 +205,7 @@ def facet_to_description(out, values="therm"):
 
 
 def build_facet_template(d, layers, shared=True, rows=True, widths=None, hidden=True, copy=False, gates="panel",
-                         cols="named"):
+                         cols="named", labels=(), shared_comps=True):
     """Objects are split into FACETS f(O, A), A in {type, size, color}; with shared=True every rule has
     the attribute as a variable, so one set of weights serves all attributes. Values are codes (code()).
     Everything above the objects is per COMPONENT C (ocomp(O, C)); components share all weights.
@@ -240,7 +240,24 @@ def build_facet_template(d, layers, shared=True, rows=True, widths=None, hidden=
     cols="roles" (with col_names(roles=True) facts): the columns of a row are first / mid / last. The facet layers
     get a weight set per role pair; rel, ans and their position versions read the first and last column
     through a rule each and the middle columns through ONE rule with the panel as a variable, averaged. So
-    the template names no middle column (notes §24). Per-panel copy gates still name panels and break this."""
+    the template names no middle column (notes §24). Per-panel copy gates still name panels and break this.
+    cols="fold" (with puzzle_facts(..., col_roles=True, fold=True)): as "roles", except that the attribute
+    channel reads a row by a recursive fold along it (notes §25):
+      acc(P, C, A)  :- the row's first panel's vF                                    (start)
+      acc(Q, C, A)  :- next(P, Q), acc(P, C, A)[Wh] + vF(Q, C, A)[Wx], tanh           (one step per column)
+      rel(Rw, C, A) :- acc of the row's last panel + vF of its first panel
+      ans(C, A)     :- acc of the question row's last context panel + ctx
+    One weight set serves every step, so the template does not depend on the row length, and every position
+    of a row is read by the same transition.
+    labels: the symmetry ablations of notes §26. "components" adds a one-hot fact per component, cid(k0) /
+    cid(k1), to every panel-component summary (vF, vP); "attributes" adds a one-hot aid(A) per attribute to vF.
+    The weights stay shared and the model gains only a few weights, but the facts now tell the components (or
+    attributes) apart, so swapping them is no longer a renaming the model is blind to: the left-right and
+    up-down symmetry (or size <-> colour and the other attribute swaps) is removed at nearly equal capacity.
+    Needs facet_facts(..., labels=labels).
+    shared_comps=False: every rule with weights is written once per component (k0, k1), with its own weights,
+    so the two components no longer share anything. With shared=False (attributes) this is the ablation of
+    weight sharing behind the label ablations (notes §26.1)."""
     from neuralogic.core import Model, R, V, Transformation, Aggregation, Metadata, Combination
     w = list(widths) if widths else [d] * (layers + 1)
     layers, W = len(w) - 1, w[-1]
@@ -253,29 +270,36 @@ def build_facet_template(d, layers, shared=True, rows=True, widths=None, hidden=
     S = R.hidden if hidden else R
     Ps = [getattr(V, f"P{i + 1}") for i in range(len(COLS))]       # the panels of a row, in order                                # structural atoms
     mine = (S.obj(V.P, V.O), S.ocomp(V.O, V.C))                   # object O of panel P, component C
-    roles = cols == "roles"
+    assert shared_comps or not labels, "the label ablations assume shared component weights"
+    cs = [V.C] if shared_comps else ["k0", "k1"]                  # one weight set for all components, or one each
+    mine_c = lambda C: (S.obj(V.P, V.O), S.ocomp(V.O, C))
+    oc = lambda C: () if shared_comps else (S.ocomp(V.O, C),)     # names the component where the rule has none
+    roles, fold = cols in ("roles", "fold"), cols == "fold"
     names = col_names(roles)          # same-position partners: column pairs (named), role pairs (roles)
     col_pairs = [(a, b) for a in COLS for b in COLS if a != b] if not roles else \
         [(a, b) for a in ROLES for b in ROLES if a != b or (a == "mid" and names.count("mid") > 1)]
 
     for A in attrs(FACET_ATTRS):
-        m += (R.f0(V.O, A) <= R.fv(V.O, A)[w[0], THERM])
+        for C in cs:
+            m += (R.f0(V.O, A) <= oc(C) + (R.fv(V.O, A)[w[0], THERM],))
     m += (R.f0 / 2) | tanh
     for k in range(1, layers + 1):
         prev, f, pv = f"f{k - 1}", f"f{k}", f"pv{k}"
         for A in attrs(FACET_ATTRS):
-            m += (R.get(pv)(V.P, V.C, A) <= mine + (R.get(prev)(V.O, A)[w[k], w[k - 1]],)) | avg
-            m += (R.get(f)(V.O, A) <= mine + (R.get(pv)(V.P, V.C, A)[w[k], w[k]],))
-            for a, b in col_pairs:
-                m += (R.get(f)(V.O, A) <= (S.samepos(V.O1, V.O), S.obj(V.P, V.O), S.col(V.P, a),
-                                           S.obj(V.Q, V.O1), S.col(V.Q, b),
-                                           R.get(prev)(V.O1, A)[w[k], w[k - 1]])) | avg
+            for C in cs:
+                m += (R.get(pv)(V.P, C, A) <= mine_c(C) + (R.get(prev)(V.O, A)[w[k], w[k - 1]],)) | avg
+                m += (R.get(f)(V.O, A) <= mine_c(C) + (R.get(pv)(V.P, C, A)[w[k], w[k]],))
+                for a, b in col_pairs:
+                    m += (R.get(f)(V.O, A) <= oc(C) + (S.samepos(V.O1, V.O), S.obj(V.P, V.O), S.col(V.P, a),
+                                                       S.obj(V.Q, V.O1), S.col(V.Q, b),
+                                                       R.get(prev)(V.O1, A)[w[k], w[k - 1]])) | avg
         m += (R.get(pv) / 3) | tanh
         if w[k] == w[k - 1]:
             m += (R.get(f)(V.O, V.A) <= R.get(prev)(V.O, V.A))
         else:
             for A in attrs(FACET_ATTRS):
-                m += (R.get(f)(V.O, A) <= R.get(prev)(V.O, A)[w[k], w[k - 1]])
+                for C in cs:
+                    m += (R.get(f)(V.O, A) <= oc(C) + (R.get(prev)(V.O, A)[w[k], w[k - 1]],))
         m += (R.get(f) / 2) | Metadata(transformation=Transformation.NORM)
 
     m += (R.pt(V.P, V.C, V.A) <= mine + (R.fv(V.O, V.A),)) | Metadata(aggregation=Aggregation.AVG,
@@ -283,57 +307,76 @@ def build_facet_template(d, layers, shared=True, rows=True, widths=None, hidden=
     m += (R.pt(V.P, V.C, "number") <= R.nm(V.P, V.C)) | ident
     m += (R.pt / 3) | ident
     for A in attrs(NUM_ATTRS):
-        m += (R.vF(V.P, V.C, A) <= R.pt(V.P, V.C, A)[W, THERM])
+        for C in cs:
+            m += (R.vF(V.P, C, A) <= R.pt(V.P, C, A)[W, THERM])
     for A in attrs(FACET_ATTRS):
-        m += (R.vF(V.P, V.C, A) <= mine + (R.get(f"f{layers}")(V.O, A)[W, W],)) | avg
+        for C in cs:
+            m += (R.vF(V.P, C, A) <= mine_c(C) + (R.get(f"f{layers}")(V.O, A)[W, W],)) | avg
+    for A in attrs(NUM_ATTRS):              # symmetry ablations (§26): the facts name components / attributes
+        if "components" in labels:
+            m += (R.vF(V.P, V.C, A) <= mine + (S.isattr(A), R.cid(V.C)[W, 2])) | avg
+        if "attributes" in labels:
+            m += (R.vF(V.P, V.C, A) <= mine + (R.aid(A)[W, len(NUM_ATTRS)],)) | avg
     m += (R.vF / 3) | tanh
     # rel and ans are each written as TWO rules (the same sum, split): chain_pruning removes the
     # transformation of single-rule atoms, and without these two tanh layers everything after vF is
     # one linear map, which cannot express "the relation of rows 1-2 decides how (3,1), (3,2) combine"
     for A in attrs(NUM_ATTRS):
-        if rows and roles:                # three rules per atom, so chain pruning keeps the tanh
-            for role in ROLES:
-                m += (R.rel(V.Rw, V.C, A) <= (S.full(V.Rw), S.inrow(V.P, V.Rw), S.col(V.P, role),
-                                              R.vF(V.P, V.C, A)[W, W])) | avg
-            m += (R.ctx(V.C, A) <= (S.full(V.Rw), R.rel(V.Rw, V.C, A)[W, W])) | avg
-            for role in ROLES[:2]:
-                m += (R.ans(V.C, A) <= (S.inrow(V.P, "r3"), S.col(V.P, role), R.vF(V.P, V.C, A)[W, W])) | avg
-            m += (R.ans(V.C, A) <= R.ctx(V.C, A)[W, W])
-        elif rows:
-            m += (R.rel(V.Rw, V.C, A) <= (S.row(V.Rw, *Ps),) + tuple(R.vF(P, V.C, A)[W, W] for P in Ps[:-1]))
-            m += (R.rel(V.Rw, V.C, A) <= (S.row(V.Rw, *Ps), R.vF(Ps[-1], V.C, A)[W, W]))
-            m += (R.ctx(V.C, A) <= (S.full(V.Rw), R.rel(V.Rw, V.C, A)[W, W])) | avg
-            m += (R.ans(V.C, A) <= (S.row3(*Ps[:-1]),) + tuple(R.vF(P, V.C, A)[W, W] for P in Ps[:-1]))
-            m += (R.ans(V.C, A) <= R.ctx(V.C, A)[W, W])
-        else:
-            for p in range(N_CTX):
-                m += (R.hid(V.C, A) <= R.vF(f"p{p}", V.C, A)[W, W])
-            m += (R.ans(V.C, A) <= R.hid(V.C, A)[W, W])
-            m += (R.ans(V.C, A) <= R.vF(f"p{N_CTX - 1}", V.C, A)[W, W])
-        # one decoder per weight set; the weighted puzzle(G) fact is a learned bias per code bit
-        # ("value > k" needs its own threshold for every k; the template has no other bias)
-        m += (R.oa(V.G, A) <= (R.puzzle(V.G)[THERM, 1], S.qcomp(V.G, V.C), R.ans(V.C, A)[THERM, W]))
-        if copy:
-            # two rules per gate so chain pruning keeps its sigmoid; the hidden pc atom only binds A. The
-            # gate bias starts at GATE_BIAS0 (gates ~0.0025): open at 0.5, the 3n-1 copies swamped the logits
-            # and memorising 200 3x10 puzzles went from 99% to 60% exact after 150 epochs
-            if gates == "panel":
+        for C in cs:
+            if rows and fold:                 # two rules per step and per readout, so chain pruning keeps the tanh
+                m += (R.acc(V.P, C, A) <= (S.col(V.P, "first"), R.vF(V.P, C, A)[W, W]))
+                m += (R.acc(V.Q, C, A) <= (S.next(V.P, V.Q), R.acc(V.P, C, A)[W, W]))
+                m += (R.acc(V.Q, C, A) <= (S.next(V.P, V.Q), R.vF(V.Q, C, A)[W, W]))
+                m += (R.rel(V.Rw, C, A) <= (S.full(V.Rw), S.inrow(V.P, V.Rw), S.col(V.P, "last"), R.acc(V.P, C, A)[W, W]))
+                m += (R.rel(V.Rw, C, A) <= (S.full(V.Rw), S.inrow(V.P, V.Rw), S.col(V.P, "first"), R.vF(V.P, C, A)[W, W]))
+                m += (R.ctx(C, A) <= (S.full(V.Rw), R.rel(V.Rw, C, A)[W, W])) | avg
+                m += (R.ans(C, A) <= (S.qlast(V.P), R.acc(V.P, C, A)[W, W]))
+                m += (R.ans(C, A) <= R.ctx(C, A)[W, W])
+            elif rows and roles:              # three rules per atom, so chain pruning keeps the tanh
+                for role in ROLES:
+                    m += (R.rel(V.Rw, C, A) <= (S.full(V.Rw), S.inrow(V.P, V.Rw), S.col(V.P, role),
+                                                  R.vF(V.P, C, A)[W, W])) | avg
+                m += (R.ctx(C, A) <= (S.full(V.Rw), R.rel(V.Rw, C, A)[W, W])) | avg
+                for role in ROLES[:2]:
+                    m += (R.ans(C, A) <= (S.inrow(V.P, "r3"), S.col(V.P, role), R.vF(V.P, C, A)[W, W])) | avg
+                m += (R.ans(C, A) <= R.ctx(C, A)[W, W])
+            elif rows:
+                m += (R.rel(V.Rw, C, A) <= (S.row(V.Rw, *Ps),) + tuple(R.vF(P, C, A)[W, W] for P in Ps[:-1]))
+                m += (R.rel(V.Rw, C, A) <= (S.row(V.Rw, *Ps), R.vF(Ps[-1], C, A)[W, W]))
+                m += (R.ctx(C, A) <= (S.full(V.Rw), R.rel(V.Rw, C, A)[W, W])) | avg
+                m += (R.ans(C, A) <= (S.row3(*Ps[:-1]),) + tuple(R.vF(P, C, A)[W, W] for P in Ps[:-1]))
+                m += (R.ans(C, A) <= R.ctx(C, A)[W, W])
+            else:
                 for p in range(N_CTX):
-                    m += (R.gate(f"p{p}", V.C, A) <= R.ans(V.C, A)[THERM, W])
-                    m += (R.gate(f"p{p}", V.C, A) <= (R.puzzle(V.G)[[GATE_BIAS0] * THERM], R.hidden.qcomp(V.G, V.C),
-                                                       R.hidden.pc(f"p{p}", V.C, A)))
-            else:               # the role atoms are always hidden: in an ELPRODUCT a visible 1.0 would join the product
-                for role in ((R.hidden.inrow(V.P, V.Rw), R.hidden.full(V.Rw)), (R.hidden.inrow(V.P, "r3"),)):
-                    m += (R.gate(V.P, V.C, A) <= (R.ans(V.C, A)[THERM, W], R.vF(V.P, V.C, A)[THERM, W]) + role) | Metadata(
-                        combination=Combination.ELPRODUCT)
-                    m += (R.gate(V.P, V.C, A) <= (R.puzzle(V.G)[[GATE_BIAS0] * THERM], R.hidden.qcomp(V.G, V.C),
-                                                  R.hidden.pc(V.P, V.C, A)) + role)
-            m += (R.copy(V.C, A) <= (R.gate(V.P, V.C, A), R.pc(V.P, V.C, A))) | Metadata(
-                combination=Combination.ELPRODUCT, aggregation=Aggregation.SUM)
-            m += (R.oa(V.G, A) <= (S.qcomp(V.G, V.C), R.copy(V.C, A)))
+                    m += (R.hid(C, A) <= R.vF(f"p{p}", C, A)[W, W])
+                m += (R.ans(C, A) <= R.hid(C, A)[W, W])
+                m += (R.ans(C, A) <= R.vF(f"p{N_CTX - 1}", C, A)[W, W])
+            # one decoder per weight set; the weighted puzzle(G) fact is a learned bias per code bit
+            # ("value > k" needs its own threshold for every k; the template has no other bias)
+            m += (R.oa(V.G, A) <= (R.puzzle(V.G)[THERM, 1], S.qcomp(V.G, C), R.ans(C, A)[THERM, W]))
+            if copy:
+                # two rules per gate so chain pruning keeps its sigmoid; the hidden pc atom only binds A. The
+                # gate bias starts at GATE_BIAS0 (gates ~0.0025): open at 0.5, the 3n-1 copies swamped the logits
+                # and memorising 200 3x10 puzzles went from 99% to 60% exact after 150 epochs
+                if gates == "panel":
+                    for p in range(N_CTX):
+                        m += (R.gate(f"p{p}", C, A) <= R.ans(C, A)[THERM, W])
+                        m += (R.gate(f"p{p}", C, A) <= (R.puzzle(V.G)[[GATE_BIAS0] * THERM], R.hidden.qcomp(V.G, C),
+                                                           R.hidden.pc(f"p{p}", C, A)))
+                else:               # the role atoms are always hidden: in an ELPRODUCT a visible 1.0 would join the product
+                    for role in ((R.hidden.inrow(V.P, V.Rw), R.hidden.full(V.Rw)), (R.hidden.inrow(V.P, "r3"),)):
+                        m += (R.gate(V.P, C, A) <= (R.ans(C, A)[THERM, W], R.vF(V.P, C, A)[THERM, W]) + role) | Metadata(
+                            combination=Combination.ELPRODUCT)
+                        m += (R.gate(V.P, C, A) <= (R.puzzle(V.G)[[GATE_BIAS0] * THERM], R.hidden.qcomp(V.G, C),
+                                                      R.hidden.pc(V.P, C, A)) + role)
+                m += (R.copy(C, A) <= (R.gate(V.P, C, A), R.pc(V.P, C, A))) | Metadata(
+                    combination=Combination.ELPRODUCT, aggregation=Aggregation.SUM)
+                m += (R.oa(V.G, A) <= (S.qcomp(V.G, C), R.copy(C, A)))
     if rows:
         m += (R.rel / 3) | tanh
         m += (R.ctx / 2) | tanh
+        if fold:
+            m += (R.acc / 3) | tanh
     else:
         m += (R.hid / 2) | tanh
     m += (R.ans / 2) | tanh
@@ -345,33 +388,43 @@ def build_facet_template(d, layers, shared=True, rows=True, widths=None, hidden=
     m += (R.occ(V.P, V.C) <= mine + (R.pos(V.O),)) | Metadata(aggregation=Aggregation.SUM,
                                                                transformation=Transformation.IDENTITY)
     m += (R.occ / 2) | ident
-    m += (R.vP(V.P, V.C) <= R.occ(V.P, V.C)[p0, N_POS])
-    m += (R.vP / 2) | tanh
-    if rows and roles:
-        for role in ROLES:
-            m += (R.relp(V.Rw, V.C) <= (S.full(V.Rw), S.inrow(V.P, V.Rw), S.col(V.P, role), R.vP(V.P, V.C)[p1, p0])) | avg
-        m += (R.relp / 2) | tanh
-        m += (R.ctxp(V.C) <= (S.full(V.Rw), R.relp(V.Rw, V.C)[p1, p1])) | avg
-        m += (R.ctxp / 1) | tanh
-        for role in ROLES[:2]:
-            m += (R.ansp(V.C) <= (S.inrow(V.P, "r3"), S.col(V.P, role), R.vP(V.P, V.C)[p2, p0])) | avg
-        m += (R.ansp(V.C) <= R.ctxp(V.C)[p2, p1])
-    elif rows:
-        m += (R.relp(V.Rw, V.C) <= (S.row(V.Rw, *Ps),) + tuple(R.vP(P, V.C)[p1, p0] for P in Ps[:-1]))
-        m += (R.relp(V.Rw, V.C) <= (S.row(V.Rw, *Ps), R.vP(Ps[-1], V.C)[p1, p0]))
-        m += (R.relp / 2) | tanh
-        m += (R.ctxp(V.C) <= (S.full(V.Rw), R.relp(V.Rw, V.C)[p1, p1])) | avg
-        m += (R.ctxp / 1) | tanh
-        m += (R.ansp(V.C) <= (S.row3(*Ps[:-1]),) + tuple(R.vP(P, V.C)[p2, p0] for P in Ps[:-1]))
-        m += (R.ansp(V.C) <= R.ctxp(V.C)[p2, p1])
-    else:
-        for p in range(N_CTX):
-            m += (R.hidp(V.C) <= R.vP(f"p{p}", V.C)[p1, p0])
-        m += (R.hidp / 1) | tanh
-        m += (R.ansp(V.C) <= R.hidp(V.C)[p2, p1])
-        m += (R.ansp(V.C) <= R.vP(f"p{N_CTX - 1}", V.C)[p2, p0])
-    m += (R.ansp / 1) | tanh
-    m += (R.op(V.G) <= (R.puzzle(V.G)[N_POS, 1], S.qcomp(V.G, V.C), R.ansp(V.C)[N_POS, p2]))
+    for i, C in enumerate(cs):        # the position channel: metadata once, rules per component
+        m += (R.vP(V.P, C) <= R.occ(V.P, C)[p0, N_POS])
+        if "components" in labels:
+            m += (R.vP(V.P, C) <= mine + (R.cid(C)[p0, 2],)) | avg
+        if i == 0:
+            m += (R.vP / 2) | tanh
+        if rows and roles:
+            for role in ROLES:
+                m += (R.relp(V.Rw, C) <= (S.full(V.Rw), S.inrow(V.P, V.Rw), S.col(V.P, role), R.vP(V.P, C)[p1, p0])) | avg
+            if i == 0:
+                m += (R.relp / 2) | tanh
+            m += (R.ctxp(C) <= (S.full(V.Rw), R.relp(V.Rw, C)[p1, p1])) | avg
+            if i == 0:
+                m += (R.ctxp / 1) | tanh
+            for role in ROLES[:2]:
+                m += (R.ansp(C) <= (S.inrow(V.P, "r3"), S.col(V.P, role), R.vP(V.P, C)[p2, p0])) | avg
+            m += (R.ansp(C) <= R.ctxp(C)[p2, p1])
+        elif rows:
+            m += (R.relp(V.Rw, C) <= (S.row(V.Rw, *Ps),) + tuple(R.vP(P, C)[p1, p0] for P in Ps[:-1]))
+            m += (R.relp(V.Rw, C) <= (S.row(V.Rw, *Ps), R.vP(Ps[-1], C)[p1, p0]))
+            if i == 0:
+                m += (R.relp / 2) | tanh
+            m += (R.ctxp(C) <= (S.full(V.Rw), R.relp(V.Rw, C)[p1, p1])) | avg
+            if i == 0:
+                m += (R.ctxp / 1) | tanh
+            m += (R.ansp(C) <= (S.row3(*Ps[:-1]),) + tuple(R.vP(P, C)[p2, p0] for P in Ps[:-1]))
+            m += (R.ansp(C) <= R.ctxp(C)[p2, p1])
+        else:
+            for p in range(N_CTX):
+                m += (R.hidp(C) <= R.vP(f"p{p}", C)[p1, p0])
+            if i == 0:
+                m += (R.hidp / 1) | tanh
+            m += (R.ansp(C) <= R.hidp(C)[p2, p1])
+            m += (R.ansp(C) <= R.vP(f"p{N_CTX - 1}", C)[p2, p0])
+        if i == 0:
+            m += (R.ansp / 1) | tanh
+        m += (R.op(V.G) <= (R.puzzle(V.G)[N_POS, 1], S.qcomp(V.G, C), R.ansp(C)[N_POS, p2]))
     m += (R.op / 1) | ident
 
     m += (R.out(V.G) <= (R.oa(V.G, "type"), R.oa(V.G, "size"), R.oa(V.G, "color"), R.oa(V.G, "number"),
@@ -384,10 +437,15 @@ COPY_SCALE = 4.0                                        # copied code bits enter
 GATE_BIAS0 = -6.0                                       # initial bias of the copy gates
 
 
-def facet_facts(panels, values, cfg, copy=False, source=None):
-    """source: the puzzle the copied codes come from (default: this one; the shuffled control passes another)."""
+def facet_facts(panels, values, cfg, copy=False, source=None, labels=()):
+    """source: the puzzle the copied codes come from (default: this one; the shuffled control passes another).
+    labels: the one-hot component / attribute facts of the symmetry ablations (build_facet_template)."""
     from neuralogic.core import R
     facts = []
+    if "components" in labels:
+        facts += [R.cid("k0")[[1.0, 0.0]], R.cid("k1")[[0.0, 1.0]]] + [R.isattr(a) for a in NUM_ATTRS]
+    if "attributes" in labels:
+        facts += [R.aid(a)[[1.0 if j == i else 0.0 for j in range(len(NUM_ATTRS))]] for i, a in enumerate(NUM_ATTRS)]
     src = panels if source is None else source
     for p in range(N_CTX):
         for k in comps(cfg):
@@ -406,12 +464,17 @@ def facet_facts(panels, values, cfg, copy=False, source=None):
     return facts
 
 
-def puzzle_facts(panels, gid, with_feat=False, col_roles=False):
+def puzzle_facts(panels, gid, with_feat=False, col_roles=False, fold=False):
+    """fold=True adds next(P, Q) for neighbouring panels of a row and qlast(P) for the question row's last
+    context panel (the --columns fold template)."""
     from neuralogic.core import R
     name = lambda ps: [f"p{p}" for p in ps]
     cols = col_names(col_roles)
     facts = ([R.puzzle(gid), R.row("r1", *name(ROWS["r1"])), R.row("r2", *name(ROWS["r2"])), R.row3(*name(ROWS["r3"])),
               R.full("r1"), R.full("r2")] + [R.col(f"p{p}", cols[p % len(COLS)]) for p in range(N_CTX)])
+    if fold:
+        facts += [R.next(f"p{a}", f"p{b}") for ps in ROWS.values() for a, b in zip(ps, ps[1:])]
+        facts.append(R.qlast(f"p{ROWS['r3'][-1]}"))
     for rw, ps in ROWS.items():
         facts += [R.inrow(f"p{p}", rw) for p in ps]
         for a in ps:                             # same position, same row, different panel
@@ -539,9 +602,16 @@ def main():
                          "constellation, so the links carry the same weights but no information")
     ap.add_argument("--no-rows", action="store_true",
                     help="facet: no row relation (level 1); the answer reads all eight panels directly")
-    ap.add_argument("--columns", choices=["named", "roles"], default="named",
+    ap.add_argument("--label-components", action="store_true",
+                    help="facet: one-hot facts tell the two components apart, removing their symmetry (notes §26)")
+    ap.add_argument("--per-comp-weights", action="store_true",
+                    help="facet: own weights for every component (k0, k1), removing their weight sharing (notes §26.1)")
+    ap.add_argument("--label-attributes", action="store_true",
+                    help="facet: one-hot facts tell the attributes apart, removing their symmetry (notes §26)")
+    ap.add_argument("--columns", choices=["named", "roles", "fold"], default="named",
                     help="facet: weights per column (named), or per role first / middle / last, so that the middle "
-                         "columns are interchangeable (roles; the operands of I-RAVEN-X Arithmetic, notes §24)")
+                         "columns are interchangeable (roles; the operands of I-RAVEN-X Arithmetic, notes §24), or "
+                         "roles with a recursive fold along each row (fold, notes §25)")
     args = ap.parse_args()
     cfgs = list(POS_MAP) if args.constellation == "all" else args.constellation.split(",")
     if args.iravenx:
@@ -577,9 +647,10 @@ def main():
 
     values = args.values
     widths = [int(x) for x in args.widths.split(',')] if args.widths else None
+    labels = tuple(k for k, on in (("components", args.label_components), ("attributes", args.label_attributes)) if on)
     model = build_facet_template(args.dim, args.layers, not args.per_attr_weights, not args.no_rows, widths,
                                  hidden=not args.visible_selectors, copy=args.copy_links, gates=args.copy_gates,
-                                 cols=args.columns)
+                                 cols=args.columns, labels=labels, shared_comps=not args.per_comp_weights)
     model.build(Settings(optimizer=Adam(lr=args.lr), error_function=MSE(), iso_value_compression=False))
     heap0 = jvm_used_mb()
 
@@ -591,10 +662,10 @@ def main():
     for name, i, k in units:
         panels, y, cfg = sets[name][i]
         gid = f"{name}{i}{k or ''}"
-        facts = puzzle_facts(panels, gid, col_roles=args.columns == "roles")
+        facts = puzzle_facts(panels, gid, col_roles=args.columns != "named", fold=args.columns == "fold")
         target = facet_target(comp_objs(panels[N_CTX + y], cfg, k), values)
         src = sets[name][nxt[name][i]][0] if nxt else None
-        facts += facet_facts(panels, values, cfg, args.copy_links, src) + [R.qcomp(gid, k)]
+        facts += facet_facts(panels, values, cfg, args.copy_links, src, labels) + [R.qcomp(gid, k)]
         samples.append(Sample(R.out(gid)[target.tolist()], facts))
     t_facts = time.time() - t
 
@@ -626,10 +697,12 @@ def main():
         print(f"train/val: {args.n} train, {args.n_sel} selection (val 0..{args.n_sel - 1}), "
               f"{args.n_val} unseen (val 300..{299 + args.n_val}) puzzles per constellation ({what}); "
               f"{len(b_tr)} training samples; template {args.template}"
-              + (f" (values {args.values}, {'per-attribute' if args.per_attr_weights else 'shared'} weights, "
+              + (f" (values {args.values}, {'per-attribute' if args.per_attr_weights else 'shared'} weights"
+                 f"{', per component' if args.per_comp_weights else ''}, "
                  f"{'no row relation' if args.no_rows else 'row relation'}"
                  + (f", copy links ({args.copy_gates} gates{', shuffled sources' if args.copy_shuffled else ''})"
-                    if args.copy_links else "") + (", column roles" if args.columns == "roles" else "") + ")")
+                    if args.copy_links else "") + ({"named": "", "roles": ", column roles", "fold": ", row fold"}[args.columns])
+                    + "".join(f", {k} labelled" for k in labels) + ")")
               + (f", widths {args.widths}" if args.widths else f", dim {args.dim}, layers {args.layers}")
               + f", lr {args.lr}; "
               f"grounded in {t_ground:.0f}s", flush=True)

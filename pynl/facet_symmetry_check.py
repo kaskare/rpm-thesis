@@ -98,7 +98,7 @@ def predict(outs, i, pz, cfg):
                               for k in B.comps(cfg)) for c in range(8)]))
 
 
-def run(model, puzzles, copy, draws, roles=False):
+def run(model, puzzles, copy, draws, roles=False, fold=False, labels=()):
     """Per check: the max |output difference| over `draws` random weight settings, or (draws=None) on the
     model's current weights, where it also counts the puzzles whose chosen candidate changes and the
     puzzles answered right before and after the transformation."""
@@ -112,7 +112,7 @@ def run(model, puzzles, copy, draws, roles=False):
         for i, (pz, y, cfg) in enumerate(ps):
             for k in B.comps(cfg):
                 gid = f"g{len(units)}"
-                facts = (B.puzzle_facts(pz, gid, with_feat=False, col_roles=roles) + B.facet_facts(pz, "therm", cfg, copy)
+                facts = (B.puzzle_facts(pz, gid, col_roles=roles, fold=fold) + B.facet_facts(pz, "therm", cfg, copy, labels=labels)
                          + [R.qcomp(gid, k)])
                 units.append((s, i, k))
                 samples.append(Sample(R.out(gid)[B.facet_target(B.comp_objs(pz[B.N_CTX + y], cfg, k)).tolist()],
@@ -177,8 +177,9 @@ def main():
     from neuralogic.core import Settings
     from neuralogic.nn import Adam, MSE
 
-    def build(copy=False, rows=True, shared=True, gates="panel", cols="named", ckpt=None):
-        m = B.build_facet_template(32, 2, shared, rows, [32, 64, 128], copy=copy, gates=gates, cols=cols)
+    def build(copy=False, rows=True, shared=True, gates="panel", cols="named", labels=(), shared_comps=True, ckpt=None):
+        m = B.build_facet_template(32, 2, shared, rows, [32, 64, 128], copy=copy, gates=gates, cols=cols, labels=labels,
+                                   shared_comps=shared_comps)
         m.build(Settings(optimizer=Adam(lr=3e-4), error_function=MSE(), iso_value_compression=False))
         if ckpt:
             m.load(os.path.join(ckpt, "template_best.bin"))
@@ -195,9 +196,13 @@ def main():
     cols = {}
     for label, kw in [("level 2 (default)", {}), ("copy links", {"copy": True}),
                       ("copy, content gates", {"copy": True, "gates": "content"}),
-                      ("level 1 (--no-rows)", {"rows": False}), ("per-attribute weights", {"shared": False})]:
+                      ("level 1 (--no-rows)", {"rows": False}), ("per-attribute weights", {"shared": False}),
+                      ("components labelled", {"labels": ("components",)}),
+                      ("attributes labelled", {"labels": ("attributes",)}),
+                      ("per-component weights", {"shared_comps": False})]:
         m, n = build(**kw)
-        cols[f"{label}, {n // 1000}k w"] = fmt_rand(run(m, puzzles, kw.get("copy", False), args.draws))
+        cols[f"{label}, {n // 1000}k w"] = fmt_rand(run(m, puzzles, kw.get("copy", False), args.draws,
+                                                        labels=kw.get("labels", ())))
     table(cols)
     if args.trained:
         print("\ntrained checkpoints (moved: puzzles whose chosen candidate changes; right: puzzles answered "
@@ -213,9 +218,11 @@ def main():
     cols = {}
     for label, kw in [("named columns", {}), ("column roles", {"cols": "roles"}),
                       ("roles, content gates", {"cols": "roles", "copy": True, "gates": "content"}),
-                      ("roles, panel gates", {"cols": "roles", "copy": True})]:
+                      ("roles, panel gates", {"cols": "roles", "copy": True}), ("row fold", {"cols": "fold"}),
+                      ("roles, per-attribute weights", {"cols": "roles", "shared": False})]:
         m, n = build(**kw)
-        cols[f"{label}, {n // 1000}k w"] = fmt_rand(run(m, px, kw.get("copy", False), args.draws, kw.get("cols") == "roles"))
+        cols[f"{label}, {n // 1000}k w"] = fmt_rand(run(m, px, kw.get("copy", False), args.draws,
+                                                        kw.get("cols") in ("roles", "fold"), kw.get("cols") == "fold"))
     table(cols)
     if not args.trained:
         return
@@ -227,7 +234,8 @@ def main():
                              "facet_iravenx_n10_m50_roles_content")]:
         if os.path.exists(f"experiments/{ckpt}/template_best.bin"):
             m, n = build(ckpt=f"experiments/{ckpt}", **kw)
-            cols[f"{label}, {n // 1000}k w"] = fmt_tr(run(m, px, kw.get("copy", False), None, kw.get("cols") == "roles"))
+            cols[f"{label}, {n // 1000}k w"] = fmt_tr(run(m, px, kw.get("copy", False), None,
+                                                          kw.get("cols") in ("roles", "fold"), kw.get("cols") == "fold"))
     print(f"\nI-RAVEN-X, trained checkpoints\n")
     table(cols)
 

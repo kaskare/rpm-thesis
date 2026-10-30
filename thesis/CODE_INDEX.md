@@ -23,8 +23,12 @@ run everything from the repository root. Superseded code is in `archive/` (botto
 | `facet_viz.py` | Drawings for the notebook. `ground_graph` reads the network PyNeuraLogic grounds for one sample (built without chain pruning) as atom-to-atom edges; `draw_network` puts one attribute of it on the puzzle grid; `gate_means` reads a sample's trained copy gates. | |
 | `facet_symmetry_check.py` | Which symmetries each template variant has, on random weights and (`--trained`) on checkpoints (§21, §24). | |
 | `dataset_symmetry_check.py` | Which symmetries the I-RAVEN and I-RAVEN-X data have: which rules survive each transformation, the generators' statistics, the structure of the candidate sets (§22). | |
-| `facet_rule_eval.py` | Rebuilds any I-RAVEN-X checkpoint from its `best.json`; matched, exact and exact value per rule on the unseen puzzles, optionally with rows 1 ↔ 2 or middle columns 2 ↔ 3 swapped. | |
-| `submit_facet_long.sh`, `submit_column_roles.sh` | 150-epoch runs; the column-role runs (§24). Other runs used `sbatch --wrap` (command in notes §18.1). | |
+| `facet_rule_eval.py` | Rebuilds any I-RAVEN-X checkpoint from its `best.json`; matched, exact and exact value per rule on the unseen puzzles, optionally transformed (rows 1 ↔ 2, middle columns 2 ↔ 3, size ↔ colour, mirrored layouts), or (`--iravenx FILE`) on rows of another length. Also I-RAVEN checkpoints (per constellation, and per rule from the XML). | |
+| `submit_facet_long.sh`, `submit_column_roles.sh` | 150-epoch runs; the column-role and row-fold runs (§24–§25). Other runs used `sbatch --wrap` (command in notes §18.1). | |
+| `value_axis.py` | The value-axis model (notes §27): values as constants, a kernel over offsets ±2, pair comparisons pooled over values, exact sums through `plus`, scoring per value with shared weights; `--no-plus`, `--per-value` (the value-symmetry ablation), `--check-shift`, `--eval DIR` (another range or row length). | template: `build_value_template` · facts: `value_facts` · scoring: `to_codes`, `score` |
+| `value_axis_viz.py` | Drawings for the value-axis notebook: `draw_value_graph` places every ground atom of one attribute on the value axis (lanes = panels), `draw_kernel` the learned kernel. Uses `facet_viz.ground_graph(..., out_len=153)`. | |
+| `value_axis.ipynb` | One unseen I-RAVEN-X puzzle through the value-axis model: the printed template, the grounded graph per attribute, the kernel, the answer distribution, accuracy per rule, the shift symmetry with trained weights, values 0–99, and every run's `best.json`. Executed copy: `thesis/value_axis.html`. | |
+| `submit_value_axis.sh`, `submit_symmetry_ablation.sh` | Value-axis runs (plus, noplus, pervalue, zero; §27); the symmetry ablations with labels and separate weights (§26). | |
 
 Options of `bench_hub_grounding.py --template facet`:
 * `--widths 32,64,128` widens the layers; `--iravenx FILE` trains on I-RAVEN-X; `--save-dir` saves the best
@@ -33,7 +37,11 @@ Options of `bench_hub_grounding.py --template facet`:
   * `--copy-gates content` chooses gates by content and row role, which keeps rows 1 and 2 interchangeable (§21).
   * `--copy-shuffled` is the control: the copied codes come from another puzzle.
 * `--columns roles`: first / middle / last columns, so the operands of Arithmetic are interchangeable (§24).
+  `--columns fold`: roles, but each row is read by a recursive fold, one shared step per column (§25).
+  Neither names a column, so their checkpoints run on rows of any length.
 * Ablations: `--values onehot`, `--per-attr-weights`, `--no-rows`; `--visible-selectors` restores the bug of §17.
+  `--label-components` / `--label-attributes` remove the component or attribute symmetry at nearly equal
+  capacity (§26; runs: `submit_symmetry_ablation.sh`).
 
 ## Torch baselines (`baselines/`, notes §23)
 
@@ -41,7 +49,7 @@ Options of `bench_hub_grounding.py --template facet`:
 |---|---|
 | `prepare_baseline_data.py` | pynl env: writes the facet model's puzzles, splits and weight counts as arrays (`experiments/baselines/data/<dataset>.npz`), plus `bench_hub_grounding`'s own targets for a check. |
 | `train_baseline.py` | nvsa env, GPU: on the facet model's task (same targets, selection and metrics), sized to the facet model's weights (`--scale` for more). Architectures: `mlp`, `gnn` (all-to-all over objects), `attr-abs` and `attr-rel` (all-to-all over object attributes, absolute or relative labels: plan models A and B). Regularization: `--norm`, `--dropout`, `--drop-edge`, `--wd`, `--schedule cosine`, `--warmup`, `--clip`, `--augment rows`. `--check-symmetry`, and transformed test sets after training or with `--eval-only`. |
-| `submit_baselines.sh`, `submit_sweep.sh`, `submit_regularized.sh`, `submit_attr_gnn.sh` | equal weights (2 seeds); 4×, 16×, 64×; the regularization grid; models A and B. |
+| `submit_baselines.sh`, `submit_sweep.sh`, `submit_regularized.sh`, `submit_attr_gnn.sh`, `submit_final.sh` | equal weights (2 seeds); 4×, 16×, 64×; the regularization grid; models A and B; the regularized setting on every dataset, second seeds and 4×/16×. |
 | `summarize_baselines.py` | the table, next to the facet model; `--per-rule`. |
 
 ## The symbolic models (ground-truth attributes, notes §15)

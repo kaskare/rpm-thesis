@@ -22,14 +22,16 @@ def _name(n):
     return s[s.rfind(" ", 0, s.rfind("(")) + 1:]
 
 
-def ground_graph(template, facts, gid):
+def ground_graph(template, facts, gid, out_len=None):
     """Atom-level edges (X, Y) of the network grounded for one sample: atom X feeds a rule that computes
     atom Y. Built without chain pruning, so every ground atom keeps a neuron and a name of its own
-    (training prunes chains of single-input neurons, which merges neurons but keeps these connections)."""
+    (training prunes chains of single-input neurons, which merges neurons but keeps these connections).
+    out_len: the length of the query out(gid), the facet output by default (value_axis_viz passes its own)."""
     from neuralogic.core import R, Settings
     from neuralogic.dataset import Dataset, Sample
     template.build(Settings(chain_pruning=False, iso_value_compression=False))
-    sample = list(template.build_dataset(Dataset([Sample(R.out(gid)[[0.0] * B.FACET_OUT], facts)])))[0]
+    target = [0.0] * (out_len or B.FACET_OUT)
+    sample = list(template.build_dataset(Dataset([Sample(R.out(gid)[target], facts)])))[0]
 
     def sources(n):                     # through rule and aggregation neurons down to the next atoms
         for i in n.getInputs():

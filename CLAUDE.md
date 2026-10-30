@@ -1,6 +1,7 @@
 # I-RAVEN and I-RAVEN-X: symmetries as inductive bias in PyNeuraLogic models (thesis)
 
-Findings in order: `thesis/FINDINGS.md`. Plan: `thesis/THESIS_PLAN_symmetry.md`. Lab notes:
+Findings in order: `thesis/FINDINGS.md`. All result tables: `thesis/RESULTS.md` (update it with every new
+result). Plan: `thesis/THESIS_PLAN_symmetry.md`. Lab notes:
 `thesis/PYNEURALOGIC_NOTES.md`. Code map: `thesis/CODE_INDEX.md`. Project summary for Claude projects:
 `thesis/claude_project/PROJECT_KNOWLEDGE.md`.
 
@@ -42,7 +43,10 @@ root, so imports stay bare (`from train_pynl import parse`).
 - `pynl/pixel_pipeline.py` + `submit_pixels.sh`: the ResNet-18 frontend over every panel
   (`experiments/frontend_preds/`); `frontend/`: the frontend itself; `gnn/`: the inherited data package
   (slot fix), still imported.
-- `notebooks/facet_model.ipynb` (it `chdir`s to the repo root); executed copy `thesis/facet_model.html`.
+- `pynl/value_axis.py`: the value-axis model (values as constants, a convolution along them; notes §27);
+  drawings `value_axis_viz.py`; jobs `submit_value_axis.sh`.
+- `notebooks/facet_model.ipynb` and `notebooks/value_axis.ipynb` (they `chdir` to the repo root); executed
+  copies `thesis/facet_model.html`, `thesis/value_axis.html`.
 - `llm/`: LLM benchmark on I-RAVEN (images end to end, or text with XML labels); see `llm/README.md`.
 - Superseded code is in `archive/` (the GNN-style PyNeuraLogic model and the original torch GNN in
   `archive/superseded_2026-10-28/`); not runnable from there as is.

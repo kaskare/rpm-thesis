@@ -785,6 +785,16 @@ Results, 1000 unseen puzzles, epoch picked on selection (45 for both new runs):
 
 * **The gain is the bias, not the capacity.** The control has the same weights as the copy model and gains
   only 1.9 points over plain. Copy links with real codes gain 12.4.
+  - **Bias or just more connections?** The control keeps every connection, gate and weight; only what flows
+    through the copy path is uninformative. So of the 12.4 points, about 1.9 can be credited to the extra
+    connections and weights, and the rest to the information they carry: the bias "the answer may be a
+    context value".
+  - **More connections can hurt here.** Gates that start half open swamped the logits: memorising 200
+    puzzles reached 34/200 exact, against 195/200 with closed gates (§20.2). Per-panel gates learned a
+    shortcut that collapses under a row swap (§21.5).
+  - **Open gap.** The shuffled codes are wrong values that can actively mislead, so the control might
+    understate what uninformative connections would give. A blank-code control (copied codes all zero) would
+    close this; one 5-hour run, not run yet.
 * **Content gates keep most of the gain and lose the shortcut.** Row swap, per rule
   (`rows_swap_content_11908129.out`):
 
@@ -859,6 +869,10 @@ Union and difference do not survive column reversal (2.5 / 0): a union cannot be
      - The answer is still "the value row 3 lacks". So the swap is a symmetry of that weaker rule ("every row
        holds the same n values"), but it leaves the generator's support.
      - 3×3 is different: 3δ ≡ 0 (mod 3), so the swap survives there.
+   - *Consequence:* on I-RAVEN and I-RAVEN-X 3×3 the swap is a data symmetry, so building it in only saves
+     the data from teaching it. On 3×10 it is a task symmetry, not a data symmetry: the swapped puzzle never
+     occurs, but its answer is still "the value row 3 lacks". Building it in costs nothing and removes the
+     address shortcut that per-panel gates learned (§21.5).
      - This is the gap §21.5's address rule lived in.
 2. **Columns are not a symmetry.** Progression dies under any column swap. What survives is the order-free
    part of Arithmetic, which is a task symmetry but not a data symmetry:
@@ -1049,6 +1063,56 @@ I-RAVEN by layout, best settings:
     The plain facet model: 93 / 77 / 10 / 19. So the baselines generate Distribute better than the plain facet
     model; copy links reach 87, content gates 60.
 
+### 23.4 Final baselines: every dataset, 2 seeds, and more weights regularized (2026-10-29)
+`baselines/submit_final.sh`, job 11914716 (24 runs). The setting picked in §23.3 is run unchanged, not re-tuned
+per dataset: LayerNorm (MLP), weight decay 0.5, dropout 0 on I-RAVEN and 0.3 on I-RAVEN-X, cosine schedule with
+5 warm-up epochs, clipping at 1. Weight counts as in §23.1 (facet model's; with copy links on 3×10).
+
+**At the facet model's weight count** (matched % (exact %), 2 seeds):
+
+| dataset | facet (best variant) | MLP | MLP, regularized | GNN | GNN, regularized |
+|---|---|---|---|---|---|
+| I-RAVEN | **97.3** (69.1) | 60.6 ± 0.8 (17.1) | 72.0 ± 1.1 (27.5) | 87.2 ± 1.1 (51.5) | 90.5 ± 1.2 (55.1) |
+| I-RAVEN-X 3×3, 0–9 | **99.2** (92.7) | 92.8 ± 0.2 (64.8) | 95.1 ± 0.4 (74.3) | 92.0 ± 0.4 (58.5) | 93.9 ± 0.2 (67.7) |
+| 3×10, 0–49 | **97.8** (60.0) | 83.5 ± 0.4 (3.9) | 84.5 ± 0.1 (2.7) | 71.6 ± 0.1 (1.2) | 85.3 ± 1.9 (4.2) |
+| 3×10, 0–99 | **96.2** (30.8) | 80.0 ± 2.3 (0.5) | 76.3 ± 1.4 (0.1) | 64.7 ± 5.4 (0.0) | 76.8 ± 2.1 (0.2) |
+| 3×10, 0–999 | **94.3** (15.0) | 74.3 ± 3.2 (0.0) | 73.8 ± 0.2 (0.0) | 54.1 ± 3.1 (0.0) | 55.1 ± 1.0 (0.0) |
+
+(facet on 3×10: copy links with per-panel gates; without them 85.4 / 84.9 / 81.2.)
+
+**More weights, regularized** (seed 0):
+
+| weights | I-RAVEN MLP | I-RAVEN GNN | 3×10 0–49 MLP | 3×10 0–49 GNN |
+|---|---|---|---|---|
+| 1× (2 seeds) | 72.0 (27.5) | 90.5 (55.1) | 84.5 (2.7) | 85.3 (4.2) |
+| 4× | 79.4 (40.4) | 92.9 (62.6) | 84.1 (2.6) | 83.4 (2.6) |
+| 16× | 81.2 (46.1) | **93.8** (63.7) | 82.3 (1.8) | 72.8 (1.2) |
+
+I-RAVEN by layout, regularized at 16×: GNN 99.5 / 89.6 / 75.2 / 99.8 / 99.7 / 99.9 / 92.8, MLP 97.5 / 57.8 / 45.2 /
+96.1 / 97.9 / 99.3 / 74.7 (center, 2×2, 3×3, L-R, U-D, in-out, in-out grid; facet 99.3 / 95.5 / 89.8 / 99.5 /
+99.7 / 99.6 / 97.8).
+
+* **Regularization helps on I-RAVEN** (MLP +11.4, GNN +3.3) **and on 3×3** (+1.9 to +2.3), helps the GNN on
+  3×10 (+12 to +14 at values 0–49 and 0–99), and does nothing at values 0–999. It costs the MLP 3.7 points at 0–99; selection
+  then prefers the unregularized MLP.
+* **On I-RAVEN, regularized models keep gaining with weights**, unlike the unregularized ones (§23.2): the GNN
+  reaches 93.8 (63.7) at 16× (4.3M weights), the strongest object-level baseline. It is still 3.5 points below
+  the facet model at 1/16 of its weights, and 14.6 below on the 3×3 grid.
+* **On I-RAVEN-X 3×10 more weights hurt** even with regularization (GNN 85.3 → 72.8 at 16×). Exact generation
+  stays at 1–4% at every size and setting.
+* **3×3, values 0–9 is the dataset where the baselines come closest:** the regularized MLP matches 95.1
+  (74.3), exact per rule 99.7 / 94.7 / 93.4 / 64.4 (Constant / Progression / Distribute / Arithmetic), against
+  the facet model's 99.2 (92.7). Few values and three columns leave little to generalize across.
+
+**Are they fair baselines?** Yes, for what they are meant to show: the same puzzles, splits, inputs, targets,
+metrics and selection rule as the facet model; matched weights, then 4–64× more; a 40-run regularization grid
+picked on selection; 2 seeds where it matters. Limits:
+- one setting carried across datasets, tuned on two of them;
+- weight decay 0.5 was the edge of the grid;
+- the 64× runs are unregularized;
+- object granularity is a design choice: the attribute-level GNNs A and B (`thesis/notes_attr_gnn_draft.md`)
+  are the stronger torch comparison (I-RAVEN A 95.0 (62.5), B 96.8 (67.9); 3×10 A 95.0 (27.7), B 85.8 (3.5)).
+
 ## 24. Column roles: the operand-order symmetry of I-RAVEN-X Arithmetic (2026-10-28)
 The prediction from §22.4, tested as plan item E4 (`thesis/THESIS_PLAN_symmetry.md`). I-RAVEN-X Arithmetic is
 c_n = c_1 + … + c_{n−1} (plus) or c_1 = c_2 + … + c_n (minus). In both, columns 2..n−1 are interchangeable
@@ -1104,4 +1168,363 @@ out of the generator's support. Their answer by the weaker rule is unchanged: Di
 one row 3 lacks, and Progression's answer is still determined by c_1 and the sum. The named models lose 15–20
 points of matching there, which a model with roles cannot lose, by construction.
 
-ROLES_RESULTS_PENDING
+**Result, plain column roles** (job 11913673, 288k weights, epoch 55 picked on selection; unseen 6300–7299):
+
+| | matched | exact | exact value: Constant | Progression | Distribute | Arithmetic |
+|---|---|---|---|---|---|---|
+| named columns, 1,411k w | 85.4 | 15.0 | 93.4 | 77.4 | 9.8 | 18.6 |
+| **column roles, 288k w** | **94.1** | **29.0** | **98.6** | **94.3** | **22.0** | **40.5** |
+| (copy links, content gates, 1,436k w) | 94.9 | 51.7 | 100 | 98.2 | 59.8 | 30.0 |
+
+* **The prediction holds for Arithmetic:** 18.6 → 40.5% exact, more than copy links with content gates reach
+  (30.0). Building the operand-order symmetry in did what copy links could not.
+* **The other rules improved too,** where I predicted no change: Progression +17, Distribute +12, Constant
+  +5. The roles also remove 80% of the weights; per-column weights were spending data on telling columns
+  apart.
+* **Exactly symmetric on the trained model:** swapping middle columns 2 and 3, or rows 1 and 2, leaves every
+  number unchanged (the named models lose 15–20 points of matching, see above).
+* Matching 94.1% approaches the copy-link models without any copy path. Distribute stays the weak rule: it
+  needs a single panel of row 1, which the copy links supply.
+
+**Result, column roles + content copy gates** (job 11913674, 314k weights, epoch 60):
+
+| | matched | exact | Constant | Progression | Distribute | Arithmetic |
+|---|---|---|---|---|---|---|
+| named columns + content gates, 1,436k w | 94.9 | 51.7 | 100 | 98.2 | 59.8 | 30.0 |
+| **roles + content gates, 314k w** | **96.3** | 43.3 | 99.6 | 94.8 | 42.8 | **37.5** |
+
+* Matching and Arithmetic improve over the named-column copy model (+1.4, +7.5); exact generation falls (−8.4),
+  all of it in Distribute (−17) and a little in Progression (−3.4). A possible reason, not tested: the gates
+  read `ans`, which with roles sees the question row's middle columns only as an average, so it may carry less
+  about which value is missing; with named columns `ans` had a weight per column.
+* Again identical under the middle-column and row swaps.
+
+**Row-length transfer of the roles models** (job 11914475): trained on rows of 10, scored on 1000 puzzles with
+rows of 5 and 20 (values 0–49; same weights, the template names no column):
+
+| rows of | model | matched | exact | Constant | Progression | Distribute | Arithmetic |
+|---|---|---|---|---|---|---|---|
+| 10 (trained) | roles / + content gates | 94.1 / 96.3 | 29.0 / 43.3 | 98.6 / 99.6 | 94.3 / 94.8 | 22.0 / 42.8 | 40.5 / 37.5 |
+| 5 | roles / + content gates | 65.6 / 66.3 | 4.0 / 5.2 | 99.0 / 99.8 | 23.8 / 9.8 | 4.2 / 16.7 | 4.3 / 5.1 |
+| 20 | roles / + content gates | 50.1 / 49.2 | 4.6 / 4.6 | 98.7 / 99.8 | 11.0 / 2.8 | 7.3 / 11.2 | 6.5 / 4.5 |
+
+* Only Constant transfers. Everything that depends on how many columns a row has breaks: Arithmetic (a sum of
+  n−2 middle values, read as their average), Progression (c_1 + (n−1)·step) and Distribute (n values).
+  As predicted for Arithmetic; Progression breaking was not predicted, but follows from the same count.
+* So the roles generalize over the ORDER of the middle columns but not over their NUMBER. That is the test
+  the row fold has to pass (§25).
+
+**At the named-column model's weight count** (`--columns roles --widths 64,144,288`, jobs 11913675–76, 60 epochs):
+
+| 3×10, values 0–49 | weights | matched | exact | Constant | Progression | Distribute | Arithmetic |
+|---|---|---|---|---|---|---|---|
+| named columns | 1,411k | 85.4 | 15.0 | 93.4 | 77.4 | 9.8 | 18.6 |
+| column roles | 288k | 94.1 | 29.0 | 98.6 | 94.3 | 22.0 | 40.5 |
+| column roles, wide (epoch 55) | 1,390k | **94.9** | 28.5 | 97.1 | 94.8 | 20.9 | 36.6 |
+| roles + content gates | 314k | **96.3** | **43.3** | 99.6 | 94.8 | 42.8 | 37.5 |
+| roles + content gates, wide (epoch 30) | 1,448k | 93.1 | 30.0 | 99.4 | 80.2 | 27.5 | 25.1 |
+
+* **At equal weights the operand-order symmetry is worth 9.5 points of matching** (94.9 vs 85.4) and 13.5 of exact.
+  The comparison in the table above was at a fifth of the weights; this one removes the capacity question.
+* **Width does not help the roles model**: 4.8× the weights gives 94.9 vs 94.1. With content gates the wide model is
+  worse (93.1 vs 96.3; its selection picked epoch 30, the final epoch had 94.3 / 32.4).
+* Both wide models are identical under the middle-column and row swaps, as built.
+* Row-length transfer of the wide models (job 11914476): rows of 5 63.9 / 67.7, rows of 20 49.3 / 50.1 (without /
+  with content gates); again only Constant survives (97–100% exact). Width changes nothing here either.
+
+## 25. A recursive row fold: the step symmetry and other row lengths (2026-10-28)
+Plan E4, suggested by the supervisor's paper (`thesis/PAPER_NOTES_sourek2021.md`): recursion is the construct
+only NeuraLogic expresses. `--columns fold` (`bench_hub_grounding.py`) keeps the column roles everywhere
+except the attribute channel's reading of a row, which becomes a fold:
+
+```
+acc(P, C, A)  :- col(P, first), vF(P, C, A)                       start
+acc(Q, C, A)  :- next(P, Q), Wh·acc(P, C, A) + Wx·vF(Q, C, A)      one step per column, tanh
+rel(Rw, C, A) :- acc of the row's last panel + vF of its first panel
+ans(C, A)     :- acc of the question row's last context panel + ctx
+```
+
+(Each step is written as two rules so chain pruning keeps its tanh; the start state has one rule, so it stays
+linear in vF.)
+* **Symmetry it builds in:** one transition for every step, the same rule applied at every position of the row
+  (Progression's step, a running sum). It gives up the operand-order symmetry: a fold reads the row in order.
+  Random weights: rows 1 ↔ 2, size ↔ colour and object order exact (≤4.4e-16); middle columns 2 ↔ 3 change the
+  output (0.041), as they should.
+* **Row length:** neither the fold nor the roles name a column, so their weight layout is identical for rows of
+  5, 10 and 20 (roles 288,328 weights, fold 304,712): a checkpoint trained on 10 runs on any length.
+  Named-column models cannot.
+* **Toy check** (PyNeuraLogic 0.9.2): a two-rule recursive template trained on rows of 3–5 values summed rows of
+  8 and 10 to a mean error of 0.009 (sums 0–90). It needed the structural atoms hidden (§17); visible, it
+  learned nothing.
+* **Test sets at other lengths:** IBM's `iravenx_task.py` (`~/raven-large-language-models/...`) with
+  `--n 5` / `--n 20 --maxval 50 --nconf 0`, seed 1234: `data/iravenx/center_single_shuffle_n_{5,20}_maxval_50.json`.
+  Rows of 30 would break its Progression sampler at values 0–49. Longer rows also narrow Progression's start
+  values, so the value distribution shifts as well.
+
+**Runs** (`submit_column_roles.sh`, RUN=fold / fold_content, 60 epochs, jobs 11914473–74): trained on 3×10, scored
+on unseen rows of 10, and on rows of 5 and 20. The roles checkpoints get the same row-length scoring (jobs
+11914475–76).
+
+**Predictions:**
+- **Rows of 10:** the fold at least matches the roles on Progression and below them on Arithmetic (order
+  sensitivity).
+- **Other lengths:** the roles average over the middle columns, which hides their number, so roles models
+  should break on Arithmetic at rows of 5 and 20. The fold should transfer better.
+- **Risk:** precision over 9–19 tanh steps.
+
+**Snapshot mid-training** (2026-10-29; checkpoints copied to `experiments/snapshot_fold_30`,
+`snapshot_fold_content_20`; job 11914793). Matched (exact), and exact value per rule
+(Constant / Progression / Distribute / Arithmetic):
+
+| model, rows of | 10 (trained) | 5 | 20 |
+|---|---|---|---|
+| fold, epoch 30 | 91.1 (22.8); 99.9 / 94.8 / 15.1 / 26.7 | 49.6 (0.2); 38.6 / 9.9 / 9.2 / 0.0 | 48.9 (4.6); 99.7 / 5.9 / 12.4 / 2.6 |
+| fold + content gates, epoch 20 | 93.2 (32.1); 99.9 / 86.5 / 28.8 / 21.5 | 57.5 (6.8); 97.4 / 19.2 / 16.9 / 2.0 | 48.4 (9.5); 100 / 10.5 / 25.2 / 2.8 |
+| column roles (final, for reference) | 94.1 (29.0); 98.6 / 94.3 / 22.0 / 40.5 | 65.6 (4.0) | 50.1 (4.6) |
+
+* At rows of 10 the fold equals the roles on Constant and Progression, and is below them on Arithmetic (26.7 vs
+  40.5), as predicted from its order sensitivity.
+* **It does not transfer to other row lengths either.** At rows of 5 the plain fold even loses Constant (38.6%).
+  Trained only on rows of 10, nothing asks the recurrence to mean the same after 4 steps as after 9: the
+  readouts learned to decode the state reached after exactly 9 steps. The toy (§25) transferred because it was
+  linear and trained on mixed lengths (3–5).
+* So recursion makes length transfer *possible* (same weights at any length), not automatic. The fair test
+  trains on mixed row lengths (e.g. 5, 7, 10) and tests on 20; both the fold and the roles templates can train
+  on mixed lengths as they are.
+
+**Final** (60 epochs; epoch picked on selection: fold 60, fold + content gates 30). Same format:
+
+| model, rows of | 10 (trained) | 5 | 20 |
+|---|---|---|---|
+| fold | 92.2 (28.0); 99.9 / **99.2** / 15.1 / 36.2 | 53.8 (0.4); 41.7 / 13.4 / 9.8 / 1.2 | 55.1 (5.9); 99.1 / 2.8 / 15.6 / 3.0 |
+| fold + content gates | 93.7 (35.0); 99.6 / 89.8 / 32.4 / 29.4 | 61.0 (8.1); 94.9 / 22.4 / 19.8 / 1.0 | 60.5 (10.1); 99.9 / 14.5 / 27.5 / 3.4 |
+| column roles | 94.1 (29.0); 98.6 / 94.3 / 22.0 / 40.5 | 65.6 (4.0) | 50.1 (4.6) |
+| column roles + content gates | 96.3 (43.3); 99.6 / 94.8 / 42.8 / 37.5 | 66.3 (5.2) | 49.2 (4.6) |
+
+* **Progression: 99.2% exact, the best of any model** (copy links with content gates 98.2, roles 94.3). The step
+  symmetry the fold builds in is Progression's own.
+* **Arithmetic: 36.2, below the roles (40.5)**, as predicted from order sensitivity; Distribute unchanged (15.1).
+  Overall the fold is 1.9 points below the roles at a few more weights (305k vs 288k).
+* **Swaps:** rows 1 ↔ 2 identical (built in); middle columns 2 ↔ 3 cost 0.5 (fold) and 0.6 points (fold +
+  content gates), against 15 for named columns. A fold *can* tell the middle columns apart but learns not to;
+  the data teaches the symmetry the template does not have.
+* **Row length: still no transfer.** Rows of 5 give 54–61, rows of 20 give 55–61; only Constant survives (Arithmetic
+  1–3%). At rows of 20 the fold models are 5–11 points above the roles, at rows of 5 they are 5–12 below, but none
+  is near the trained length. The conclusion of the snapshot holds: one trained length does not make the
+  recurrence length-independent. Mixed-length training is the open test.
+
+## 26. Symmetry ablations: components and attributes (2026-10-29)
+Plan E1/E2 for two symmetries the facet model has built in but whose benefit was never measured: the two
+components of left-right and up-down layouts, and the attributes (size ↔ colour is a data symmetry of
+I-RAVEN-X, §22). The question is what each symmetry buys in accuracy, in training data, and on transformed
+puzzles.
+
+**How the symmetry is removed** (`--label-components`, `--label-attributes`, `build_facet_template(labels=...)`):
+- One-hot facts name what the symmetry makes interchangeable: `cid(k0) = [1, 0]`, `cid(k1) = [0, 1]` (into
+  every panel-component summary `vF` and `vP`), or `aid(type|size|color|number)` (into `vF`).
+- The weights stay shared; only 0.4–1k weights are added. So this removes the symmetry at nearly equal
+  capacity, unlike `--per-attr-weights`, which triples the weights.
+- Random weights (`facet_symmetry_check.py`): component labels break the mirror (0.37), not type ↔ colour (0);
+  attribute labels break type ↔ colour (0.41), not the mirror (0); rows stay exact. Defaults unchanged
+  (checked for all template variants, I-RAVEN and 3×10).
+
+**Runs** (`pynl/submit_symmetry_ablation.sh`, jobs 11914707–15; scored by `facet_rule_eval.py`, which now also
+handles I-RAVEN checkpoints and the transforms `mirror` and `sizecolor`):
+- Components: I-RAVEN left-right + up-down, default vs labelled, at 100 / 1000 / 6000 puzzles per layout
+  (300 / 120 / 60 epochs); scored as is and mirrored.
+- Attributes: I-RAVEN-X 3×10 values 0–49 with column roles, default (6000: `facet_iravenx_n10_m50_roles`;
+  600 new) vs labelled, at 600 / 6000 puzzles; scored as is and with size ↔ colour swapped.
+
+**Predictions:**
+- **Full data:** little difference. The data has these symmetries, so it teaches them; the torch baselines
+  learned the left-right symmetry from I-RAVEN without it built in.
+- **Small data:** the default (symmetric) model ahead.
+- **Transformed puzzles:** the default model identical by construction; the labelled one may drop.
+
+**Results** (matched % (exact %); I-RAVEN: val 300–1299 per layout; I-RAVEN-X: unseen 6300–7299; epoch picked on
+selection puzzles):
+
+| data | puzzles | symmetric | labelled | symmetric, transformed | labelled, transformed |
+|---|---|---|---|---|---|
+| I-RAVEN L-R + U-D | 100 per layout | 86.6 (40.4) | 87.3 (41.3) | 86.6 (40.4) | 87.1 (41.1) |
+| | 1000 | 99.3 (95.6) | 99.6 (95.7) | 99.3 (95.6) | 99.6 (95.7) |
+| | 6000 | 99.9 (97.7) | 99.8 (98.7) | 99.9 (97.7) | 99.8 (98.7) |
+| I-RAVEN-X 3×10 0–49, roles | 600 | 66.3 (16.4) | 64.6 (14.1) | 66.3 (16.4) | 65.1 (14.3) |
+| | 6000 | 94.1 (29.0) | 93.9 (28.5) | identical | 93.9 (29.1) |
+
+Transformed = mirrored (L-R + U-D) or size ↔ colour swapped (I-RAVEN-X). Exact value per rule, I-RAVEN-X: at 600,
+symmetric 99.8 / 84.7 / 5.3 / 8.7 vs labelled 98.3 / 77.3 / 5.0 / 8.1 (Constant / Progression / Distribute /
+Arithmetic); at 6000, 98.6 / 94.3 / 22.0 / 40.5 vs 99.3 / 94.8 / 23.4 / 42.7.
+
+* **Removing the exact symmetry costs nothing measurable.** All differences are within about 2 points, and at
+  L-R + U-D the labelled model is, if anything, ahead (one seed each). The small-data prediction failed; only
+  I-RAVEN-X at 600 puzzles points the predicted way (−1.7 matched, −7 on Progression).
+* **The labelled models stay almost invariant after training.** Mirroring or swapping size and colour moves their
+  matching by 0.2–0.5 points, although with random weights the labels break the symmetry clearly (0.37, 0.41). The
+  data is symmetric, so the labels carry no information about the answer and training does not use them.
+* **What the ablation keeps is the larger part of the bias.** The labels break the symmetry but leave the weights
+  shared: both components (both attributes) are still read by the same rules, and each rule still trains on both.
+  So this measures exact invariance on top of sharing, and finds it worth little here. The sharing itself is
+  removed only by separate weights per component or attribute (`--per-attr-weights`, 3× the weights); the one
+  earlier test of that (2000 distribute_nine puzzles, dim 32: separate 75.4 vs shared 73.6 matched, job 11877948)
+  was within noise too.
+* **Contrast with the symmetries that did matter:** the row symmetry (copy links with per-panel gates lose 38
+  points on swapped rows, §21.5) and operand order (column roles, §24: +8.7 matched, a fifth of the weights). Both
+  are symmetries where the alternative has many more weights or a shortcut that conflicts with the data. Components
+  and attributes in the facet model are neither: two components and four attributes, sharing kept either way.
+* **Not a conclusion on its own:** see §26.1, where removing the weight sharing does cost accuracy at small data.
+
+### 26.1 Separate weights per component and per attribute
+The labels above break the invariance but keep the sharing. Here the sharing goes too:
+- **Components:** `--per-comp-weights` (`build_facet_template(shared_comps=False)`) writes every rule with weights
+  once per component, `k0` and `k1`, with the component as a constant (and `ocomp(O, k)` in the object-level rules,
+  which name no component). Weight-free rules and all metadata are unchanged.
+- **Attributes:** `--per-attr-weights` (`shared=False`), which existed: every attribute rule once per attribute.
+- All 18 earlier template variants are unchanged, string for string (I-RAVEN and 3×10; default, copy links, both
+  gates, level 1, labels, roles, fold, per-attribute).
+- Random weights (`facet_symmetry_check.py`): per-component weights break the mirror (0.78) and keep rows and
+  type ↔ colour exact; per-attribute weights with roles break type ↔ colour (0.90) and keep rows and middle
+  columns exact (≤4.4e-16).
+
+Two arms each (`submit_symmetry_ablation.sh`, arms `sep` and `sepm`):
+
+| | shared (default) | separate, same widths | separate, matched weights |
+|---|---|---|---|
+| L-R + U-D, components | 266,528 (32, 64, 128) | 533,056 (2×) | 265,532 (22, 45, 90) |
+| I-RAVEN-X roles, attributes | 288,328 (32, 64, 128) | 932,190 (3.2×) | 288,214 (18, 35, 69) |
+
+Same training sizes and epochs as the label runs (L-R + U-D 100 / 1000 / 6000, I-RAVEN-X 600 / 6000).
+
+Jobs 11916358–67 (sep: 58–62, sepm: 63–67).
+
+**Results** (matched (exact); all 10 runs):
+
+| data | puzzles | shared | labels | separate, same widths | separate, matched weights |
+|---|---|---|---|---|---|
+| L-R + U-D | 100 | **86.6** (40.4) | 87.3 (41.3) | 75.6 (22.2) | 74.6 (19.6) |
+| | 1000 | **99.3** (95.6) | 99.6 (95.7) | 97.9 (84.5) | 98.5 (84.5) |
+| | 6000 | 99.9 (97.7) | 99.8 (98.7) | 100.0 (97.8) | 100.0 (98.8) |
+| I-RAVEN-X roles | 600 | **66.3** (16.4) | 64.6 (14.1) | 52.5 (4.1) | 53.0 (3.6) |
+| | 6000 | **94.1** (29.0) | 93.9 (28.5) | 90.5 (17.8) | 88.1 (17.6) |
+
+* **Removing the sharing costs what removing the invariance did not.** Separate weights per component lose 11–12
+  points of matching and 18–21 of exact at 100 puzzles per layout, 11 points of exact at 1000, and nothing at
+  6000. Separate weights per attribute lose 13–14 points at 600 puzzles and 6 at 6000 (matched count).
+* **It is the sharing, not the weight count:** with twice or three times the weights (same widths) the separate
+  models are no better than at the matched count (75.6 vs 74.6; 52.5 vs 53.0).
+* **The gain shrinks with data**, as predicted for a data symmetry (§21–§22): the data teaches the symmetry
+  eventually, and at 6000 puzzles per layout the components no longer matter.
+* So the label ablation (§26) measured the wrong thing: an invariance on top of shared weights. The inductive
+  bias of these symmetries is the weight sharing they allow.
+
+* The separate attribute weights at the same widths (932k) peaked at the last epoch, 60: 90.5 (17.8), still below
+  the shared 94.1 (29.0); exact per rule 93.4 / 80.4 / 16.2 / 25.7 against 98.6 / 94.3 / 22.0 / 40.5. The
+  components at 6000 are level in every arm (99.9–100.0).
+
+
+## 27. The value axis: values as constants, a convolution along them (2026-10-29)
+`pynl/value_axis.py` (I-RAVEN-X, one object per panel). Every value 0..maxval is a constant `v0..vM`, and a
+panel's attribute is a fact `x(P, A, v17)`. Background facts give the value axis its structure: `off(U, V, k)`
+for V = U + k (k = −2..2) and `plus(U, W, V)` for U + W = V. No rule names a value.
+
+**Template** (10,817 weights at width 32; the facet model with column roles has 288k):
+- `h(P, A, V) :- x(P, A, U), off(U, V, k)`, one weight per offset: a kernel along the value axis, the same at every
+  value. h says "V is k above P's value".
+- `pv(P, Q, A, V)` compares neighbouring panels at the same value; `pd(P, Q, A)` sums it over V. So a pair's
+  descriptor depends only on the offset between their values, not on the values.
+- `rd(Rw, A)`: the row's pairs averaged; counts per row and value `pr`, distinct values `nd`, overlap with the
+  question row `ov`.
+- `acc`, `accm`: exact running sums along a row, `acc(Q, A, V) :- next(P, Q), acc(P, A, U), x(Q, A, W),
+  plus(U, W, V)` with a product of the operands' values summed over `plus`, i.e. the convolution of their value
+  distributions. `pchk` / `mchk`: does a complete row satisfy plus (last = sum of the rest) or minus (first = sum
+  of the rest). `sa`, `ma`: the question row's answer under plus and under minus.
+- `ctx(A)`: which rule, from the value-free descriptors and checks. `o(A, V)`: two tanh layers shared across
+  all V (a 1×1 convolution) over ctx, h of the question row's last panel, the counts, sa and ma at V. Softmax
+  over the values per attribute; MSE on the one-hot answer.
+- Number and position are constant in I-RAVEN-X; for scoring they are taken from the last panel. Scoring turns the
+  value distributions into thermometer codes, so matched and exact are `bench_hub_grounding.evaluate`'s.
+
+**Checks:**
+- Running sums, plus/minus checks, counts and distinct values on real Arithmetic puzzles: exact (45 of 45
+  queries).
+- Random weights (`--check-shift`), every context value of one attribute moved by k ∈ {+1, +3, −2}, in puzzles
+  whose values stay 2 away from the ends of the range: without plus the output moves by k exactly (≤3e-17, all
+  130–181 puzzles per case); with plus it does so in 94–97% of them, and differs (≤2.8e-3) where the shift changes
+  a sum, as addition should. Control: the same outputs compared without moving them differ by 2.8e-2 on
+  average, so the exact match is not a flat output.
+- The weights do not depend on the value range (the same 29 weight tensors at 0–50 and 0–100), nor on the row
+  length: a checkpoint trained on values 0–49 runs on 0–99 and on rows of 5 or 20.
+
+**Why it should help, and the Arithmetic question.** The facet model reads a 50-bit thermometer code with a
+weight per bit: "+2 from 17" and "+2 from 33" are different inputs to learn. Here they are the same computation,
+moved along the axis, so every training puzzle teaches every value. For Arithmetic the global shift is not a
+symmetry ((u+k) + (w+k) = (u+w) + 2k), and the template does not impose it: `plus` is not preserved by the shift.
+What addition does have is equivariance per operand: shift one operand by k and the sum moves by k (shift the
+operands by k₁ and k₂, the sum moves by k₁ + k₂). A convolution of value distributions has exactly this property,
+and `plus` computes one. So the plus pathway is the same at every value without being shift-invariant.
+`plus` is background knowledge (like NVSA's binding); what is learned is when to use it.
+
+**Runs** (`pynl/submit_value_axis.sh`): smoke (job 11916971); then the full model, without plus, and at 600
+puzzles; each scored also on values 0–99 and rows of 5 and 20.
+
+**Smoke run** (500 training puzzles, 20 epochs, 300 unseen puzzles 6300..; job 11916971): best on selection at
+epoch 5, unseen **99.3% matched, 98.3% exact**; exact value per rule Constant 100 / Progression 100 / Distribute
+100 / Arithmetic 98.5. Every epoch from 5 to 20 is within 0.7 points. The facts hold only the 29 context panels.
+For scale: the column-roles facet model reaches 94.1 (29.0) with 6000 puzzles.
+
+* What does the work is not settled by this run: the model has the value symmetry *and* primitives the facet
+  model lacks (exact sums, per-row value counts, offsets of ±2 from the last panel). `noplus` takes out the sums;
+  the value-symmetry ablation (weights per value instead of per offset) is not built yet.
+
+Jobs 11917071–74 (plus, noplus, plus600, plus100); smoke checkpoint on values 0–99 and rows of 5 / 20: 11917075.
+
+**Ablation of the value symmetry: weights per value** (`--per-value`, `build_value_template(per_value=True)`).
+Every rule with weights whose atoms carry a value is written once per value constant, with its own weights:
+the kernel (`h`, per value and offset), the comparison and pooling (`pv`, `pd`), and the scoring layers
+(`o`, `o2`, `s`). The value-free part (`rd`, `ctx`), the exact sums and the counts are unchanged. So the
+template names every value, as the facet model does with a weight per code bit, and the primitives stay.
+- 335,475 weights with plus (332,147 without), against 10,817 shared; the facet model with roles has 288k.
+- The default templates are unchanged, string for string (with and without plus).
+- Cannot run on another value range (weights tied to values 0–50); rows of 5 and 20 still work.
+- Random weights, without plus: shifting the values no longer moves the output (exact in 0 of 130–181 puzzles
+  per case, max difference 0.2; the shared template: all exact, ≤8e-17).
+- Runs at 6000 / 600 / 100 puzzles: jobs 11917285–87.
+
+**Results so far** (unseen 6300–7299; matched (exact); exact value per rule C / P / D / A):
+
+| run | weights | 3×10, 0–49 | per rule | values 0–99 | rows of 5 |
+|---|---|---|---|---|---|
+| 100 puzzles | 10,817 | 99.0 (95.5) | 99.9 / 98.5 / 100 / 97.2 | 98.1 (96.4) | 59.7 (32.7) |
+| 600 puzzles | 10,817 | 99.9 (98.3) | 100 / 100 / 100 / 99.8 | 100.0 (99.5) | 75.8 (52.5) |
+| 6000 puzzles, without plus (epoch 45) | 10,689 | 84.0 (58.4) | 100 / 100 / 100 / 11.1 | | |
+
+* Without `plus` the other three rules stay perfect and Arithmetic falls to 11%, near the share of answers that
+  local features can reach (within ±2 of the last panel: 19%; in rows 1–2: 27%). So the sums come from the
+  given relation; the convolution with a ±2 kernel cannot add. A sum shifts by an amount that depends on the
+  other operand: a kernel spanning the range, tied to the values through the position of zero.
+
+**More results** (2026-10-29):
+
+| run | 3×10, 0–49 | per rule C / P / D / A | values 0–99 | rows of 5 | rows of 20 |
+|---|---|---|---|---|---|
+| 6000 puzzles (epoch 5) | 100.0 (98.4) | 100 / 100 / 100 / 100 | 100.0 (99.6) | 89.8 (76.6) | 98.6 (62.7) |
+| 6000, without plus (epoch 45) | 84.0 (58.4) | 100 / 100 / 100 / 11.1 | 78.9 (58.7) | 57.0 (24.4) | 80.1 (58.6) |
+| weights per value, 6000 (epoch 40) | 98.4 (95.7) | 100 / 100 / 100 / 94.9 | cannot run | 55.7 (17.3) | 98.9 (96.9) |
+| weights per value, 600 | 92.7 (79.5) | 98.0 / 87.8 / 97.7 / 86.8 | cannot run | 63.6 (23.4) | 87.6 (64.4) |
+| weights per value, 100 | 38.3 (3.6) | 60.5 / 30.8 / 21.4 / 22.3 | cannot run | 27.3 (0.6) | 33.5 (3.4) |
+
+* **The value symmetry is what makes the model data-efficient.** With the same primitives (sums, counts, offsets),
+  weights per value instead of per offset drop matching from 99.0 to 38.3 at 100 puzzles and from 99.9 to 92.7 at
+  600 (exact 95.5 → 3.6 and 98.3 → 79.5), with 31 times the weights. Arithmetic too (97.2 → 22.3 at 100): the
+  sum is given, but reading it at each value has to be learned separately for each value.
+* **Weights per value at 6000 puzzles:** 98.4% matched (95.7 exact), Arithmetic 94.9, best on selection at
+  epoch 40 of 60. That is where shared weights are at 100 puzzles (99.0, 95.5 exact): without the value
+  symmetry the model needs about 60 times the data. Rows of 5: 55.7 (17.3), worse than at 600 puzzles (63.6);
+  per-value scoring layers fit the sums of rows of 10 more tightly.
+
+* **Rows of 20 transfer better than rows of 5.** Shared weights: 98.6 (62.7) at 6000 puzzles, 92.4 (84.4) at
+  600, 97.4 (82.3) at 100; Constant, Distribute and Arithmetic stay at 99–100% exact, Progression drops (51.2 /
+  89.2 / 81.7). Weights per value: 98.9 (96.9) at 6000 (Progression 99.8, Arithmetic 96.6), 87.6 (64.4) at 600,
+  33.5 (3.4) at 100. At 100 and 600 puzzles the value symmetry wins here too; at 6000 the per-value model is the
+  best on rows of 20 but the worst on rows of 5 (55.7). Scoring needed the named last panel in `sa`/`ma` (the
+  `qlast(P), acc(P, …)` join did not finish in 10 h with the BUP grounder).
