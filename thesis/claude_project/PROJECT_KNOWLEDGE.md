@@ -22,7 +22,7 @@ puzzle:
 |---|---|
 | I-RAVEN, unseen validation | **97.3%** (69.1%) |
 | I-RAVEN-X 3×3 | 99.2–100% |
-| I-RAVEN-X 3×10, values 0–49 / 0–99 / 0–999 | 85.4 / 84.9 / 81.2%; with gated copy links **97.8 / 96.2 / 94.3%** |
+| I-RAVEN-X 3×10, values 0–50 / 0–100 / 0–1000 | 85.4 / 84.9 / 81.2%; with gated copy links **97.8 / 96.2 / 94.3%** |
 
 ARLC reaches 95.0 / 95.0 / 90.6 on I-RAVEN-X 3×10, and LLMs at most 84. A symbolic PyNeuraLogic model with
 the rule vocabulary given reaches 98.33% on the I-RAVEN test split (96.31% end to end through a ResNet-18
@@ -90,7 +90,7 @@ checkpoint.
 * **Partitions:** `amd` (24 h), `amdlong` (3 days), `amdfast` (CPU); `amdgpu` (24 h), `amdgpufast` (4 h,
   A100).
 * **Facet run sizes:** the full I-RAVEN run needs a 300 GB JVM heap (grounding 30 min, ~14 min per epoch).
-  I-RAVEN-X 3×10 at values 0–49 needs 64–96 GB and takes ~5 h for 60 epochs. Compute nodes cannot see the
+  I-RAVEN-X 3×10 at values 0–50 needs 64–96 GB and takes ~5 h for 60 epochs. Compute nodes cannot see the
   session's `/tmp`.
 * **Login node:** never shut it down. Plain scripts are fine; CPU-heavy Jupyter kernels are killed. Execute
   notebooks with `sbatch … jupyter nbconvert --execute --inplace`.
@@ -138,7 +138,7 @@ checkpoint.
 
 ## 5. Results
 
-| model | I-RAVEN matched (exact) | I-RAVEN-X 3×10, values 0–49 |
+| model | I-RAVEN matched (exact) | I-RAVEN-X 3×10, values 0–50 |
 |---|---|---|
 | facet | **97.3** (69.1); per layout 99.3 / 95.5 / 89.8 / 99.5 / 99.7 / 99.6 / 97.8 | 85.4 (15.0); 89.1 after 150 epochs |
 | facet + copy links, per-panel gates | – | **97.8** (60.0), but 39.5% on Distribute puzzles after a row swap |
@@ -148,7 +148,7 @@ checkpoint.
 | torch all-to-all object GNN, equal / best regularized | 87.2 / 91.3 | 71.6 / 84.0 (exact 3.3) |
 | symbolic rules (test split) | 98.33 (end to end 96.31) | – |
 
-* **Exact value per rule, 3×10, values 0–49,** in the order Constant / Progression / Distribute / Arithmetic:
+* **Exact value per rule, 3×10, values 0–50,** in the order Constant / Progression / Distribute / Arithmetic:
   - facet: 93 / 77 / 10 / 19;
   - copy links: 100 / 93 / 87 / 30;
   - content gates: 100 / 98 / 60 / 30.

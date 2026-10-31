@@ -10,7 +10,7 @@ constants the template itself names, so renaming any other constant (objects, pa
 attributes) maps the network onto itself, with the same weight on every corresponding edge.
 
     python3 pynl/facet_symmetry_check.py              # random weights, four template variants (I-RAVEN)
-    python3 pynl/facet_symmetry_check.py --trained    # + I-RAVEN and I-RAVEN-X 3x10 (values 0..49) checkpoints
+    python3 pynl/facet_symmetry_check.py --trained    # + I-RAVEN and I-RAVEN-X 3x10 (values 0..50) checkpoints
 The I-RAVEN-X table checks the column roles (--columns roles, notes §24): columns 2 and 3 exchanged in every
 row, both middle columns for n = 10.
 """
@@ -213,7 +213,7 @@ def main():
     path = "data/iravenx/center_single_shuffle_n_10_maxval_50.json"
     B.configure(n_cols=10, maxval=50)
     px = B.load_iravenx(path, 6300, args.n_iravenx)
-    print(f"\nI-RAVEN-X 3x10, values 0..49: {len(px)} unseen puzzles (6300..; one object per panel, one "
+    print(f"\nI-RAVEN-X 3x10, values 0..50: {len(px)} unseen puzzles (6300..; one object per panel, one "
           f"component); random weights\n")
     cols = {}
     for label, kw in [("named columns", {}), ("column roles", {"cols": "roles"}),

@@ -16,7 +16,7 @@
 # Trained at a small and a full training set, then scored on the unseen puzzles as they are and transformed.
 #   components: I-RAVEN left-right + up-down (their two components are a data symmetry, §22), the default
 #               template vs --label-components, at 100 / 1000 / 6000 puzzles per layout; scored also mirrored.
-#   attributes: I-RAVEN-X 3x10 values 0..49 with column roles (the base at 6000 is facet_iravenx_n10_m50_roles),
+#   attributes: I-RAVEN-X 3x10 values 0..50 with column roles (the base at 6000 is facet_iravenx_n10_m50_roles),
 #               vs --label-attributes, at 600 / 6000 puzzles; scored also with size <-> colour swapped.
 # Small training sets get more epochs; the epoch is picked on the selection puzzles as always. One run per job:
 #   for r in lrud_base_100 lrud_lab_100 lrud_base_1000 lrud_lab_1000 lrud_base_6000 lrud_lab_6000 \

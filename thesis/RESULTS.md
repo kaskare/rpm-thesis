@@ -18,7 +18,7 @@ Every result that still holds, in one place (last updated 2026-10-29). How each 
 
 ## 1. Main table
 
-| model | weights | I-RAVEN | I-RAVEN-X 3×3, 0–9 | 3×10, 0–49 | 3×10, 0–99 | 3×10, 0–999 |
+| model | weights | I-RAVEN | I-RAVEN-X 3×3, 0–10 | 3×10, 0–50 | 3×10, 0–100 | 3×10, 0–1000 |
 |---|---|---|---|---|---|---|
 | **Facet model (PyNeuraLogic)** | | | | | | |
 | facet, named columns, 60–80 epochs | 266k / 1,411k | **97.3** (69.1) | **99.2** (92.7) | 85.4 (15.0) | 84.9 (6.4) | 81.2 (0.0) |
@@ -30,14 +30,14 @@ Every result that still holds, in one place (last updated 2026-10-29). How each 
 | column roles + content gates | 314k | – | – | 96.3 (43.3) | – | – |
 | column roles, widths 64/144/288 (equal weights to named) | 1,390k | – | – | 94.9 (28.5) | – | – |
 | column roles + content gates, widths 64/144/288 | 1,448k | – | – | 93.1 (30.0) | – | – |
-| row fold | 305k | *running* (job 11921354) | – | 92.2 (28.0) | – | – |
+| row fold | 283k / 305k | 95.8 (63.0) | – | 92.2 (28.0) | – | – |
 | row fold + content gates | 330k | – | – | 93.7 (35.0) | – | – |
 | **Value axis (PyNeuraLogic, §27)** | | | | | | |
-| value axis, 6000 puzzles | 10.8k | – | – | **100.0** (**98.4**) | 100.0 (99.6), trained on 0–49 | – |
-| value axis, 600 puzzles | 10.8k | – | – | 99.9 (98.3) | 100.0 (99.5), trained on 0–49 | – |
-| value axis, 100 puzzles | 10.8k | – | – | 99.0 (95.5) | 98.1 (96.4), trained on 0–49 | – |
-| value axis, 500 puzzles (smoke, 300 unseen) | 10.8k | – | – | 99.3 (98.3) | 98.5 (97.5), trained on 0–49 | – |
-| value axis, 6000 puzzles, without plus | 10.7k | – | – | 84.0 (58.4) | 78.9 (58.7), trained on 0–49 | – |
+| value axis, 6000 puzzles | 10.8k | – | **99.8** (**95.3**) | **100.0** (**98.4**) | 100.0 (99.6), trained on 0–50 | – |
+| value axis, 600 puzzles | 10.8k | – | – | 99.9 (98.3) | 100.0 (99.5), trained on 0–50 | – |
+| value axis, 100 puzzles | 10.8k | – | – | 99.0 (95.5) | 98.1 (96.4), trained on 0–50 | – |
+| value axis, 500 puzzles (smoke, 300 unseen) | 10.8k | – | – | 99.3 (98.3) | 98.5 (97.5), trained on 0–50 | – |
+| value axis, 6000 puzzles, without plus | 10.7k | – | – | 84.0 (58.4) | 78.9 (58.7), trained on 0–50 | – |
 | value axis, weights per value (symmetry removed), 600 puzzles | 335k | – | – | 92.7 (79.5) | cannot run | – |
 | value axis, weights per value, 100 puzzles | 335k | – | – | 38.3 (3.6) | cannot run | – |
 | value axis, weights per value, 6000 puzzles | 335k | – | – | 98.4 (95.7) | cannot run | – |
@@ -62,12 +62,12 @@ Every result that still holds, in one place (last updated 2026-10-29). How each 
 | MLP (as reported with ARLC) | | 87.1 | – | – | – | – |
 
 Notes on the main table:
-- **Weights:** for 3×10 the facet weight counts are at values 0–49.
+- **Weights:** for 3×10 the facet weight counts are at values 0–50.
 - **Copy links:** the per-panel gates break the row symmetry; see §3.
 - **The facet model's I-RAVEN-X exact scores are slightly off** (generator draws Distribute values up to maxval
   inclusive, §23). Matching is unaffected.
 - **Torch baselines:**
-  - "regularized" is the setting picked on selection puzzles of I-RAVEN and 3×10 0–49 (§23.3), run unchanged
+  - "regularized" is the setting picked on selection puzzles of I-RAVEN and 3×10 0–50 (§23.3), run unchanged
     on every dataset with 2 seeds: LayerNorm (MLP), weight decay 0.5, dropout 0 on I-RAVEN and 0.3 on
     I-RAVEN-X, cosine schedule, clipping.
   - "strongest" is the run with the highest selection accuracy among all object-level runs on that dataset
@@ -77,7 +77,7 @@ Notes on the main table:
 - **Literature:** from the respective papers; they see candidates or train differently, so they are not
   directly comparable.
 
-## 2. Row-length transfer (trained on rows of 10, values 0–49)
+## 2. Row-length transfer (trained on rows of 10, values 0–50)
 
 | model | rows of 5 | rows of 10 (trained) | rows of 20 |
 |---|---|---|---|
@@ -103,6 +103,11 @@ Rows of 20, exact value per rule (Constant / Progression / Distribute / Arithmet
 100 / 51.2 / 100 / 100, 600 100 / 89.2 / 100 / 100, 100 100 / 81.7 / 100 / 99.1; weights per value 6000
 100 / 99.8 / 100 / 96.6, 600 98.0 / 67.0 / 96.5 / 87.3, 100 61.8 / 27.3 / 16.7 / 24.4.
 
+**Value axis trained on 3×3** (job 11926965; 6000 puzzles, epoch 10 picked on selection; the data's values are
+0–10). Unseen 3×3: 99.8 (95.3); exact per rule 100 / 100 / 100 / 99.4 (facet 99.2 (92.7)). The same checkpoint
+on 3×10, values 0–50 (rows 3× longer, values 5× wider than it saw): 65.2 (35.5); exact per rule 93.9 / 36.9 /
+**100** / **76.7**.
+
 ## 3. Transformed puzzles (does a model give the same answers when the puzzle is transformed?)
 
 Each transformation is either a symmetry of the data or one under which the answer stays the same
@@ -116,7 +121,7 @@ Each transformation is either a symmetry of the data or one under which the answ
 | attribute GNN A | 95.0 | 95.0 | – | – | 95.0 |
 | object GNN, regularized (seed 0) | 91.3 | 91.3 | – | – | 91.1 |
 | MLP, regularized (seed 0) | 72.8 | 72.4 | – | – | 73.0 |
-| **I-RAVEN-X 3×10, values 0–49** | | | | | |
+| **I-RAVEN-X 3×10, values 0–50** | | | | | |
 | facet, named columns | 85.4 | 85.4 (identical) | 70.2 | identical (built in) | – |
 | + copy links, per-panel gates | 97.8 | ≈60.0 (puzzles with Distribute 98.3 → 39.5) | – | – | – |
 | + copy links, content gates | 94.9 | 94.9 (identical) | 74.9 | – | – |
@@ -136,7 +141,7 @@ The rows-swap row for per-panel gates combines §21.5's two groups (646 puzzles 
 | model | center | 2×2 | 3×3 | L-R | U-D | in-out | in-out grid |
 |---|---|---|---|---|---|---|---|
 | facet | 99.3 | 95.5 | 89.8 | 99.5 | 99.7 | 99.6 | 97.8 |
-| row fold (job 11921354) | *running* | *running* | *running* | *running* | *running* | *running* | *running* |
+| row fold (job 11921354, epoch 40) | 98.6 | 93.9 | 86.2 | 98.6 | 98.2 | 99.0 | 96.0 |
 | symbolic rules (*test*) | 99.90 | 95.98 | 95.46 | 99.95 | 99.95 | 99.85 | 97.26 |
 | attribute GNN B (symmetric) | 99.7 | 93.6 | 87.2 | 99.9 | 99.3 | 99.8 | 97.8 |
 | attribute GNN A | 99.6 | 89.4 | 83.6 | 100 | 100 | 99.9 | 92.7 |
@@ -147,23 +152,23 @@ The rows-swap row for per-panel gates combines §21.5's two groups (646 puzzles 
 | MLP, regularized (2 seeds) | 93.2 | 46.8 | 37.6 | 85.0 | 84.9 | 95.0 | 61.8 |
 | MLP, facet's weights (seed 0) | 87.8 | 32.7 | 20.3 | 74.0 | 63.0 | 90.5 | 52.1 |
 
-**Facet model on I-RAVEN by rule** (job 11920318, `facet_rule_eval.py`, 1000 unseen puzzles per layout;
-reproduces 97.3 (69.1)). Rules from each puzzle's XML, per component. Exact: the component's value histogram
+**Facet model / row fold on I-RAVEN by rule** (jobs 11920318 and 11921354, `facet_rule_eval.py`, 1000 unseen
+puzzles per layout; facet reproduces 97.3 (69.1), fold 95.8 (63.0)). Cells: facet / fold. Rules from each puzzle's XML, per component. Exact: the component's value histogram
 for that attribute (its object count for Number, its positions for Position and Number/Position).
 
 | part | Constant | Progression | Distribute | Arithmetic |
 |---|---|---|---|---|
-| type, size and colour | 83.7 | 89.7 | 88.7 | 83.8 |
-| type | 81.4 | 90.8 | 89.5 | – |
-| size | 81.8 | 90.3 | 90.4 | 83.9 |
-| colour | 87.0 | 87.1 | 85.0 | 83.7 |
-| Number/Position | 99.5 | – | – | – |
-| Number | – | 44.4 | 49.0 | 47.6 |
-| Position | – | 50.9 | 70.7 | 63.5 |
+| type, size and colour | 83.7 / 82.1 | 89.7 / 88.8 | 88.7 / 88.4 | 83.8 / **75.9** |
+| type | 81.4 / 80.1 | 90.8 / 90.3 | 89.5 / 89.3 | – |
+| size | 81.8 / 79.9 | 90.3 / 90.4 | 90.4 / 90.8 | 83.9 / 77.1 |
+| colour | 87.0 / 85.4 | 87.1 / 84.5 | 85.0 / 83.6 | 83.7 / 74.6 |
+| Number/Position | 99.5 / 99.7 | – | – | – |
+| Number | – | 44.4 / 46.8 | 49.0 / 44.6 | 47.6 / 45.1 |
+| Position | – | 50.9 / 48.7 | 70.7 / 71.3 | 63.5 / 63.5 |
 
-Matched: 97.3% of the 4031 puzzles with an Arithmetic rule and 97.3% of the 2969 without.
+Matched: facet 97.3% of the 4031 puzzles with an Arithmetic rule and 97.3% of the 2969 without; fold 95.3 / 96.5.
 
-## 5. I-RAVEN-X 3×10, values 0–49: exact value per rule (%)
+## 5. I-RAVEN-X 3×10, values 0–50: exact value per rule (%)
 
 | model | Constant | Progression | Distribute | Arithmetic |
 |---|---|---|---|---|
@@ -194,7 +199,7 @@ Count of attribute values per rule (of 3000): Constant 837, Progression 792, Dis
 
 **More weights** (seed 0; 1× is the mean of 2 seeds):
 
-| weights | I-RAVEN MLP | I-RAVEN GNN | 3×10 0–49 MLP | 3×10 0–49 GNN |
+| weights | I-RAVEN MLP | I-RAVEN GNN | 3×10 0–50 MLP | 3×10 0–50 GNN |
 |---|---|---|---|---|
 | 1× (264k / 1.6M) | 60.6 (17.1) | 87.2 (51.5) | 83.5 (3.9) | 71.6 (1.2) |
 | 4× | 68.9 (25.2) | 86.3 (50.9) | 87.2 (2.5) | 72.3 (1.2) |
@@ -216,12 +221,12 @@ Count of attribute values per rule (of 3000): Constant 837, Progression 792, Dis
 
 **The regularized setting on every dataset** (2 seeds, not re-tuned; §23.4):
 
-| | I-RAVEN | 3×3, 0–9 | 3×10, 0–49 | 3×10, 0–99 | 3×10, 0–999 |
+| | I-RAVEN | 3×3, 0–10 | 3×10, 0–50 | 3×10, 0–100 | 3×10, 0–1000 |
 |---|---|---|---|---|---|
 | MLP | 60.6 → 72.0 | 92.8 → 95.1 | 83.5 → 84.5 | 80.0 → 76.3 | 74.3 → 73.8 |
 | object GNN | 87.2 → 90.5 | 92.0 → 93.9 | 71.6 → 85.3 | 64.7 → 76.8 | 54.1 → 55.1 |
 
-Exact per rule on 3×3, values 0–9, regularized MLP / GNN: Constant 99.7 / 98.1, Progression 94.7 / 88.8,
+Exact per rule on 3×3, values 0–10, regularized MLP / GNN: Constant 99.7 / 98.1, Progression 94.7 / 88.8,
 Distribute 93.4 / 87.7, Arithmetic 64.4 / 69.4.
 
 ## 7. Symmetry ablations (§26, §27): one symmetry removed
@@ -233,7 +238,7 @@ Distribute 93.4 / 87.7, Arithmetic 64.4 / 69.4.
 | I-RAVEN L-R + U-D (components) | 100 per layout | **86.6** (40.4) | 87.3 (41.3) | 75.6 (22.2) | 74.6 (19.6) |
 | | 1000 | **99.3** (95.6) | 99.6 (95.7) | 97.9 (84.5) | 98.5 (84.5) |
 | | 6000 | 99.9 (97.7) | 99.8 (98.7) | 100.0 (97.8) | 100.0 (98.8) |
-| I-RAVEN-X 3×10, 0–49, column roles (attributes) | 600 | **66.3** (16.4) | 64.6 (14.1) | 52.5 (4.1) | 53.0 (3.6) |
+| I-RAVEN-X 3×10, 0–50, column roles (attributes) | 600 | **66.3** (16.4) | 64.6 (14.1) | 52.5 (4.1) | 53.0 (3.6) |
 | | 6000 | **94.1** (29.0) | 93.9 (28.5) | 90.5 (17.8), still rising at epoch 60 | 88.1 (17.6) |
 
 - Weights: components 266k shared, 533k separate, 266k matched (widths 22, 45, 90); attributes 288k shared, 932k
@@ -242,7 +247,7 @@ Distribute 93.4 / 87.7, Arithmetic 64.4 / 69.4.
   models move by at most 0.8 points (they learn the symmetry from the symmetric data).
 - One seed each.
 
-**The value symmetry in the value-axis model** (3×10, values 0–49, plus relation given; matched (exact)):
+**The value symmetry in the value-axis model** (3×10, values 0–50, plus relation given; matched (exact)):
 
 | training puzzles | shared across values (10.8k) | weights per value (335k) |
 |---|---|---|

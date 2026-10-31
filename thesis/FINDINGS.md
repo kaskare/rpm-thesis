@@ -75,7 +75,7 @@ are untouched except where marked.
     |---|---|---|
     | I-RAVEN, all 7 layouts | **97.3%** (69.1%) | test split not yet scored |
     | I-RAVEN-X 3×3 | **99.2%**, 100% from epoch 15 | |
-    | I-RAVEN-X 3×10, values 0–49 / 0–99 / 0–999 | 85.4 / 84.9 / 81.2 | 89.1 / 86.3 / 85.4 after 150 epochs |
+    | I-RAVEN-X 3×10, values 0–50 / 0–100 / 0–1000 | 85.4 / 84.9 / 81.2 | 89.1 / 86.3 / 85.4 after 150 epochs |
 
     I-RAVEN by layout: center 99.3, 2×2 95.5, 3×3 89.8, L-R 99.5, U-D 99.7, in-out 99.6, in-out grid 97.8.
     150 epochs gain nothing over 60 on I-RAVEN.
@@ -91,19 +91,19 @@ are untouched except where marked.
       attributes.
 13. **Cost** (§18.6). Grounding takes 10–165 ms per puzzle, once. All of I-RAVEN trains at about 14 min per
     epoch on CPU.
-14. **What limits 3×10 (2026-10-26, §20.1).** Exact value per rule at values 0–49: Constant 93,
+14. **What limits 3×10 (2026-10-26, §20.1).** Exact value per rule at values 0–50: Constant 93,
     Progression 77, Arithmetic 19, Distribute 10.
     - Distribute is a limit of the structure: the answer reads rows 1–2 only through an average.
-    - At 0–999, precision is a limit of the value code.
+    - At 0–1000, precision is a limit of the value code.
     - The model memorises training puzzles fine.
 15. **Gated copy links** (§20.2–20.4), an operation prior: "the answer may be a context value". No rule is
     named.
 
     | values | facet | facet + copy links | ARLC | LLMs |
     |---|---|---|---|---|
-    | 0–49 | 85.4 | **97.8** (60.0 exact) | 95.0 | – |
-    | 0–99 | 84.9 | **96.2** | 95.0 | at most 84 |
-    | 0–999 | 81.2 | **94.3** | 90.6 | at most 84 |
+    | 0–50 | 85.4 | **97.8** (60.0 exact) | 95.0 | – |
+    | 0–100 | 84.9 | **96.2** | 95.0 | at most 84 |
+    | 0–1000 | 81.2 | **94.3** | 90.6 | at most 84 |
 
 ## 2026-10-27: symmetries of the model and of the data
 16. **Theorem: a template is blind to the constants it does not name** (§21.2). Renaming such constants
@@ -143,8 +143,8 @@ are untouched except where marked.
     | I-RAVEN, equal weights | 60.6 | 87.2 | 97.3 |
     | I-RAVEN, best of 4×–64× weights | 71.0 | 88.5 | |
     | I-RAVEN, best regularized (weight decay) | 72.8 | 91.3 | |
-    | 3×10, values 0–49, matched | 83.5 | 71.6 | 85.4 |
-    | 3×10, values 0–49, exact | 3.9 | 1.2 | 15.0; 60.0 with copy links |
+    | 3×10, values 0–50, matched | 83.5 | 71.6 | 85.4 |
+    | 3×10, values 0–50, exact | 3.9 | 1.2 | 15.0; 60.0 with copy links |
     | 3×10, best regularized, matched (exact) | 84.4 (2.6) | 84.0 (3.3) | |
 
     - **Equal weights:** the GNN matches the facet model wherever a component holds one object, and loses
@@ -165,7 +165,7 @@ are untouched except where marked.
 22. **Operand order built in: column roles (§24).** Columns are first / middle / last, and the middle ones
     share one rule. The symmetry is exact (4e-16).
 
-    | 3×10, values 0–49 | matched | exact | Arithmetic exact | weights |
+    | 3×10, values 0–50 | matched | exact | Arithmetic exact | weights |
     |---|---|---|---|---|
     | named columns | 85.4 | 15.0 | 18.6 | 1,411k |
     | **column roles** | **94.1** | **29.0** | **40.5** | 288k |
@@ -184,7 +184,7 @@ are untouched except where marked.
     per column, the same at every step, and independent of the row length. A toy recursive template
     trained on rows of 3–5 values summed rows of 8–10 exactly.
 
-    | 3×10, values 0–49 | matched | Progression exact | Arithmetic exact | rows of 5 / 20 |
+    | 3×10, values 0–50 | matched | Progression exact | Arithmetic exact | rows of 5 / 20 |
     |---|---|---|---|---|
     | column roles | 94.1 | 94.3 | 40.5 | 65.6 / 50.1 |
     | **row fold** | 92.2 | **99.2** | 36.2 | 53.8 / 55.1 |
@@ -196,12 +196,17 @@ are untouched except where marked.
       costs it only 0.5 points: the data teaches what the template leaves open.
     - **Trained on one row length, it does not transfer** (54–61% on rows of 5 and 20, only Constant
       survives). Recursion makes transfer possible, not automatic; mixed-length training is the open test.
+    - **On I-RAVEN (rows of 3) it is below the facet model:** 95.8% matched (63.0 exact) against 97.3 (69.1), at
+      283k weights against 266k. Arithmetic exact drops most (75.9 vs 83.8); Progression gains nothing (88.8 vs
+      89.7), since with three panels the facet model already reads each position with its own weights. The fold
+      levels off by epoch 20 (96.1) and oscillates after, where the facet model keeps improving to epoch 55.
+      So the fold is kept as an I-RAVEN-X model only (decided 2026-10-30).
 
 24. **Final baselines (§23.4): the regularized setting on every dataset, 2 seeds, and up to 16× weights.**
     - The strongest object-level baseline on I-RAVEN is the regularized GNN at 16× the weights: 93.8 (63.7),
       3.5 points below the facet model and 14.6 below on the 3×3 grid.
     - On I-RAVEN-X 3×10 no size or setting generates exactly more than 4%; more weights hurt.
-    - 3×3, values 0–9 is closest: regularized MLP 95.1 (74.3) against 99.2 (92.7).
+    - 3×3, values 0–10 is closest: regularized MLP 95.1 (74.3) against 99.2 (92.7).
     - The attribute-level GNNs are stronger: on I-RAVEN, B (symmetric) 96.8 (67.9) and A 95.0 (62.5), so
       granularity does most of the work there and the built-in symmetries add a little. On 3×10, B learned
       much worse than A (85.8 vs 95.0, one seed), and A's lead partly comes from reading Distribute by
@@ -212,7 +217,7 @@ are untouched except where marked.
     counts per row, offsets of ±2 from the last panel) and learns which rule applies and how to combine
     them. 10.8k weights.
 
-    | 3×10, values 0–49 | matched | exact | Arithmetic exact | on values 0–99 (never seen) |
+    | 3×10, values 0–50 | matched | exact | Arithmetic exact | on values 0–100 (never seen) |
     |---|---|---|---|---|
     | value axis, 100 puzzles | 99.0 | 95.5 | 97.2 | 98.1 (96.4) |
     | value axis, 600 puzzles | 99.9 | 98.3 | 99.8 | 100.0 (99.5) |
@@ -220,13 +225,17 @@ are untouched except where marked.
     | value axis without `plus`, 6000 puzzles | 84.0 | 58.4 | 11.1 | 78.9 (58.7) |
     | facet, column roles, 6000 puzzles | 94.1 | 29.0 | 40.5 | cannot run |
 
-    - No weight belongs to a value, so a model trained on values 0–49 runs on 0–99 at the same accuracy.
+    - No weight belongs to a value, so a model trained on values 0–50 runs on 0–100 at the same accuracy.
     - Rows of another length transfer only partly: rows of 5 give 60–90% matched (more with more training
       data); Distribute breaks most. Rows of 20 transfer better: 92–99% matched, with Constant, Distribute
       and Arithmetic at 99–100% exact and Progression dropping (51–89%).
     - Without `plus`, Constant, Progression and Distribute stay at 100% exact and Arithmetic falls to 11%:
       the sums come from the given relation, not from the convolution. The facet model learns approximate
       sums (40.5% exact, mostly within ±2), which is why it matches more often (94.1 vs 84.0).
+    - **Trained on 3×3** (values 0–10, rows of 3): 99.8% matched (95.3 exact) against the facet model's 99.2
+      (92.7); exact 100 / 100 / 100 / 99.4 per rule. The same checkpoint on 3×10 with values 0–50, never seen:
+      65.2% (35.5); Distribute 100 and Arithmetic 76.7 exact carry over (better than any model trained on 3×10
+      itself, except the value axis), Progression does not (36.9).
     - What the symmetry contributes is open until the runs with weights per value (the symmetry removed,
       335k weights) are in.
 

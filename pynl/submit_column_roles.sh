@@ -6,7 +6,7 @@
 #SBATCH --job-name=facet_roles
 #SBATCH --output=log/facet_roles_%x_%j.out
 
-# The facet model with column roles (--columns roles, notes §24) on I-RAVEN-X 3x10, values 0..49: the middle
+# The facet model with column roles (--columns roles, notes §24) on I-RAVEN-X 3x10, values 0..50: the middle
 # columns, the operands of Arithmetic, become interchangeable. Same settings as the 60-epoch runs it is
 # compared with (facet_iravenx_n10_m50, facet_iravenx_n10_m50_copy_content). One run per job, chosen by RUN:
 #   sbatch -J roles         pynl/submit_column_roles.sh                             # RUN=plain, ~5 h
@@ -16,7 +16,7 @@
 # Roles share weights across the middle columns: at widths 32,64,128 the model has 288k weights (named columns:
 # 1,411k); the wide runs, widths 64,144,288, have 1,390k (1,448k with content gates). EPOCHS overrides the 60.
 # RUN=fold / fold_content: the recursive row fold instead (--columns fold, notes §25), 305k weights.
-# Roles and fold runs are also scored on rows of 5 and 20 (same values 0..49; generated with IBM's
+# Roles and fold runs are also scored on rows of 5 and 20 (same values 0..50; generated with IBM's
 # iravenx_task.py --n 5 / 20 --maxval 50 --nconf 0, seed 1234), to test row-length transfer.
 
 export JAVA_HOME=/mnt/appl/software/Java/21.0.8

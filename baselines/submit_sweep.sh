@@ -9,7 +9,7 @@
 #SBATCH --output=log/baseline_sweep_%A_%a.out
 
 # Capacity sweep of the torch baselines: MLP and all-to-all GNN at 4x, 16x and 64x the facet model's
-# weights, on I-RAVEN and I-RAVEN-X 3x10 values 0-49, seed 0 (the 1x runs are submit_baselines.sh).
+# weights, on I-RAVEN and I-RAVEN-X 3x10 values 0-50, seed 0 (the 1x runs are submit_baselines.sh).
 # If accuracy levels off below the facet model's as the weights grow, the gap is the architecture, not
 # its size. Task i: dataset i / 6, architecture (i / 3) % 2, scale 4 / 16 / 64 by i % 3. The I-RAVEN GNN
 # at 64x uses batch 64: its all-pairs message tensors (73 nodes, width ~1190) would not fit a 40 GB A100

@@ -52,7 +52,7 @@ To credit a gain to symmetry rather than to the facet model's sparser graph, cro
 ## 3. Experiments
 **E1. Accuracy at the facet model's weight count.**
 - Models: A–D plus the references.
-- Data: I-RAVEN and I-RAVEN-X 3×10, values 0–49; then values 0–99 and 0–999.
+- Data: I-RAVEN and I-RAVEN-X 3×10, values 0–50; then values 0–100 and 0–1000.
 - Already have (§23): D beats the references at equal weights and at 64×. The capacity sweep shows weights
   alone do not close the gap.
 - Running: regularized references (§23.3).
@@ -81,7 +81,7 @@ To credit a gain to symmetry rather than to the facet model's sparser graph, cro
     - the middle columns enter `rel` and `ans` through one rule with a panel variable;
     - the facet layers get one weight set per role pair.
   - Run plain and with content copy gates; per-panel gates name panels and would break the symmetry.
-  - Prediction: Arithmetic exact rises (now 18.6 plain, 30.2 with copy links at 0–49); the other rules are
+  - Prediction: Arithmetic exact rises (now 18.6 plain, 30.2 with copy links at 0–50); the other rules are
     unchanged.
 - **Wrong symmetries.**
   - Columns 1 ↔ 2 tied (I-RAVEN), out of support for Progression. Prediction: no ceiling; at most slower

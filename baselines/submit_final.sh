@@ -12,9 +12,9 @@
 # is the one picked on selection puzzles in submit_regularized.sh and is NOT re-tuned per dataset:
 # I-RAVEN weight decay 0.5, no dropout; I-RAVEN-X weight decay 0.5, dropout 0.3; all with LayerNorm (MLP),
 # cosine learning rate after 5 warm-up epochs and gradients clipped at 1.
-#   tasks 0-11:  I-RAVEN-X 3x3 values 0..9, 3x10 values 0..99 and 0..999; MLP and GNN; seeds 0 and 1
-#   tasks 12-15: seed 1 of the I-RAVEN and 3x10 values 0..49 runs (seed 0 is in submit_regularized.sh)
-#   tasks 16-23: 4x and 16x weights, regularized, seed 0, I-RAVEN and 3x10 values 0..49
+#   tasks 0-11:  I-RAVEN-X 3x3 values 0..10, 3x10 values 0..100 and 0..1000; MLP and GNN; seeds 0 and 1
+#   tasks 12-15: seed 1 of the I-RAVEN and 3x10 values 0..50 runs (seed 0 is in submit_regularized.sh)
+#   tasks 16-23: 4x and 16x weights, regularized, seed 0, I-RAVEN and 3x10 values 0..50
 # Task i: see the table below. Runs are grouped with the grid's runs by their tag.
 
 i=${SLURM_ARRAY_TASK_ID}

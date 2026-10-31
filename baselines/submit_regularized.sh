@@ -9,7 +9,7 @@
 #SBATCH --output=log/baseline_reg_%A_%a.out
 
 # Regularized torch baselines at the facet model's number of weights, seed 0, on I-RAVEN and I-RAVEN-X 3x10
-# values 0-49 (baselines/train_baseline.py). Every run: LayerNorm in the MLP, cosine learning rate after 5
+# values 0-50 (baselines/train_baseline.py). Every run: LayerNorm in the MLP, cosine learning rate after 5
 # warm-up epochs, gradient norm clipped at 1. The configuration is picked on the selection split.
 #   tasks 0-35: dropout 0 / 0.1 / 0.3 x weight decay 0 / 0.05 / 0.5;
 #               i -> dataset i / 18, architecture (i / 9) % 2, dropout (i / 3) % 3, weight decay i % 3

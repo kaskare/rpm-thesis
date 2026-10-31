@@ -6,18 +6,20 @@
 #SBATCH --job-name=valaxis
 #SBATCH --output=log/valaxis_%x_%j.out
 
-# The value-axis model (pynl/value_axis.py, notes §27) on I-RAVEN-X 3x10, values 0..49. One run per job:
+# The value-axis model (pynl/value_axis.py, notes §27) on I-RAVEN-X 3x10, values 0..50. One run per job:
 #   smoke    500 puzzles, 20 epochs, 300 unseen
 #   plus     6000 puzzles, 60 epochs (the full model)
 #   noplus   6000 puzzles, without the plus relation (exactly shift-equivariant)
 #   plus600  600 puzzles, 200 epochs (training data; the column-roles facet model: 66.3% at 600)
 #   plus100  100 puzzles, 200 epochs
 #   pervalue, pervalue600, pervalue100   the same with weights per value (--per-value): the value symmetry
-#            removed, 335k weights (the facet model with column roles: 288k); not scored on values 0..99
+#            removed, 335k weights (the facet model with column roles: 288k); not scored on values 0..100
+#   n3       I-RAVEN-X 3x3, values 0..10 (rows of 3, like I-RAVEN center_single), 6000 puzzles, 60 epochs; scored
+#            after training on 3x3 and on 3x10, values 0..50 (longer rows and a wider range than it saw)
 #   findzero, findzero600, findzero100   no plus table: sums counted from every candidate zero, the zero found
 #            per puzzle as the one both complete rows check out under (--find-zero); 6000 puzzles need
 #            JVM=150 and --mem=180G
-# After training: scored on values 0..99 (a range it never saw; the template has no weight per value) and on
+# After training: scored on values 0..100 (a range it never saw; the template has no weight per value) and on
 # rows of 5 and 20.
 #   for r in plus noplus plus600 plus100 pervalue pervalue600 pervalue100 findzero600 findzero100; do sbatch -J va_$r --export=ALL,RUN=$r pynl/submit_value_axis.sh; done
 
@@ -41,14 +43,22 @@ case "${RUN}" in
   findzero)    ARGS="--n 6000 --train-epochs 60 --find-zero" ;;
   findzero600) ARGS="--n 600 --train-epochs 200 --eval-every 10 --find-zero" ;;
   findzero100) ARGS="--n 100 --train-epochs 200 --eval-every 10 --find-zero" ;;
-  *) echo "RUN must be smoke, plus, noplus, plus600, plus100, pervalue[600|100] or findzero[600|100]"; exit 1 ;;
+  n3)      ARGS="--n 6000 --train-epochs 60"; X=data/iravenx/center_single_shuffle_n_3_maxval_10.json ;;
+  *) echo "RUN must be smoke, plus, noplus, plus600, plus100, pervalue[600|100], findzero[600|100] or n3"; exit 1 ;;
 esac
 SAVE=experiments/valaxis_n10_m50_${RUN}
+[ "${RUN}" = n3 ] && SAVE=experiments/valaxis_n3_m10_plus
 
 echo "node $(hostname), run ${RUN}, saving to ${SAVE}"
 python3 -u pynl/value_axis.py --iravenx ${X} --dim 32 --lr 1e-3 ${ARGS} --save-dir ${SAVE} --jvm-gb ${JVM:-64} 2>&1 \
     | grep -v "^WARNING\|SLF4J"
 [ "${RUN}" = smoke ] && exit 0
+if [ "${RUN}" = n3 ]; then
+    for f in center_single_shuffle_n_3_maxval_10.json center_single_shuffle_n_10_maxval_50.json; do
+        python3 -u pynl/value_axis.py --iravenx data/iravenx/${f} --eval ${SAVE} --jvm-gb 64 2>&1 | grep -v "^WARNING\|SLF4J"
+    done
+    exit 0
+fi
 RANGES=center_single_shuffle_n_10_maxval_100.json
 [[ "${RUN}" == pervalue* ]] && RANGES=""     # weights tied to values 0..50
 for f in center_single_shuffle_n_10_maxval_50.json ${RANGES} \

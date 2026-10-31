@@ -69,8 +69,8 @@ Unseen puzzles; the cells give matched %, with exact % in brackets.
 | same + row-swap augmentation | 70.4 (23.5) | 70.9 (23.4) | – | – | 70.5 (23.8) |
 | I-RAVEN GNN, dropout 0.1, weight decay 0.05 | 89.3 (55.1) | 89.5 (55.0) | – | – | 89.1 (54.8) |
 | same + row-swap augmentation | 90.5 (55.7) | 90.5 (55.8) | – | – | 90.4 (55.3) |
-| 3×10 values 0–49 MLP, weight decay 0.5, dropout 0.3 | 84.4 (2.6) | **47.7** (1.4) | **63.9** (2.1) | 83.5 (3.0) | – |
-| 3×10 values 0–49 GNN, weight decay 0.5, dropout 0.3 | 84.0 (3.3) | **52.7** (2.1) | **71.6** (2.1) | 85.0 (4.4) | – |
+| 3×10 values 0–50 MLP, weight decay 0.5, dropout 0.3 | 84.4 (2.6) | **47.7** (1.4) | **63.9** (2.1) | 83.5 (3.0) | – |
+| 3×10 values 0–50 GNN, weight decay 0.5, dropout 0.3 | 84.0 (3.3) | **52.7** (2.1) | **71.6** (2.1) | 85.0 (4.4) | – |
 
 * **Data symmetries are learned from the data.** On I-RAVEN, rows 1 ↔ 2 and the mirror are symmetries of the
   generator (§22): every swapped puzzle is another valid one. The baselines, which have neither built in, lose
@@ -108,7 +108,7 @@ picked on the selection split, as matched % with exact % in brackets.
 Exact per part, A / B: position 69.1 / 79.0, type 71.2 / 77.3, size 70.7 / 76.3, colour 67.8 / 72.0. Both runs
 were still improving: the best epochs were 290 and 293 of 300.
 
-**I-RAVEN-X 3×10, values 0–49** (unseen 6300–7299). The last four columns give the exact value per rule:
+**I-RAVEN-X 3×10, values 0–50** (unseen 6300–7299). The last four columns give the exact value per rule:
 
 | model | weights | matched | exact | Constant | Progression | Distribute | Arithmetic |
 |---|---|---|---|---|---|---|---|

@@ -458,7 +458,7 @@ Training-side changes did not help (cross-entropy 23.5, training on all three ro
   checkpoint: example distribute_four val 303 is picked correctly, though the generated panel has one object
   too many; val 300–399 gives 97.6% matched. The 150-epoch repeat (job 11887180, `experiments/facet_ep150_all`)
   peaked at epoch 65 with 97.4% matched / 69.3% exact: no gain over 60 epochs.
-* **I-RAVEN-X 3×3, values 0–9** (`experiments/facet_iravenx_n3_m10`). **99.2%** at the epoch picked on
+* **I-RAVEN-X 3×3, values 0–10** (`experiments/facet_iravenx_n3_m10`). **99.2%** at the epoch picked on
   val 6000–6299 (epoch 10), **100.0%** from epoch 15 on, 95.4% exact. Copying the last panel matches 4.7%.
 * **I-RAVEN-X 3×10** (IBM generator, seed 1234, no confounders), jobs 11883234–36, 60 epochs, finished
   2026-10-26. Unseen matched at the epoch picked on selection / at the last epoch (exact in brackets):
@@ -535,7 +535,7 @@ The 60-epoch 3×10 checkpoints, on unseen puzzles 6300–7299. For each attribut
 (= the number of thermometer bits on) is compared with the true one, grouped by that attribute's rule
 label. Script and output: `experiments/facet_iravenx_analysis/` (`rule_errors.py`, job 11897470).
 
-| rule | values 0–49: exact | mean error (% of range) | values 0–99: exact | values 0–999: exact | mean error (% of range) |
+| rule | values 0–50: exact | mean error (% of range) | values 0–100: exact | values 0–1000: exact | mean error (% of range) |
 |---|---|---|---|---|---|
 | Constant | 93% | 0.3 | 72% | 5% | 0.6 |
 | Progression | 77% | 0.7 | 58% | 5% | 0.7 |
@@ -551,10 +551,10 @@ Two separate problems:
   an approximate answer lands near a distractor.
 * **Precision is a limit of the value code.** Constant and Progression are almost right (under 1% of the
   range off), but a 1000-bit thermometer squeezed into 128 tanh units cannot keep single-value resolution,
-  and an off-by-5 error changes the per-bit-averaged MSE by about 0.001. The values 0–999 run's training
+  and an off-by-5 error changes the per-bit-averaged MSE by about 0.001. The values 0–1000 run's training
   MSE stayed at 0.0010 from epoch 5 to 60.
 
-Memorisation is not the problem: without copy links the model memorises 200 3×10 puzzles (values 0–49)
+Memorisation is not the problem: without copy links the model memorises 200 3×10 puzzles (values 0–50)
 to 198/200 exact in 50 epochs. The model learns rules that do not carry over to unseen puzzles.
 
 ### 20.2 Gated copy links (`--copy-links`, `build_facet_template(copy=True)`)
@@ -566,7 +566,7 @@ to 198/200 exact in 50 epochs. The model learns rules that do not carry over to 
 * **Copy.** `copy(C, A) <= gate(P, C, A), pc(P, C, A)` with ELPRODUCT, summed over panels, then added to
   the output logits `oa` beside the existing decoder.
 * **Unchanged without the flag.** The flag-off template is byte-identical to the committed one
-  (checked: I-RAVEN, 3×10 values 0–49, 3×3 values 0–9; default, visible selectors, per-attribute
+  (checked: I-RAVEN, 3×10 values 0–50, 3×3 values 0–10; default, visible selectors, per-attribute
   weights, no rows).
 * **Gate initialisation matters.** With gates starting at 0.5, the 29 copies swamped the logits:
   memorising 200 puzzles reached only 34/200 exact at epoch 50 (121/200 at epoch 150). With the −6
@@ -577,11 +577,11 @@ to 198/200 exact in 50 epochs. The model learns rules that do not carry over to 
 ### 20.3 Results (3×10, unseen 6300–7299, epoch picked on 6000–6299)
 | values | facet, 60 epochs | facet, 150 epochs | **facet + copy links, 60 epochs** | ARLC learned | best LLM/LRM |
 |---|---|---|---|---|---|
-| 0–49 | 85.4 (exact 15.0) | 89.1 (23.8) | **97.8 (60.0)**, job 11899232 | 95.0 | – |
-| 0–99 | 84.9 (6.4) | 86.3 (6.5) | **96.2 (30.8)**, epoch 45, job 11901474 | 95.0 | DeepSeek R1 84.0 |
-| 0–999 | 81.2 (0.0) | 85.4 (0.1) | **94.3 (15.0)**, epoch 45, job 11904250 (11901475 ran out of memory at 180 GB while grounding; 420 GB worked) | 90.6 | DeepSeek R1 82.8 |
+| 0–50 | 85.4 (exact 15.0) | 89.1 (23.8) | **97.8 (60.0)**, job 11899232 | 95.0 | – |
+| 0–100 | 84.9 (6.4) | 86.3 (6.5) | **96.2 (30.8)**, epoch 45, job 11901474 | 95.0 | DeepSeek R1 84.0 |
+| 0–1000 | 81.2 (0.0) | 85.4 (0.1) | **94.3 (15.0)**, epoch 45, job 11904250 (11901475 ran out of memory at 180 GB while grounding; 420 GB worked) | 90.6 | DeepSeek R1 82.8 |
 
-At values 0–49, copy links beat 150 epochs of the plain model already at epoch 5 (94.6%). Type became
+At values 0–50, copy links beat 150 epochs of the plain model already at epoch 5 (94.6%). Type became
 almost always exact (96% against 60%), size and colour 79% (against 51–52%). There is a slight overfit:
 99.3% matched on training puzzles. LLM/LRM numbers are from arXiv 2510.17496 (Table 1, no
 confounders); o1 reached 86.0 on a 100-puzzle subset.
@@ -698,7 +698,7 @@ after.
 * **I-RAVEN, level 2 (70 puzzles).** Every built-in check: 0 answers changed. Columns 1 ↔ 2: 33 changed,
   68 → 36 right; that swap also changes the true answer under Progression and Arithmetic. Mirrored positions:
   1e-4. This symmetry is not built in, but it was *learned*.
-* **I-RAVEN-X 3×10, values 0–49 (300 unseen).**
+* **I-RAVEN-X 3×10, values 0–50 (300 unseen).**
   - plain model: 0 changed under the row swap;
   - per-panel copy gates: **101/300 changed, 294 → 194 right** (§21.5).
 
@@ -718,20 +718,20 @@ Also invariant by input design: orientation. The facts carry only type, size, co
 
    Through the plain path the value must cross 128 tanh units and a per-bit decoder. Holding v/m in one unit
    and thresholding it at every integer needs slopes of order m. This fits the scaling:
-   - plain: 85.4 / 84.9 / 81.2 at values 0–49 / 0–99 / 0–999;
-   - copy links: 97.8 / 96.2 / 94.3 (run 11904250 for 0–999).
+   - plain: 85.4 / 84.9 / 81.2 at values 0–50 / 0–100 / 0–1000;
+   - copy links: 97.8 / 96.2 / 94.3 (run 11904250 for 0–1000).
 5. **The gains land where the bias says.** Exact generation per rule on 1000 unseen puzzles, plain → copy:
 
-   | rule | values 0–49 | values 0–99 |
+   | rule | values 0–50 | values 0–100 |
    |---|---|---|
    | Constant | 93.4 → **100.0** | 72.1 → **98.7** |
    | Distribute-n | 9.8 → **86.8** | 4.3 → **71.6** |
    | Progression | 77.4 → 92.9 | 57.8 → 53.0 |
    | Arithmetic | 18.6 → 30.2 | 10.5 → 15.9 |
 
-   At 0–49, puzzles without Arithmetic now match 100.0% (556); with Arithmetic, 95.0% (444).
+   At 0–50, puzzles without Arithmetic now match 100.0% (556); with Arithmetic, 95.0% (444).
 6. **Not yet excluded: capacity.** Panel gates add 187k weights, 29 × (50·128 + 50): +13% on 1,410k. The
-   0–49 gains on Progression and Arithmetic (+15.5, +11.6) are not copies. They may come from:
+   0–50 gains on Progression and Arithmetic (+15.5, +11.6) are not copies. They may come from:
    - the extra weights;
    - the main path no longer carrying the copy rules;
    - seed variance (one run each).
@@ -763,7 +763,7 @@ step". They did not learn "copy the value row 3 lacks".
 - So the address rule is right in distribution and wrong off it: a shortcut in Geirhos et al.'s sense, not an
   in-distribution error.
 
-### 21.6 Content gates and the shuffled control (2026-10-27, values 0–49, 60 epochs)
+### 21.6 Content gates and the shuffled control (2026-10-27, values 0–50, 60 epochs)
 Both flags are off by default; the flag-off and panel-gate templates are byte-identical to before.
 * **`--copy-gates content`** (job 11905907):
   - `gate(P, C, A) <= ans(C, A) ⊙ vF(P, C, A)`, with weights per row role (complete row via
@@ -838,7 +838,7 @@ The share of rule instances (one attribute of one puzzle) that still satisfy a r
 Order of the columns: Constant / Progression / Arithmetic / Distribute.
 0 instances fail their own label. Non-uniform panels in grids are excluded: there the attribute is noise.
 
-| g | I-RAVEN (type, size, colour, number) | I-RAVEN-X 3×10 (all three value ranges) | I-RAVEN-X 3×3, values 0–9 |
+| g | I-RAVEN (type, size, colour, number) | I-RAVEN-X 3×10 (all three value ranges) | I-RAVEN-X 3×3, values 0–10 |
 |---|---|---|---|
 | rows 1 ↔ 2 | 100 / 100 / 100 / 100 | 100 / 100 / 100 / **0** (0 even with any shift step) | 100 / 100 / 100 / 100 |
 | columns 1 ↔ 2 | 100 / 0 / 51 (plus only) / 100 | 100 / 0 / 50 (plus only) / 0 | 100 / 0 / 55 / 100 |
@@ -878,7 +878,7 @@ Union and difference do not survive column reversal (2.5 / 0): a union cannot be
    part of Arithmetic, which is a task symmetry but not a data symmetry:
    - **I-RAVEN-X.** A row holds 9 operands and their sum (plus: sum last; minus: sum first). Any permutation
      of the operand columns keeps the rule. But the generator draws the operands one after another from a
-     shrinking range, shuffles them, then swaps a zero out of the last operand slot. Result (values 0–49,
+     shrinking range, shuffles them, then swaps a zero out of the last operand slot. Result (values 0–50,
      plus), share of zero operands by column: c1 78%, c2 67%, …, c8 55%, c9 0%. Rows are mostly zeros: the
      mean Arithmetic value is 7.4 against about 24.5 for the other rules.
    - **I-RAVEN.** c2 is drawn from what c1 leaves. Means for plus: c1 1.99 vs c2 1.10 (size); 4.41 vs 2.29
@@ -895,7 +895,7 @@ Union and difference do not survive column reversal (2.5 / 0): a union cannot be
    In the data, reflection is exact for the first three rules. I-RAVEN-X Progression values average
    24.3–24.7, against a range midpoint of 24.5.
    - Quirk: Distribute draws with Python's `random.randint(0, maxval)`, which includes maxval. Its values
-     reach 50 at "values 0–49"; the other rules stop at 49.
+     reach 50 at "values 0–50"; the other rules stop at 49.
 5. **Grid positions.** Position-Progression is `(slot + d) mod 4 | 9` in reading order (`Rule.py`). Only the
    grid symmetries that map the reading-order cycle onto itself survive:
    - 2×2: left-right, up-down and 180°;
@@ -979,16 +979,16 @@ H is the width whose weight count is closest to the facet model's: 264k on I-RAV
 
 Caveat on exact scores. I-RAVEN-X Distribute draws values up to maxval inclusive, one more than the codes
 hold. The baselines score exact generation against the decoded true code, so they are unaffected. The facet
-model's I-RAVEN-X exact scores are slightly off, most at 3×3 with values 0–9.
+model's I-RAVEN-X exact scores are slightly off, most at 3×3 with values 0–10.
 
 ### 23.1 At the facet model's weight count (2 seeds, unseen puzzles, matched % (exact %))
 | dataset | facet | facet + copy links | MLP | all-to-all GNN |
 |---|---|---|---|---|
 | I-RAVEN | **97.3** (69.1) | – | 60.6 ± 0.8 (17.1) | 87.2 ± 1.1 (51.5) |
-| I-RAVEN-X 3×3, values 0–9 | **99.2** (92.7) | – | 92.8 ± 0.2 (64.8) | 92.0 ± 0.4 (58.5) |
-| 3×10, values 0–49 | 85.4 (15.0) | **97.8** (60.0) | 83.5 ± 0.4 (3.9) | 71.6 ± 0.1 (1.2) |
-| 3×10, values 0–99 | 84.9 (6.4) | **96.2** (30.8) | 80.0 ± 2.3 (0.5) | 64.7 ± 5.4 (0.0) |
-| 3×10, values 0–999 | 81.2 (0.0) | **94.3** (15.0) | 74.3 ± 3.2 (0.0) | 54.1 ± 3.1 (0.0) |
+| I-RAVEN-X 3×3, values 0–10 | **99.2** (92.7) | – | 92.8 ± 0.2 (64.8) | 92.0 ± 0.4 (58.5) |
+| 3×10, values 0–50 | 85.4 (15.0) | **97.8** (60.0) | 83.5 ± 0.4 (3.9) | 71.6 ± 0.1 (1.2) |
+| 3×10, values 0–100 | 84.9 (6.4) | **96.2** (30.8) | 80.0 ± 2.3 (0.5) | 64.7 ± 5.4 (0.0) |
+| 3×10, values 0–1000 | 81.2 (0.0) | **94.3** (15.0) | 74.3 ± 3.2 (0.0) | 54.1 ± 3.1 (0.0) |
 
 I-RAVEN by layout, matched %, seed 0 (seed 1 within 3 points, except the MLP on up-down: 72.1):
 
@@ -1004,12 +1004,12 @@ I-RAVEN by layout, matched %, seed 0 (seed 1 within 3 points, except the MLP on 
 * The MLP has its own weights per slot: it must learn every slot and both halves of L-R and U-D separately.
 * On I-RAVEN-X 3×10 the candidates of an attribute differ between two values, so a rough answer often picks
   the right one: the MLP comes within 2 points of the plain facet model on matching (83.5 vs 85.4). Exact
-  generation tells them apart (3.9 vs 15.0, 60.0 with copy links). Exact per rule at values 0–49, MLP / GNN:
+  generation tells them apart (3.9 vs 15.0, 60.0 with copy links). Exact per rule at values 0–50, MLP / GNN:
   Constant 45 / 36, Progression 43 / 27, Distribute 26 / 11, Arithmetic 6 / 7 (facet: 93 / 77 / 10 / 19,
   with copy links 100 / 93 / 87 / 30). The baselines do not even copy a constant value exactly.
 
 ### 23.2 More weights: 4×, 16×, 64× the facet model's (seed 0)
-| | weights | I-RAVEN MLP | I-RAVEN GNN | 3×10 0–49 MLP | 3×10 0–49 GNN |
+| | weights | I-RAVEN MLP | I-RAVEN GNN | 3×10 0–50 MLP | 3×10 0–50 GNN |
 |---|---|---|---|---|---|
 | 1× (2 seeds) | 264k / 1.6M | 60.6 (17.1) | 87.2 (51.5) | 83.5 (3.9) | 71.6 (1.2) |
 | 4× | 1.1M / 6.4M | 68.9 (25.2) | 86.3 (50.9) | **87.2** (2.5) | **72.3** (1.2) |
@@ -1038,8 +1038,8 @@ Seed 0, at the facet model's weight count (`submit_regularized.sh`, job 11913187
 |---|---|---|---|
 | I-RAVEN MLP | 60.6 (17.1) | **72.8** (29.9) | weight decay 0.5, no dropout |
 | I-RAVEN GNN | 87.2 (51.5) | **91.3** (56.5) | weight decay 0.5, no dropout |
-| 3×10, values 0–49, MLP | 83.5 (3.9) | 84.4 (2.6) | weight decay 0.5, dropout 0.3 |
-| 3×10, values 0–49, GNN | 71.6 (1.2) | **84.0** (3.3) | weight decay 0.5, dropout 0.3 |
+| 3×10, values 0–50, MLP | 83.5 (3.9) | 84.4 (2.6) | weight decay 0.5, dropout 0.3 |
+| 3×10, values 0–50, GNN | 71.6 (1.2) | **84.0** (3.3) | weight decay 0.5, dropout 0.3 |
 
 I-RAVEN by layout, best settings:
 
@@ -1073,16 +1073,16 @@ per dataset: LayerNorm (MLP), weight decay 0.5, dropout 0 on I-RAVEN and 0.3 on 
 | dataset | facet (best variant) | MLP | MLP, regularized | GNN | GNN, regularized |
 |---|---|---|---|---|---|
 | I-RAVEN | **97.3** (69.1) | 60.6 ± 0.8 (17.1) | 72.0 ± 1.1 (27.5) | 87.2 ± 1.1 (51.5) | 90.5 ± 1.2 (55.1) |
-| I-RAVEN-X 3×3, 0–9 | **99.2** (92.7) | 92.8 ± 0.2 (64.8) | 95.1 ± 0.4 (74.3) | 92.0 ± 0.4 (58.5) | 93.9 ± 0.2 (67.7) |
-| 3×10, 0–49 | **97.8** (60.0) | 83.5 ± 0.4 (3.9) | 84.5 ± 0.1 (2.7) | 71.6 ± 0.1 (1.2) | 85.3 ± 1.9 (4.2) |
-| 3×10, 0–99 | **96.2** (30.8) | 80.0 ± 2.3 (0.5) | 76.3 ± 1.4 (0.1) | 64.7 ± 5.4 (0.0) | 76.8 ± 2.1 (0.2) |
-| 3×10, 0–999 | **94.3** (15.0) | 74.3 ± 3.2 (0.0) | 73.8 ± 0.2 (0.0) | 54.1 ± 3.1 (0.0) | 55.1 ± 1.0 (0.0) |
+| I-RAVEN-X 3×3, 0–10 | **99.2** (92.7) | 92.8 ± 0.2 (64.8) | 95.1 ± 0.4 (74.3) | 92.0 ± 0.4 (58.5) | 93.9 ± 0.2 (67.7) |
+| 3×10, 0–50 | **97.8** (60.0) | 83.5 ± 0.4 (3.9) | 84.5 ± 0.1 (2.7) | 71.6 ± 0.1 (1.2) | 85.3 ± 1.9 (4.2) |
+| 3×10, 0–100 | **96.2** (30.8) | 80.0 ± 2.3 (0.5) | 76.3 ± 1.4 (0.1) | 64.7 ± 5.4 (0.0) | 76.8 ± 2.1 (0.2) |
+| 3×10, 0–1000 | **94.3** (15.0) | 74.3 ± 3.2 (0.0) | 73.8 ± 0.2 (0.0) | 54.1 ± 3.1 (0.0) | 55.1 ± 1.0 (0.0) |
 
 (facet on 3×10: copy links with per-panel gates; without them 85.4 / 84.9 / 81.2.)
 
 **More weights, regularized** (seed 0):
 
-| weights | I-RAVEN MLP | I-RAVEN GNN | 3×10 0–49 MLP | 3×10 0–49 GNN |
+| weights | I-RAVEN MLP | I-RAVEN GNN | 3×10 0–50 MLP | 3×10 0–50 GNN |
 |---|---|---|---|---|
 | 1× (2 seeds) | 72.0 (27.5) | 90.5 (55.1) | 84.5 (2.7) | 85.3 (4.2) |
 | 4× | 79.4 (40.4) | 92.9 (62.6) | 84.1 (2.6) | 83.4 (2.6) |
@@ -1093,14 +1093,14 @@ I-RAVEN by layout, regularized at 16×: GNN 99.5 / 89.6 / 75.2 / 99.8 / 99.7 / 9
 99.7 / 99.6 / 97.8).
 
 * **Regularization helps on I-RAVEN** (MLP +11.4, GNN +3.3) **and on 3×3** (+1.9 to +2.3), helps the GNN on
-  3×10 (+12 to +14 at values 0–49 and 0–99), and does nothing at values 0–999. It costs the MLP 3.7 points at 0–99; selection
+  3×10 (+12 to +14 at values 0–50 and 0–100), and does nothing at values 0–1000. It costs the MLP 3.7 points at 0–100; selection
   then prefers the unregularized MLP.
 * **On I-RAVEN, regularized models keep gaining with weights**, unlike the unregularized ones (§23.2): the GNN
   reaches 93.8 (63.7) at 16× (4.3M weights), the strongest object-level baseline. It is still 3.5 points below
   the facet model at 1/16 of its weights, and 14.6 below on the 3×3 grid.
 * **On I-RAVEN-X 3×10 more weights hurt** even with regularization (GNN 85.3 → 72.8 at 16×). Exact generation
   stays at 1–4% at every size and setting.
-* **3×3, values 0–9 is the dataset where the baselines come closest:** the regularized MLP matches 95.1
+* **3×3, values 0–10 is the dataset where the baselines come closest:** the regularized MLP matches 95.1
   (74.3), exact per rule 99.7 / 94.7 / 93.4 / 64.4 (Constant / Progression / Distribute / Arithmetic), against
   the facet model's 99.2 (92.7). Few values and three columns leave little to generalize across.
 
@@ -1200,7 +1200,7 @@ points of matching there, which a model with roles cannot lose, by construction.
 * Again identical under the middle-column and row swaps.
 
 **Row-length transfer of the roles models** (job 11914475): trained on rows of 10, scored on 1000 puzzles with
-rows of 5 and 20 (values 0–49; same weights, the template names no column):
+rows of 5 and 20 (values 0–50; same weights, the template names no column):
 
 | rows of | model | matched | exact | Constant | Progression | Distribute | Arithmetic |
 |---|---|---|---|---|---|---|---|
@@ -1216,7 +1216,7 @@ rows of 5 and 20 (values 0–49; same weights, the template names no column):
 
 **At the named-column model's weight count** (`--columns roles --widths 64,144,288`, jobs 11913675–76, 60 epochs):
 
-| 3×10, values 0–49 | weights | matched | exact | Constant | Progression | Distribute | Arithmetic |
+| 3×10, values 0–50 | weights | matched | exact | Constant | Progression | Distribute | Arithmetic |
 |---|---|---|---|---|---|---|---|
 | named columns | 1,411k | 85.4 | 15.0 | 93.4 | 77.4 | 9.8 | 18.6 |
 | column roles | 288k | 94.1 | 29.0 | 98.6 | 94.3 | 22.0 | 40.5 |
@@ -1258,7 +1258,7 @@ linear in vF.)
   learned nothing.
 * **Test sets at other lengths:** IBM's `iravenx_task.py` (`~/raven-large-language-models/...`) with
   `--n 5` / `--n 20 --maxval 50 --nconf 0`, seed 1234: `data/iravenx/center_single_shuffle_n_{5,20}_maxval_50.json`.
-  Rows of 30 would break its Progression sampler at values 0–49. Longer rows also narrow Progression's start
+  Rows of 30 would break its Progression sampler at values 0–50. Longer rows also narrow Progression's start
   values, so the value distribution shifts as well.
 
 **Runs** (`submit_column_roles.sh`, RUN=fold / fold_content, 60 epochs, jobs 11914473–74): trained on 3×10, scored
@@ -1298,6 +1298,19 @@ on unseen rows of 10, and on rows of 5 and 20. The roles checkpoints get the sam
 |---|---|---|---|
 | fold | 92.2 (28.0); 99.9 / **99.2** / 15.1 / 36.2 | 53.8 (0.4); 41.7 / 13.4 / 9.8 / 1.2 | 55.1 (5.9); 99.1 / 2.8 / 15.6 / 3.0 |
 | fold + content gates | 93.7 (35.0); 99.6 / 89.8 / 32.4 / 29.4 | 61.0 (8.1); 94.9 / 22.4 / 19.8 / 1.0 | 60.5 (10.1); 99.9 / 14.5 / 27.5 / 3.4 |
+
+**On I-RAVEN** (2026-10-30, job 11921354, `submit_facet_long.sh` RUN=fold_all: all 7 layouts, 80 epochs, settings of
+`facet_all_w32-64-128_hidden`; 282,912 weights against 266,528). Epoch 40 picked on selection; unseen 95.8% matched
+(63.0 exact) against the facet model's 97.3 (69.1). Per layout 98.6 / 93.9 / 86.2 / 98.6 / 98.2 / 99.0 / 96.0
+(facet 99.3 / 95.5 / 89.8 / 99.5 / 99.7 / 99.6 / 97.8). Exact per rule over type/size/colour, fold vs facet:
+Constant 82.1 vs 83.7, Progression 88.8 vs 89.7, Distribute 88.4 vs 88.7, Arithmetic **75.9 vs 83.8**; matched with
+Arithmetic 95.3 vs 97.3, without 96.5 vs 97.3.
+* With rows of 3 the fold buys nothing: Progression's step is already one weight set per column pair in the facet
+  model, and there is no row length to transfer to. What it costs is the order sensitivity seen on I-RAVEN-X
+  (Arithmetic 75.9 vs 83.8), and a two-step tanh chain in place of one function of the three panels.
+* Training: ahead of the facet model at epoch 5 (94.5 vs 92.9), level at 10, then flat and noisy (94.4–96.1 from
+  epoch 15), while the facet model climbs to 97.3 at epoch 55.
+* Decision (2026-10-30): the fold stays an I-RAVEN-X model; on I-RAVEN the facet model is the main model.
 | column roles | 94.1 (29.0); 98.6 / 94.3 / 22.0 / 40.5 | 65.6 (4.0) | 50.1 (4.6) |
 | column roles + content gates | 96.3 (43.3); 99.6 / 94.8 / 42.8 / 37.5 | 66.3 (5.2) | 49.2 (4.6) |
 
@@ -1332,7 +1345,7 @@ puzzles.
 handles I-RAVEN checkpoints and the transforms `mirror` and `sizecolor`):
 - Components: I-RAVEN left-right + up-down, default vs labelled, at 100 / 1000 / 6000 puzzles per layout
   (300 / 120 / 60 epochs); scored as is and mirrored.
-- Attributes: I-RAVEN-X 3×10 values 0–49 with column roles, default (6000: `facet_iravenx_n10_m50_roles`;
+- Attributes: I-RAVEN-X 3×10 values 0–50 with column roles, default (6000: `facet_iravenx_n10_m50_roles`;
   600 new) vs labelled, at 600 / 6000 puzzles; scored as is and with size ↔ colour swapped.
 
 **Predictions:**
@@ -1349,7 +1362,7 @@ selection puzzles):
 | I-RAVEN L-R + U-D | 100 per layout | 86.6 (40.4) | 87.3 (41.3) | 86.6 (40.4) | 87.1 (41.1) |
 | | 1000 | 99.3 (95.6) | 99.6 (95.7) | 99.3 (95.6) | 99.6 (95.7) |
 | | 6000 | 99.9 (97.7) | 99.8 (98.7) | 99.9 (97.7) | 99.8 (98.7) |
-| I-RAVEN-X 3×10 0–49, roles | 600 | 66.3 (16.4) | 64.6 (14.1) | 66.3 (16.4) | 65.1 (14.3) |
+| I-RAVEN-X 3×10 0–50, roles | 600 | 66.3 (16.4) | 64.6 (14.1) | 66.3 (16.4) | 65.1 (14.3) |
 | | 6000 | 94.1 (29.0) | 93.9 (28.5) | identical | 93.9 (29.1) |
 
 Transformed = mirrored (L-R + U-D) or size ↔ colour swapped (I-RAVEN-X). Exact value per rule, I-RAVEN-X: at 600,
@@ -1453,7 +1466,7 @@ for V = U + k (k = −2..2) and `plus(U, W, V)` for U + W = V. No rule names a v
   a sum, as addition should. Control: the same outputs compared without moving them differ by 2.8e-2 on
   average, so the exact match is not a flat output.
 - The weights do not depend on the value range (the same 29 weight tensors at 0–50 and 0–100), nor on the row
-  length: a checkpoint trained on values 0–49 runs on 0–99 and on rows of 5 or 20.
+  length: a checkpoint trained on values 0–50 runs on 0–100 and on rows of 5 or 20.
 
 **Why it should help, and the Arithmetic question.** The facet model reads a 50-bit thermometer code with a
 weight per bit: "+2 from 17" and "+2 from 33" are different inputs to learn. Here they are the same computation,
@@ -1465,7 +1478,7 @@ and `plus` computes one. So the plus pathway is the same at every value without 
 `plus` is background knowledge (like NVSA's binding); what is learned is when to use it.
 
 **Runs** (`pynl/submit_value_axis.sh`): smoke (job 11916971); then the full model, without plus, and at 600
-puzzles; each scored also on values 0–99 and rows of 5 and 20.
+puzzles; each scored also on values 0–100 and rows of 5 and 20.
 
 **Smoke run** (500 training puzzles, 20 epochs, 300 unseen puzzles 6300..; job 11916971): best on selection at
 epoch 5, unseen **99.3% matched, 98.3% exact**; exact value per rule Constant 100 / Progression 100 / Distribute
@@ -1476,7 +1489,7 @@ For scale: the column-roles facet model reaches 94.1 (29.0) with 6000 puzzles.
   model lacks (exact sums, per-row value counts, offsets of ±2 from the last panel). `noplus` takes out the sums;
   the value-symmetry ablation (weights per value instead of per offset) is not built yet.
 
-Jobs 11917071–74 (plus, noplus, plus600, plus100); smoke checkpoint on values 0–99 and rows of 5 / 20: 11917075.
+Jobs 11917071–74 (plus, noplus, plus600, plus100); smoke checkpoint on values 0–100 and rows of 5 / 20: 11917075.
 
 **Ablation of the value symmetry: weights per value** (`--per-value`, `build_value_template(per_value=True)`).
 Every rule with weights whose atoms carry a value is written once per value constant, with its own weights:
@@ -1492,7 +1505,7 @@ template names every value, as the facet model does with a weight per code bit, 
 
 **Results so far** (unseen 6300–7299; matched (exact); exact value per rule C / P / D / A):
 
-| run | weights | 3×10, 0–49 | per rule | values 0–99 | rows of 5 |
+| run | weights | 3×10, 0–50 | per rule | values 0–100 | rows of 5 |
 |---|---|---|---|---|---|
 | 100 puzzles | 10,817 | 99.0 (95.5) | 99.9 / 98.5 / 100 / 97.2 | 98.1 (96.4) | 59.7 (32.7) |
 | 600 puzzles | 10,817 | 99.9 (98.3) | 100 / 100 / 100 / 99.8 | 100.0 (99.5) | 75.8 (52.5) |
@@ -1505,7 +1518,7 @@ template names every value, as the facet model does with a weight per code bit, 
 
 **More results** (2026-10-29):
 
-| run | 3×10, 0–49 | per rule C / P / D / A | values 0–99 | rows of 5 | rows of 20 |
+| run | 3×10, 0–50 | per rule C / P / D / A | values 0–100 | rows of 5 | rows of 20 |
 |---|---|---|---|---|---|
 | 6000 puzzles (epoch 5) | 100.0 (98.4) | 100 / 100 / 100 / 100 | 100.0 (99.6) | 89.8 (76.6) | 98.6 (62.7) |
 | 6000, without plus (epoch 45) | 84.0 (58.4) | 100 / 100 / 100 / 11.1 | 78.9 (58.7) | 57.0 (24.4) | 80.1 (58.6) |
@@ -1528,3 +1541,16 @@ template names every value, as the facet model does with a weight per code bit, 
   33.5 (3.4) at 100. At 100 and 600 puzzles the value symmetry wins here too; at 6000 the per-value model is the
   best on rows of 20 but the worst on rows of 5 (55.7). Scoring needed the named last panel in `sa`/`ma` (the
   `qlast(P), acc(P, …)` join did not finish in 10 h with the BUP grounder).
+
+**Trained on 3×3** (2026-10-30, job 11926965, `submit_value_axis.sh` RUN=n3: I-RAVEN-X
+`center_single_shuffle_n_3_maxval_10.json`, values 0–10, 6000 puzzles, 60 epochs, 10,817 weights). Epoch 10 picked
+on selection. Unseen 3×3: 99.8% matched (95.3 exact), all three values right 99.7%; exact per rule Constant 100 /
+Progression 100 / Distribute 100 / Arithmetic 99.4 (facet model: 99.2 (92.7)). On 3×10, values 0–50: 65.2% (35.5);
+93.9 / 36.9 / 100 / 76.7.
+* Distribute and Arithmetic carry over to rows 3× longer and values 5× wider: the counts and the running sum
+  work at any length, and no weight belongs to a value. Arithmetic 76.7 exact is above every model trained on 3×10
+  except the value axis itself (column roles 40.5).
+* Progression does not (36.9), as at rows of 20 (51.2): the step descriptor averages a row's pairs, and nothing in
+  3×3 training fixes what an average over 9 pairs should mean. Not checked further.
+* Value ranges: IBM's generator draws up to maxval inclusive, so the files hold values 0–10, 0–50, 0–100 and
+  0–1000 (checked on the data). Until 2026-10-31 these notes and the tables said 0–9, 0–49, 0–99, 0–999.
