@@ -219,10 +219,10 @@ are untouched except where marked.
 
     | 3×10, values 0–50 | matched | exact | Arithmetic exact | on values 0–100 (never seen) |
     |---|---|---|---|---|
-    | value axis, 100 puzzles | 99.0 | 95.5 | 97.2 | 98.1 (96.4) |
-    | value axis, 600 puzzles | 99.9 | 98.3 | 99.8 | 100.0 (99.5) |
-    | value axis, 6000 puzzles | **100.0** | **98.4** | **100.0** | **100.0** (99.6) |
-    | value axis without `plus`, 6000 puzzles | 84.0 | 58.4 | 11.1 | 78.9 (58.7) |
+    | value axis, 100 puzzles | 99.0 | 97.3 | 97.2 | 98.1 (96.8) |
+    | value axis, 600 puzzles | 99.9 | 99.9 | 99.8 | 100.0 (99.9) |
+    | value axis, 6000 puzzles | **100.0** | **100.0** | **100.0** | **100.0** (100.0) |
+    | value axis without `plus`, 6000 puzzles | 84.0 | 59.6 | 11.1 | 78.9 (60.5) |
     | facet, column roles, 6000 puzzles | 94.1 | 29.0 | 40.5 | cannot run |
 
     - No weight belongs to a value, so a model trained on values 0–50 runs on 0–100 at the same accuracy.
@@ -232,10 +232,12 @@ are untouched except where marked.
     - Without `plus`, Constant, Progression and Distribute stay at 100% exact and Arithmetic falls to 11%:
       the sums come from the given relation, not from the convolution. The facet model learns approximate
       sums (40.5% exact, mostly within ±2), which is why it matches more often (94.1 vs 84.0).
-    - **Trained on 3×3** (values 0–10, rows of 3): 99.8% matched (95.3 exact) against the facet model's 99.2
+    - **Trained on 3×3** (values 0–10, rows of 3): 99.8% matched (99.7 exact) against the facet model's 99.2
       (92.7); exact 100 / 100 / 100 / 99.4 per rule. The same checkpoint on 3×10 with values 0–50, never seen:
-      65.2% (35.5); Distribute 100 and Arithmetic 76.7 exact carry over (better than any model trained on 3×10
+      65.2% (46.2); Distribute 100 and Arithmetic 76.7 exact carry over (better than any model trained on 3×10
       itself, except the value axis), Progression does not (36.9).
+    - Exact here is the argmax of the value distribution (corrected 2026-10-31, §27): read through the facet
+      model's thermometer code it had been the distribution's median, up to 16 points lower.
     - What the symmetry contributes is open until the runs with weights per value (the symmetry removed,
       335k weights) are in.
 
@@ -279,9 +281,9 @@ are untouched except where marked.
 
     | value symmetry, value-axis model (same given primitives) | shared across values (10.8k weights) | weights per value (335k) |
     |---|---|---|
-    | 100 training puzzles | **99.0** (95.5) | 38.3 (3.6) |
-    | 600 | **99.9** (98.3) | 92.7 (79.5) |
-    | 6000 | **100.0** (**98.4**) | 98.4 (95.7) |
+    | 100 training puzzles | **99.0** (97.3) | 38.3 (4.0) |
+    | 600 | **99.9** (99.9) | 92.7 (81.0) |
+    | 6000 | **100.0** (**100.0**) | 98.4 (97.4) |
 
     **Why weight sharing is what a symmetry is, in a template.** The theorem of §21.2 says a renaming σ of
     constants (k0 ↔ k1, type ↔ colour, v17 → v19) leaves every output unchanged when two things hold:
@@ -355,11 +357,11 @@ are untouched except where marked.
       scoring layers, now separately at each value. About 17% of attribute values are Arithmetic, so 100
       puzzles give roughly one Arithmetic answer per value to learn that from.
 
-    At 6000 puzzles weights per value reach 98.4% matched (95.7 exact; Arithmetic 94.9%), about what shared
-    weights reach with 100 puzzles (99.0, 95.5 exact; Arithmetic 97.2). Without the symmetry the model needs
-    some 60 times the data for the same accuracy. On rows of 5 it transfers worse: 55.7% (17.3 exact) against
-    89.8% (76.6) with shared weights. On rows of 20 it transfers best of all (98.9%, 96.9 exact, against 98.6%,
-    62.7 exact); with 100 and 600 puzzles shared weights stay ahead there too (97.4 vs 33.5, 92.4 vs 87.6).
+    At 6000 puzzles weights per value reach 98.4% matched (97.4 exact; Arithmetic 94.9%), about what shared
+    weights reach with 100 puzzles (99.0, 97.3 exact; Arithmetic 97.2). Without the symmetry the model needs
+    some 60 times the data for the same accuracy. On rows of 5 it transfers worse: 55.7% (17.0 exact) against
+    89.8% (78.9) with shared weights. On rows of 20 it transfers best of all (98.9%, 98.2 exact, against 98.6%,
+    63.7 exact); with 100 and 600 puzzles shared weights stay ahead there too (97.4 vs 33.5, 92.4 vs 87.6).
 
 ## Still open
 - Score the facet model once on the I-RAVEN test split, and end to end.

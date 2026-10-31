@@ -1507,9 +1507,9 @@ template names every value, as the facet model does with a weight per code bit, 
 
 | run | weights | 3×10, 0–50 | per rule | values 0–100 | rows of 5 |
 |---|---|---|---|---|---|
-| 100 puzzles | 10,817 | 99.0 (95.5) | 99.9 / 98.5 / 100 / 97.2 | 98.1 (96.4) | 59.7 (32.7) |
-| 600 puzzles | 10,817 | 99.9 (98.3) | 100 / 100 / 100 / 99.8 | 100.0 (99.5) | 75.8 (52.5) |
-| 6000 puzzles, without plus (epoch 45) | 10,689 | 84.0 (58.4) | 100 / 100 / 100 / 11.1 | | |
+| 100 puzzles | 10,817 | 99.0 (97.3) | 99.9 / 98.5 / 100 / 97.2 | 98.1 (96.8) | 59.7 (32.6) |
+| 600 puzzles | 10,817 | 99.9 (99.9) | 100 / 100 / 100 / 99.8 | 100.0 (99.9) | 75.8 (68.8) |
+| 6000 puzzles, without plus (epoch 45) | 10,689 | 84.0 (59.6) | 100 / 100 / 100 / 11.1 | | |
 
 * Without `plus` the other three rules stay perfect and Arithmetic falls to 11%, near the share of answers that
   local features can reach (within ±2 of the last panel: 19%; in rows 1–2: 27%). So the sums come from the
@@ -1520,32 +1520,32 @@ template names every value, as the facet model does with a weight per code bit, 
 
 | run | 3×10, 0–50 | per rule C / P / D / A | values 0–100 | rows of 5 | rows of 20 |
 |---|---|---|---|---|---|
-| 6000 puzzles (epoch 5) | 100.0 (98.4) | 100 / 100 / 100 / 100 | 100.0 (99.6) | 89.8 (76.6) | 98.6 (62.7) |
-| 6000, without plus (epoch 45) | 84.0 (58.4) | 100 / 100 / 100 / 11.1 | 78.9 (58.7) | 57.0 (24.4) | 80.1 (58.6) |
-| weights per value, 6000 (epoch 40) | 98.4 (95.7) | 100 / 100 / 100 / 94.9 | cannot run | 55.7 (17.3) | 98.9 (96.9) |
-| weights per value, 600 | 92.7 (79.5) | 98.0 / 87.8 / 97.7 / 86.8 | cannot run | 63.6 (23.4) | 87.6 (64.4) |
-| weights per value, 100 | 38.3 (3.6) | 60.5 / 30.8 / 21.4 / 22.3 | cannot run | 27.3 (0.6) | 33.5 (3.4) |
+| 6000 puzzles (epoch 5) | 100.0 (100.0) | 100 / 100 / 100 / 100 | 100.0 (100.0) | 89.8 (78.9) | 98.6 (63.7) |
+| 6000, without plus (epoch 45) | 84.0 (59.6) | 100 / 100 / 100 / 11.1 | 78.9 (60.5) | 57.0 (23.9) | 80.1 (60.2) |
+| weights per value, 6000 (epoch 40) | 98.4 (97.4) | 100 / 100 / 100 / 94.9 | cannot run | 55.7 (17.0) | 98.9 (98.2) |
+| weights per value, 600 | 92.7 (81.0) | 98.0 / 87.8 / 97.7 / 86.8 | cannot run | 63.6 (23.7) | 87.6 (65.4) |
+| weights per value, 100 | 38.3 (4.0) | 60.5 / 30.8 / 21.4 / 22.3 | cannot run | 27.3 (0.8) | 33.5 (3.6) |
 
 * **The value symmetry is what makes the model data-efficient.** With the same primitives (sums, counts, offsets),
   weights per value instead of per offset drop matching from 99.0 to 38.3 at 100 puzzles and from 99.9 to 92.7 at
-  600 (exact 95.5 → 3.6 and 98.3 → 79.5), with 31 times the weights. Arithmetic too (97.2 → 22.3 at 100): the
+  600 (exact 97.3 → 4.0 and 99.9 → 81.0), with 31 times the weights. Arithmetic too (97.2 → 22.3 at 100): the
   sum is given, but reading it at each value has to be learned separately for each value.
-* **Weights per value at 6000 puzzles:** 98.4% matched (95.7 exact), Arithmetic 94.9, best on selection at
-  epoch 40 of 60. That is where shared weights are at 100 puzzles (99.0, 95.5 exact): without the value
-  symmetry the model needs about 60 times the data. Rows of 5: 55.7 (17.3), worse than at 600 puzzles (63.6);
+* **Weights per value at 6000 puzzles:** 98.4% matched (97.4 exact), Arithmetic 94.9, best on selection at
+  epoch 40 of 60. That is where shared weights are at 100 puzzles (99.0, 97.3 exact): without the value
+  symmetry the model needs about 60 times the data. Rows of 5: 55.7 (17.0), worse than at 600 puzzles (63.6);
   per-value scoring layers fit the sums of rows of 10 more tightly.
 
-* **Rows of 20 transfer better than rows of 5.** Shared weights: 98.6 (62.7) at 6000 puzzles, 92.4 (84.4) at
-  600, 97.4 (82.3) at 100; Constant, Distribute and Arithmetic stay at 99–100% exact, Progression drops (51.2 /
-  89.2 / 81.7). Weights per value: 98.9 (96.9) at 6000 (Progression 99.8, Arithmetic 96.6), 87.6 (64.4) at 600,
-  33.5 (3.4) at 100. At 100 and 600 puzzles the value symmetry wins here too; at 6000 the per-value model is the
+* **Rows of 20 transfer better than rows of 5.** Shared weights: 98.6 (63.7) at 6000 puzzles, 92.4 (90.6) at
+  600, 97.4 (84.8) at 100; Constant, Distribute and Arithmetic stay at 99–100% exact, Progression drops (51.2 /
+  89.2 / 81.7). Weights per value: 98.9 (98.2) at 6000 (Progression 99.8, Arithmetic 96.6), 87.6 (65.4) at 600,
+  33.5 (3.6) at 100. At 100 and 600 puzzles the value symmetry wins here too; at 6000 the per-value model is the
   best on rows of 20 but the worst on rows of 5 (55.7). Scoring needed the named last panel in `sa`/`ma` (the
   `qlast(P), acc(P, …)` join did not finish in 10 h with the BUP grounder).
 
 **Trained on 3×3** (2026-10-30, job 11926965, `submit_value_axis.sh` RUN=n3: I-RAVEN-X
 `center_single_shuffle_n_3_maxval_10.json`, values 0–10, 6000 puzzles, 60 epochs, 10,817 weights). Epoch 10 picked
-on selection. Unseen 3×3: 99.8% matched (95.3 exact), all three values right 99.7%; exact per rule Constant 100 /
-Progression 100 / Distribute 100 / Arithmetic 99.4 (facet model: 99.2 (92.7)). On 3×10, values 0–50: 65.2% (35.5);
+on selection. Unseen 3×3: 99.8% matched (99.7 exact; decoded through the facet code 95.3); exact per rule Constant 100 /
+Progression 100 / Distribute 100 / Arithmetic 99.4 (facet model: 99.2 (92.7)). On 3×10, values 0–50: 65.2% (46.2);
 93.9 / 36.9 / 100 / 76.7.
 * Distribute and Arithmetic carry over to rows 3× longer and values 5× wider: the counts and the running sum
   work at any length, and no weight belongs to a value. Arithmetic 76.7 exact is above every model trained on 3×10
@@ -1554,3 +1554,11 @@ Progression 100 / Distribute 100 / Arithmetic 99.4 (facet model: 99.2 (92.7)). O
   3×3 training fixes what an average over 9 pairs should mean. Not checked further.
 * Value ranges: IBM's generator draws up to maxval inclusive, so the files hold values 0–10, 0–50, 0–100 and
   0–1000 (checked on the data). Until 2026-10-31 these notes and the tables said 0–9, 0–49, 0–99, 0–999.
+* **Exact, for the value axis, is the argmax** (2026-10-31). `score` reported two numbers: *exact* through
+  `B.evaluate`, after turning the value distribution into a thermometer code (bit k = P(value > k)), and *all three
+  values right*, the argmax per attribute. The code path decodes the distribution's median, which misses where the
+  mass is spread even though the peak is right: 3×3 95.3 vs 99.7, 3×10 98.4 vs 100.0, 600 puzzles on rows of 5
+  52.5 vs 68.8. It is not a range cap (the facet code holds 0..maxval; its 3×3 ceiling is 100% exact, and on some
+  sets the code path scores higher, e.g. 24.4 vs 23.9). The argmax is the model's own answer, and the per-rule
+  exacts used it already, so every value-axis exact in these notes, FINDINGS and RESULTS is now the argmax. Matched
+  is unchanged (it uses the code, as for every model).

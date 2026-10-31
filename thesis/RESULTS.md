@@ -1,13 +1,17 @@
 # Results tables
 
-Every result that still holds, in one place (last updated 2026-10-29). How each was obtained: the lab notes
+Every result that still holds, in one place (last updated 2026-10-31). How each was obtained: the lab notes
 (`thesis/PYNEURALOGIC_NOTES.md`, section numbers below); in what order: `thesis/FINDINGS.md`.
 
 **Conventions.**
 - Cells are **matched % (exact %)**:
   - *matched*: the candidate closest to the generated answer is the right one; ties count as wrong; chance
     12.5%;
-  - *exact*: the generated panel equals the answer.
+  - *exact*: the generated panel equals the answer. For the value axis this is the argmax of its value
+    distribution, its own answer (since 2026-10-31). Decoded through the facet model's thermometer code, which
+    reads off the distribution's median instead, it came out up to 16 points lower where the distribution is
+    spread (3×3: 95.3 vs 99.7; 3×10: 98.4 vs 100.0). The per-rule exacts were argmax all along. † marks the
+    one value-axis cell still code-decoded (the smoke run's rows of 10, read from its training log).
 - **Splits:**
   - I-RAVEN: unseen validation puzzles 300–1299 per layout (7000), the epoch picked on val 0–299;
   - I-RAVEN test: marked *test*;
@@ -33,14 +37,14 @@ Every result that still holds, in one place (last updated 2026-10-29). How each 
 | row fold | 283k / 305k | 95.8 (63.0) | – | 92.2 (28.0) | – | – |
 | row fold + content gates | 330k | – | – | 93.7 (35.0) | – | – |
 | **Value axis (PyNeuraLogic, §27)** | | | | | | |
-| value axis, 6000 puzzles | 10.8k | – | **99.8** (**95.3**) | **100.0** (**98.4**) | 100.0 (99.6), trained on 0–50 | – |
-| value axis, 600 puzzles | 10.8k | – | – | 99.9 (98.3) | 100.0 (99.5), trained on 0–50 | – |
-| value axis, 100 puzzles | 10.8k | – | – | 99.0 (95.5) | 98.1 (96.4), trained on 0–50 | – |
-| value axis, 500 puzzles (smoke, 300 unseen) | 10.8k | – | – | 99.3 (98.3) | 98.5 (97.5), trained on 0–50 | – |
-| value axis, 6000 puzzles, without plus | 10.7k | – | – | 84.0 (58.4) | 78.9 (58.7), trained on 0–50 | – |
-| value axis, weights per value (symmetry removed), 600 puzzles | 335k | – | – | 92.7 (79.5) | cannot run | – |
-| value axis, weights per value, 100 puzzles | 335k | – | – | 38.3 (3.6) | cannot run | – |
-| value axis, weights per value, 6000 puzzles | 335k | – | – | 98.4 (95.7) | cannot run | – |
+| value axis, 6000 puzzles | 10.8k | – | **99.8** (**99.7**) | **100.0** (**100.0**) | 100.0 (100.0), trained on 0–50 | – |
+| value axis, 600 puzzles | 10.8k | – | – | 99.9 (99.9) | 100.0 (99.9), trained on 0–50 | – |
+| value axis, 100 puzzles | 10.8k | – | – | 99.0 (97.3) | 98.1 (96.8), trained on 0–50 | – |
+| value axis, 500 puzzles (smoke, 300 unseen) | 10.8k | – | – | 99.3 (98.3†) | 98.5 (97.9), trained on 0–50 | – |
+| value axis, 6000 puzzles, without plus | 10.7k | – | – | 84.0 (59.6) | 78.9 (60.5), trained on 0–50 | – |
+| value axis, weights per value (symmetry removed), 600 puzzles | 335k | – | – | 92.7 (81.0) | cannot run | – |
+| value axis, weights per value, 100 puzzles | 335k | – | – | 38.3 (4.0) | cannot run | – |
+| value axis, weights per value, 6000 puzzles | 335k | – | – | 98.4 (97.4) | cannot run | – |
 | **Symbolic (rules given)** | | | | | | |
 | symbolic template, rules (PyNeuraLogic) | one per (attribute, rule) | **98.33** *test*; end to end 96.31 | – | – | – | – |
 | symbolic template, primitives | | 97.55 *test*; end to end 95.71 | – | – | – | – |
@@ -87,14 +91,14 @@ Notes on the main table:
 | column roles + content gates, wide (1,448k) | 67.7 (6.0) | 93.1 (30.0) | 50.1 (5.1) |
 | row fold | 53.8 (0.4) | 92.2 (28.0) | 55.1 (5.9) |
 | row fold + content gates | 61.0 (8.1) | 93.7 (35.0) | 60.5 (10.1) |
-| value axis, 6000 puzzles | 89.8 (76.6) | 100.0 (98.4) | 98.6 (62.7) |
-| value axis, 6000 puzzles, without plus | 57.0 (24.4) | 84.0 (58.4) | 80.1 (58.6) |
-| value axis, 600 puzzles | 75.8 (52.5) | 99.9 (98.3) | 92.4 (84.4) |
-| value axis, weights per value, 6000 puzzles | 55.7 (17.3) | 98.4 (95.7) | 98.9 (96.9) |
-| value axis, weights per value, 600 puzzles | 63.6 (23.4) | 92.7 (79.5) | 87.6 (64.4) |
-| value axis, weights per value, 100 puzzles | 27.3 (0.6) | 38.3 (3.6) | 33.5 (3.4) |
-| value axis, 100 puzzles | 59.7 (32.7) | 99.0 (95.5) | 97.4 (82.3) |
-| value axis, 500 puzzles (smoke) | 58.6 (34.2) | 99.3 (98.3), 300 unseen | 86.6 (78.5) |
+| value axis, 6000 puzzles | 89.8 (78.9) | 100.0 (100.0) | 98.6 (63.7) |
+| value axis, 6000 puzzles, without plus | 57.0 (23.9) | 84.0 (59.6) | 80.1 (60.2) |
+| value axis, 600 puzzles | 75.8 (68.8) | 99.9 (99.9) | 92.4 (90.6) |
+| value axis, weights per value, 6000 puzzles | 55.7 (17.0) | 98.4 (97.4) | 98.9 (98.2) |
+| value axis, weights per value, 600 puzzles | 63.6 (23.7) | 92.7 (81.0) | 87.6 (65.4) |
+| value axis, weights per value, 100 puzzles | 27.3 (0.8) | 38.3 (4.0) | 33.5 (3.6) |
+| value axis, 100 puzzles | 59.7 (32.6) | 99.0 (97.3) | 97.4 (84.8) |
+| value axis, 500 puzzles (smoke) | 58.6 (34.2) | 99.3 (98.3†), 300 unseen | 86.6 (82.3) |
 
 Named-column models and the torch baselines cannot be run on another row length: their weights are tied to
 the columns. Test sets: IBM's `iravenx_task.py --n 5 / 20 --maxval 50 --nconf 0`, seed 1234.
@@ -104,8 +108,8 @@ Rows of 20, exact value per rule (Constant / Progression / Distribute / Arithmet
 100 / 99.8 / 100 / 96.6, 600 98.0 / 67.0 / 96.5 / 87.3, 100 61.8 / 27.3 / 16.7 / 24.4.
 
 **Value axis trained on 3×3** (job 11926965; 6000 puzzles, epoch 10 picked on selection; the data's values are
-0–10). Unseen 3×3: 99.8 (95.3); exact per rule 100 / 100 / 100 / 99.4 (facet 99.2 (92.7)). The same checkpoint
-on 3×10, values 0–50 (rows 3× longer, values 5× wider than it saw): 65.2 (35.5); exact per rule 93.9 / 36.9 /
+0–10). Unseen 3×3: 99.8 (99.7); exact per rule 100 / 100 / 100 / 99.4 (facet 99.2 (92.7)). The same checkpoint
+on 3×10, values 0–50 (rows 3× longer, values 5× wider than it saw): 65.2 (46.2); exact per rule 93.9 / 36.9 /
 **100** / **76.7**.
 
 ## 3. Transformed puzzles (does a model give the same answers when the puzzle is transformed?)
@@ -251,9 +255,9 @@ Distribute 93.4 / 87.7, Arithmetic 64.4 / 69.4.
 
 | training puzzles | shared across values (10.8k) | weights per value (335k) |
 |---|---|---|
-| 100 | **99.0** (95.5) | 38.3 (3.6) |
-| 600 | **99.9** (98.3) | 92.7 (79.5) |
-| 6000 | **100.0** (**98.4**) | 98.4 (95.7) |
+| 100 | **99.0** (97.3) | 38.3 (4.0) |
+| 600 | **99.9** (99.9) | 92.7 (81.0) |
+| 6000 | **100.0** (**100.0**) | 98.4 (97.4) |
 
 ## 8. Perception (ResNet-18 frontend, trained on RAVEN; I-RAVEN test)
 
