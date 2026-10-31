@@ -26,7 +26,13 @@ answer's). Candidates are never seen in training.
        two components of left-right and up-down, size <-> colour and the middle columns are built in, as in
        the facet model with --columns roles. attr-abs (A) adds row, column, component, attribute and slot
        one-hots, which break all of them.
-  H is the width whose weight count is closest to the facet model's (meta "budget").
+  vit: end to end from images (I-RAVEN only), the black-box vision reference. A plain vision transformer
+       reads the matrix as one picture: the eight context panels at 80x80 (baselines/prepare_baseline_images.py)
+       and the missing cell blank, cut into 16x16 patches (225 tokens, learned position embeddings), plus one
+       token for the component asked for, whose final state is decoded. Pre-norm blocks, depth 6, one head per
+       32 channels, MLP ratio 4. Its target is the other baselines' (the answer's facet code), so it never sees
+       the candidates; matching compares the generated code with the candidates' codes from their XML labels.
+  H is the width whose weight count is closest to the facet model's (meta "budget"); vit: a multiple of 32.
 
 Regularization, all off by default (the runs before 2026-10-28 used none): --norm puts a LayerNorm after every
 hidden layer of the MLP (the GNN has one per layer already); --dropout drops hidden units (MLP: after every
@@ -61,8 +67,9 @@ def therm(v, T):
 class Data:
     """One split on the GPU, with the facet model's inputs and targets computed from the raw values."""
 
-    def __init__(self, z, split, meta, dev):
+    def __init__(self, z, split, meta, dev, img=None):
         self.m = meta
+        self.img = None if img is None else torch.as_tensor(img, device=dev)            # [N, 8, s, s] uint8 (vit)
         self.vals = torch.as_tensor(z[f"{split}_vals"].astype(np.int64), device=dev)   # [N, P, M, 4]
         self.comp = torch.as_tensor(z[f"{split}_comp"].astype(np.int64), device=dev)   # [N, P, M]
         self.y = z[f"{split}_y"].astype(np.int64)
@@ -119,6 +126,18 @@ class Data:
         onehot = F.one_hot(self.slot[v[..., 0].clamp(min=0)], S).float() * present[..., None]
         x = torch.einsum("bcms,bcmf->bcsf", onehot, feat).flatten(1)
         return torch.cat([x, F.one_hot(k, 2).float()], 1)
+
+    def vit_input(self, idx, k, swap=None):
+        """The matrix as one image [B, 1, 3s, 3s] (ink 1, paper 0): the context panels in their cells, the missing
+        cell blank; and the component asked for."""
+        im = self.img[torch.as_tensor(idx, device=self.img.device)]                     # [B, 8, s, s]
+        if swap is not None:
+            perm = torch.tensor([3, 4, 5, 0, 1, 2, 6, 7], device=im.device)
+            im = torch.where(swap[:, None, None, None], im[:, perm], im)
+        x = 1 - im.float() / 255
+        B_, _, s, _ = x.shape
+        x = torch.cat([x, torch.zeros_like(x[:, :1])], 1).view(B_, 3, 3, s, s)
+        return x.permute(0, 1, 3, 2, 4).reshape(B_, 1, 3 * s, 3 * s), k
 
     def gnn_input(self, idx, k, swap=None):
         """Nodes [B, n_ctx * M + 1, d] (the query node last) and their mask."""
@@ -276,17 +295,45 @@ class AttrGNN(nn.Module):
         return torch.cat([self.head(ha).flatten(1), self.head_pos(hp)], 1)
 
 
+class ViT(nn.Module):
+    """A plain vision transformer over the matrix as one image [B, 1, 240, 240]: 16x16 patches with learned
+    position embeddings, pre-norm blocks, one head per 32 channels; one extra token per component asked
+    for, whose final state is decoded."""
+
+    def __init__(self, h, d_out, depth=6, patch=16, side=240, dropout=0.0):
+        super().__init__()
+        assert h % 32 == 0, "vit width: a multiple of 32"
+        self.embed = nn.Conv2d(1, h, patch, patch)
+        self.pos = nn.Parameter(torch.zeros(1, (side // patch) ** 2, h))
+        self.query = nn.Parameter(torch.zeros(2, h))
+        nn.init.trunc_normal_(self.pos, std=0.02)
+        nn.init.trunc_normal_(self.query, std=0.02)
+        layer = nn.TransformerEncoderLayer(h, h // 32, 4 * h, dropout, activation="gelu", batch_first=True,
+                                           norm_first=True)
+        self.blocks = nn.TransformerEncoder(layer, depth)
+        self.norm = nn.LayerNorm(h)
+        self.head = nn.Linear(h, d_out)
+
+    def forward(self, img, k):
+        x = self.embed(img).flatten(2).transpose(1, 2) + self.pos                       # [B, 225, h]
+        x = torch.cat([x, self.query[k][:, None]], 1)
+        return self.head(self.norm(self.blocks(x)[:, -1]))
+
+
 def n_weights(model):
     return sum(p.numel() for p in model.parameters())
 
 
-ARCHS = ("mlp", "gnn", "attr-abs", "attr-rel")
+ARCHS = ("mlp", "gnn", "attr-abs", "attr-rel", "vit")
 
 
 def dims(arch, meta):
-    """(input width, output width); for attr-*: ((attribute node width, position node width), output width)."""
+    """(input width, output width); for attr-*: ((attribute node width, position node width), output width);
+    for vit: (None, output width)."""
     T, S, n, P = meta["therm"], len(meta["slots"]), meta["n_cols"], meta["n_pos"]
     d_out = 4 * T + P
+    if arch == "vit":
+        return None, d_out
     if arch.startswith("attr"):
         extra = arch == "attr-abs"
         return (T + 6 + (3 + n + 2 + 4 + S if extra else 0), P + 6 + (3 + n + 2 if extra else 0)), d_out
@@ -296,6 +343,8 @@ def dims(arch, meta):
 def count(arch, meta, h, norm=False):
     """Weights of build(arch, meta, h), without building it (an MLP on 1000-bit codes at width 8000 would not fit)."""
     d_in, d_out = dims(arch, meta)
+    if arch == "vit":
+        return n_weights(ViT(h, d_out))
     if arch.startswith("attr"):
         stack = lambda d, labels: d * h + h + 3 * (4 * h * h + labels * h + 4 * h)
         T, P = meta["therm"], meta["n_pos"]
@@ -310,6 +359,8 @@ def build(arch, meta, h, norm=False, dropout=0.0, drop_edge=0.0):
         model = MLP(d_in, h, d_out, norm, dropout)
     elif arch == "gnn":
         model = AllToAllGNN(d_in, h, d_out, 3, dropout, drop_edge)
+    elif arch == "vit":
+        model = ViT(h, d_out, dropout=dropout)
     else:
         model = AttrGNN(d_in[0], d_in[1], h, meta["therm"], meta["n_pos"], dropout, drop_edge)
     assert n_weights(model) == count(arch, meta, h, norm)
@@ -322,15 +373,18 @@ def model_input(arch, data, idx, k, swap=None):
         return (data.mlp_input(idx, k, swap),)
     if arch == "gnn":
         return data.gnn_input(idx, k, swap)
+    if arch == "vit":
+        return data.vit_input(idx, k, swap)
     return data.attr_input(idx, k, swap, absolute=arch == "attr-abs")
 
 
 def width_for(arch, meta, budget, norm=False):
-    """The width whose weight count is closest to the budget."""
-    h = 1
-    while count(arch, meta, h + 1, norm) <= budget:
-        h += 1
-    return min((h, h + 1), key=lambda w: abs(count(arch, meta, w, norm) - budget))
+    """The width whose weight count is closest to the budget (vit: a multiple of 32)."""
+    step = 32 if arch == "vit" else 1
+    h = step
+    while count(arch, meta, h + step, norm) <= budget:
+        h += step
+    return min((h, h + step), key=lambda w: abs(count(arch, meta, w, norm) - budget))
 
 
 def decode(out, meta):
@@ -431,6 +485,9 @@ def transformed(data, name, meta):
     panel (equal value ranges only), and their rules. objects: the objects of every panel in reverse order.
     mirror: left-right and up-down puzzles mirrored, slots 14 <-> 15 and 16 <-> 17, components 0 <-> 1."""
     n = meta["n_cols"]
+    img = getattr(data, "img", None)
+    if img is not None and name in ("size-colour", "mirror"):
+        return None                                                                     # the images would need redrawing
     d = copy.copy(data)
     perm = torch.arange(data.vals.shape[1], device=data.vals.device)
     if name == "rows12":
@@ -461,6 +518,8 @@ def transformed(data, name, meta):
         d.comp = torch.where(on & (data.comp >= 0), 1 - data.comp, data.comp)
     if name in ("rows12", "cols23"):
         d.vals, d.comp = data.vals[:, perm], data.comp[:, perm]
+        if img is not None:
+            d.img = img[:, perm[:img.shape[1]]]
     return d
 
 
@@ -520,6 +579,18 @@ def symmetry_check(model, arch, data, meta, n_puzzles=32):
         print(f"  {t:12s} max |output difference| {float(diff):.1e}")
 
 
+def images(data_dir, name, arch, z):
+    """vit: the context images per split, checked against the arrays' answer indices; other archs: none."""
+    if arch != "vit":
+        return {}
+    if name != "iraven":
+        raise SystemExit("vit: images exist for I-RAVEN only")
+    zi = np.load(os.path.join(data_dir, f"{name}_images.npz"))
+    for s in ("train", "sel", "unseen"):
+        assert (zi[f"{s}_y"] == z[f"{s}_y"]).all(), f"{s}: the images and the arrays list different puzzles"
+    return {s: zi[f"{s}_img"] for s in ("train", "sel", "unseen")}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", help="a dataset name in experiments/baselines/data")
@@ -555,7 +626,7 @@ def main():
         a = info["args"]
         z = np.load(os.path.join(args.data_dir, f"{a['data']}.npz"))
         meta = json.loads(str(z["meta"]))
-        unseen = Data(z, "unseen", meta, dev)
+        unseen = Data(z, "unseen", meta, dev, images(args.data_dir, a["data"], a["arch"], z).get("unseen"))
         model = build(a["arch"], meta, info["width"], a.get("norm", False), a.get("dropout", 0.0)).to(dev)  # dropout layers shift the MLP's indices
         model.load_state_dict(torch.load(os.path.join(args.eval_only, "model_best.pt"), map_location=dev))
         print(f"{args.eval_only}: epoch {info['best']['epoch']}, unseen matched {100 * info['best']['unseen']['matched']:.1f}")
@@ -566,7 +637,8 @@ def main():
         ap.error("--data and --arch are required")
     z = np.load(os.path.join(args.data_dir, f"{args.data}.npz"))
     meta = json.loads(str(z["meta"]))
-    sets = {s: Data(z, s, meta, dev) for s in ("train", "sel", "unseen")}
+    img = images(args.data_dir, args.data, args.arch, z)
+    sets = {s: Data(z, s, meta, dev, img.get(s)) for s in ("train", "sel", "unseen")}
     for d in sets.values():
         check(d, meta)
 

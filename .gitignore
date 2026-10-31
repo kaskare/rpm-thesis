@@ -28,3 +28,6 @@ archive/*/experiments/
 
 # LLM benchmark raw outputs (responses can be large); reports (*.md) and manifests are tracked
 llm/results/*.jsonl
+
+# private working outline of the thesis (not tracked)
+thesis/THESIS_OUTLINE.md

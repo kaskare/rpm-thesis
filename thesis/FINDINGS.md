@@ -363,6 +363,19 @@ are untouched except where marked.
     89.8% (78.9) with shared weights. On rows of 20 it transfers best of all (98.9%, 98.2 exact, against 98.6%,
     63.7 exact); with 100 and 600 puzzles shared weights stay ahead there too (97.4 vs 33.5, 92.4 vs 87.6).
 
+28. **A plain ViT, end to end, comes close on images (2026-10-31).** It reads the matrix as one image and
+    generates the answer's code; its target and the matching still use the XML labels, so this is not the
+    literature's setting.
+    - Width 64 (335,038 weights): 79.1% matched (37.6 exact). Width 224 (3,752,958 weights): 93.4% (64.4), the level
+      of the strongest object-level baseline on attributes (93.8) and 3.9 points under the facet model.
+    - No rule is its weak spot: type, size and colour exact 82.4 / 89.7 / 86.6 / 86.3 for Constant, Progression,
+      Distribute, Arithmetic (facet 83.7 / 89.7 / 88.7 / 83.8), and matched 93.8 with Arithmetic, 92.9 without.
+    - The loss is on grids. It matches the facet model on single-object layouts (99.3–99.6) and falls behind on
+      2×2 (93.0 vs 95.5), 3×3 (81.8 vs 89.8) and the in-out grid (81.1 vs 97.8).
+    - It needs 14 times the facet model's weights, and it shares weights too: one filter for every patch, one
+      block for every token. The facet model's own end-to-end score is still missing, so the two have not yet been
+      compared on the same inputs.
+
 ## Still open
 - Score the facet model once on the I-RAVEN test split, and end to end.
 - Seeds for the facet runs: most numbers are one run.

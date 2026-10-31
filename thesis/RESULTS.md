@@ -17,7 +17,9 @@ Every result that still holds, in one place (last updated 2026-10-31). How each 
   - I-RAVEN test: marked *test*;
   - I-RAVEN-X: unseen puzzles 6300–7299, the epoch picked on 6000–6299.
 - **Seeds:** one seed, unless "± sd (2 seeds)".
-- **Inputs:** ground-truth attributes; "end to end" means through the ResNet-18 frontend.
+- **Inputs:** ground-truth attributes; "end to end" means through the ResNet-18 frontend, except the
+  black-box ViT rows, which read the eight context panels themselves (their target is still the facet code,
+  and the candidates are still compared through their XML labels).
 - **Pending results:** marked *running*.
 
 ## 1. Main table
@@ -25,9 +27,9 @@ Every result that still holds, in one place (last updated 2026-10-31). How each 
 | model | weights | I-RAVEN | I-RAVEN-X 3×3, 0–10 | 3×10, 0–50 | 3×10, 0–100 | 3×10, 0–1000 |
 |---|---|---|---|---|---|---|
 | **Facet model (PyNeuraLogic)** | | | | | | |
-| facet, named columns, 60–80 epochs | 266k / 1,411k | **97.3** (69.1) | **99.2** (92.7) | 85.4 (15.0) | 84.9 (6.4) | 81.2 (0.0) |
-| facet, 150 epochs | | 97.4 (69.3) | – | 89.1 (23.8) | 86.3 (6.5) | 85.4 (0.1) |
-| + copy links, per-panel gates | 1,598k | – | – | 97.8 (60.0) | **96.2** (30.8) | **94.3** (15.0) |
+| facet, named columns, 60–80 epochs | 267k / 267k / 1,411k / 1,425k / 1,685k | **97.3** (69.1) | **99.2** (92.7) | 85.4 (15.0) | 84.9 (6.4) | 81.2 (0.0) |
+| facet, 150 epochs | 267k / 1,411k / 1,425k / 1,685k | 97.4 (69.3) | – | 89.1 (23.8) | 86.3 (6.5) | 85.4 (0.1) |
+| + copy links, per-panel gates | 1,598k / 1,799k / 5,426k | – | – | 97.8 (60.0) | **96.2** (30.8) | **94.3** (15.0) |
 | + copy links, content gates | 1,436k | – | – | 94.9 (51.7) | – | – |
 | + copy links, shuffled control | 1,598k | – | – | 87.3 (21.5) | – | – |
 | column roles | 288k | (= named at 3 columns) | – | 94.1 (29.0) | – | – |
@@ -46,18 +48,21 @@ Every result that still holds, in one place (last updated 2026-10-31). How each 
 | value axis, weights per value, 100 puzzles | 335k | – | – | 38.3 (4.0) | cannot run | – |
 | value axis, weights per value, 6000 puzzles | 335k | – | – | 98.4 (97.4) | cannot run | – |
 | **Symbolic (rules given)** | | | | | | |
-| symbolic template, rules (PyNeuraLogic) | one per (attribute, rule) | **98.33** *test*; end to end 96.31 | – | – | – | – |
-| symbolic template, primitives | | 97.55 *test*; end to end 95.71 | – | – | – | – |
+| symbolic template, rules (PyNeuraLogic) | 41 | **98.33** *test*; end to end 96.31 | – | – | – | – |
+| symbolic template, primitives | 94 | 97.55 *test*; end to end 95.71 | – | – | – | – |
 | reference solver, rules (Python, nothing learned) | 0 | 97.78 *test*; end to end 95.74 | – | – | – | – |
 | reference solver, primitives | 0 | 96.42 *test*; end to end 94.73 | – | – | – | – |
 | **Torch baselines** (same task and metrics, §23) | | | | | | |
-| MLP, facet's weights | 264k / 267k / 1.6M | 60.6 ± 0.8 (17.1) | 92.8 ± 0.2 (64.8) | 83.5 ± 0.4 (3.9) | 80.0 ± 2.3 (0.5) | 74.3 ± 3.2 (0.0) |
-| all-to-all object GNN, facet's weights | same | 87.2 ± 1.1 (51.5) | 92.0 ± 0.4 (58.5) | 71.6 ± 0.1 (1.2) | 64.7 ± 5.4 (0.0) | 54.1 ± 3.1 (0.0) |
-| MLP, regularized | same | 72.0 ± 1.1 (27.5) | 95.1 ± 0.4 (74.3) | 84.5 ± 0.1 (2.7) | 76.3 ± 1.4 (0.1) | 73.8 ± 0.2 (0.0) |
-| object GNN, regularized | same | 90.5 ± 1.2 (55.1) | 93.9 ± 0.2 (67.7) | 85.3 ± 1.9 (4.2) | 76.8 ± 2.1 (0.2) | 55.1 ± 1.0 (0.0) |
-| strongest object-level baseline, picked on selection | up to 16× | 93.8 (63.7) GNN 16× reg. | 92.8 (64.8) MLP | 86.4 (2.1) MLP 16× | 80.0 (0.5) MLP | 74.3 (0.0) MLP |
-| attribute GNN A, absolute labels | 266k / 1.6M | 95.0 (62.5) | – | 95.0 (27.7) | – | – |
-| attribute GNN B, relative labels (symmetric) | 267k / 1.6M | 96.8 (67.9) | – | 85.8 (3.5) | – | – |
+| MLP, facet's weights | 264k / 267k / 1,597k / 1,802k / 5,383k | 60.6 ± 0.8 (17.1) | 92.8 ± 0.2 (64.8) | 83.5 ± 0.4 (3.9) | 80.0 ± 2.3 (0.5) | 74.3 ± 3.2 (0.0) |
+| all-to-all object GNN, facet's weights | 265k / 265k / 1,593k / 1,798k / 5,430k | 87.2 ± 1.1 (51.5) | 92.0 ± 0.4 (58.5) | 71.6 ± 0.1 (1.2) | 64.7 ± 5.4 (0.0) | 54.1 ± 3.1 (0.0) |
+| MLP, regularized | 264k / 266k / 1,599k / 1,803k / 5,384k | 72.0 ± 1.1 (27.5) | 95.1 ± 0.4 (74.3) | 84.5 ± 0.1 (2.7) | 76.3 ± 1.4 (0.1) | 73.8 ± 0.2 (0.0) |
+| object GNN, regularized | 265k / 265k / 1,593k / 1,798k / 5,430k | 90.5 ± 1.2 (55.1) | 93.9 ± 0.2 (67.7) | 85.3 ± 1.9 (4.2) | 76.8 ± 2.1 (0.2) | 55.1 ± 1.0 (0.0) |
+| strongest object-level baseline, picked on selection | 4,258k / 267k / 25,556k / 1,802k / 5,383k | 93.8 (63.7) GNN 16× reg. | 92.8 (64.8) MLP | 86.4 (2.1) MLP 16× | 80.0 (0.5) MLP | 74.3 (0.0) MLP |
+| attribute GNN A, absolute labels | 266k / 1,596k | 95.0 (62.5) | – | 95.0 (27.7) | – | – |
+| attribute GNN B, relative labels (symmetric) | 267k / 1,599k | 96.8 (67.9) | – | 85.8 (3.5) | – | – |
+| **Black-box vision, end to end** (reads the images; same task and metrics) | | | | | | |
+| ViT over the matrix as one image, width 64 (job 11931310) | 335k | 79.1 (37.6) | – | – | – | – |
+| ViT, width 224 (job 11931310) | 3,753k | 93.4 (64.4) | – | – | – | – |
 | **Literature (reported, other protocols)** | | | | | | |
 | ARLC, learned (trains on 2×2 only) | | 92.6 | 98.4 | 95.0 | 95.0 | 90.6 |
 | ARLC, programmed | | – | 97.2 | 100 | 100 | 99.7 |
@@ -66,7 +71,13 @@ Every result that still holds, in one place (last updated 2026-10-31). How each 
 | MLP (as reported with ARLC) | | 87.1 | – | – | – | – |
 
 Notes on the main table:
-- **Weights:** for 3×10 the facet weight counts are at values 0–50.
+- **Weights** are learnable parameters, given per dataset in column order for the datasets a row has results
+  on; §9 has the exact counts, read from the checkpoints. They grow with the value range on 3×10, because the
+  thermometer codes do.
+  - The torch baselines were sized to the plain facet model on I-RAVEN and 3×3, and to the facet model with
+    per-panel copy links on 3×10. At 0–1000 that is 3.2× the named-column facet model's weights.
+  - ViT widths move in steps of 32, so the closest to the facet model's weights is 1.26× (width 64), and the
+    closest to 16× is 14× (width 224).
 - **Copy links:** the per-panel gates break the row symmetry; see §3.
 - **The facet model's I-RAVEN-X exact scores are slightly off** (generator draws Distribute values up to maxval
   inclusive, §23). Matching is unaffected.
@@ -125,6 +136,8 @@ Each transformation is either a symmetry of the data or one under which the answ
 | attribute GNN A | 95.0 | 95.0 | – | – | 95.0 |
 | object GNN, regularized (seed 0) | 91.3 | 91.3 | – | – | 91.1 |
 | MLP, regularized (seed 0) | 72.8 | 72.4 | – | – | 73.0 |
+| ViT, width 224 | 93.4 | 93.4 | – | – | – |
+| ViT, width 64 | 79.1 | 78.9 | – | – | – |
 | **I-RAVEN-X 3×10, values 0–50** | | | | | |
 | facet, named columns | 85.4 | 85.4 (identical) | 70.2 | identical (built in) | – |
 | + copy links, per-panel gates | 97.8 | ≈60.0 (puzzles with Distribute 98.3 → 39.5) | – | – | – |
@@ -155,6 +168,8 @@ The rows-swap row for per-panel gates combines §21.5's two groups (646 puzzles 
 | MLP, regularized, 16× | 97.5 | 57.8 | 45.2 | 96.1 | 97.9 | 99.3 | 74.7 |
 | MLP, regularized (2 seeds) | 93.2 | 46.8 | 37.6 | 85.0 | 84.9 | 95.0 | 61.8 |
 | MLP, facet's weights (seed 0) | 87.8 | 32.7 | 20.3 | 74.0 | 63.0 | 90.5 | 52.1 |
+| ViT, width 224, reads the images (job 11931310, epoch 271) | 99.4 | 93.0 | 81.8 | 99.6 | 99.3 | 99.6 | 81.1 |
+| ViT, width 64, reads the images (job 11931310, epoch 264) | 89.8 | 56.2 | 57.9 | 96.7 | 95.1 | 90.0 | 67.9 |
 
 **Facet model / row fold on I-RAVEN by rule** (jobs 11920318 and 11921354, `facet_rule_eval.py`, 1000 unseen
 puzzles per layout; facet reproduces 97.3 (69.1), fold 95.8 (63.0)). Cells: facet / fold. Rules from each puzzle's XML, per component. Exact: the component's value histogram
@@ -171,6 +186,34 @@ for that attribute (its object count for Number, its positions for Position and 
 | Position | – | 50.9 / 48.7 | 70.7 / 71.3 | 63.5 / 63.5 |
 
 Matched: facet 97.3% of the 4031 puzzles with an Arithmetic rule and 97.3% of the 2969 without; fold 95.3 / 96.5.
+
+**ViT on I-RAVEN by rule** (jobs 11931809–10, `baselines/rule_eval.py`, the same definitions on the same 7000
+puzzles; reproduces 93.4 (64.4) and 79.1 (37.6)). Cells: width 224 / width 64.
+
+| part | Constant | Progression | Distribute | Arithmetic |
+|---|---|---|---|---|
+| type, size and colour | 82.4 / 76.0 | 89.7 / 73.2 | 86.6 / 68.2 | 86.3 / 65.1 |
+| type | 79.2 / 69.3 | 90.4 / 72.6 | 86.9 / 61.8 | – |
+| size | 78.6 / 72.6 | 88.3 / 72.3 | 84.6 / 70.1 | 87.0 / 60.9 |
+| colour | 87.7 / 84.3 | 90.1 / 75.3 | 89.0 / 76.2 | 85.6 / 69.5 |
+| Number/Position | 99.3 / 96.7 | – | – | – |
+| Number | – | 57.6 / 34.3 | 65.1 / 38.2 | 63.4 / 40.1 |
+| Position | – | 51.3 / 13.9 | 61.4 / 23.2 | 65.6 / 23.7 |
+
+Matched, width 224 / 64: 93.8 / 78.1 with an Arithmetic rule, 92.9 / 80.4 without.
+
+**ViT, width 224, by layout and rule** (type, size and colour exact). On grids, Constant is low because panels
+that are not uniform hold noise values there (§22.2), which no model can generate.
+
+| layout | matched (exact) | Constant | Progression | Distribute | Arithmetic |
+|---|---|---|---|---|---|
+| center | 99.4 (97.3) | 99.9 | 99.6 | 98.6 | 97.6 |
+| L-R | 99.6 (97.3) | 99.9 | 99.9 | 99.8 | 97.8 |
+| U-D | 99.3 (97.1) | 100 | 100 | 99.9 | 97.2 |
+| in-out | 99.6 (97.5) | 100 | 99.9 | 99.6 | 96.3 |
+| 2×2 | 93.0 (41.4) | 37.9 | 86.0 | 79.6 | 79.6 |
+| in-out grid | 81.1 (12.5) | 74.9 | 78.5 | 71.6 | 74.0 |
+| 3×3 | 81.8 (7.6) | 11.0 | 41.4 | 34.5 | 37.4 |
 
 ## 5. I-RAVEN-X 3×10, values 0–50: exact value per rule (%)
 
@@ -205,7 +248,7 @@ Count of attribute values per rule (of 3000): Constant 837, Progression 792, Dis
 
 | weights | I-RAVEN MLP | I-RAVEN GNN | 3×10 0–50 MLP | 3×10 0–50 GNN |
 |---|---|---|---|---|
-| 1× (264k / 1.6M) | 60.6 (17.1) | 87.2 (51.5) | 83.5 (3.9) | 71.6 (1.2) |
+| 1× (264–265k / 1,593–1,597k) | 60.6 (17.1) | 87.2 (51.5) | 83.5 (3.9) | 71.6 (1.2) |
 | 4× | 68.9 (25.2) | 86.3 (50.9) | 87.2 (2.5) | 72.3 (1.2) |
 | 16× | 71.0 (27.3) | 88.5 (58.8) | 86.4 (2.1) | 64.9 (1.3) |
 | 64× (17M / 102M) | 69.9 (26.0) | 86.5 (54.9) | 84.6 (2.4), lr 1e-4 | 63.3 (0.3) |
@@ -245,8 +288,8 @@ Distribute 93.4 / 87.7, Arithmetic 64.4 / 69.4.
 | I-RAVEN-X 3×10, 0–50, column roles (attributes) | 600 | **66.3** (16.4) | 64.6 (14.1) | 52.5 (4.1) | 53.0 (3.6) |
 | | 6000 | **94.1** (29.0) | 93.9 (28.5) | 90.5 (17.8), still rising at epoch 60 | 88.1 (17.6) |
 
-- Weights: components 266k shared, 533k separate, 266k matched (widths 22, 45, 90); attributes 288k shared, 932k
-  separate, 288k matched (18, 35, 69). Labels add 320 / 512.
+- Weights: components 266,528 shared, 533,056 separate, 265,532 matched (widths 22, 45, 90); attributes 288,328
+  shared, 932,190 separate, 288,214 matched (18, 35, 69). Labels add 320 / 512.
 - Transformed puzzles (mirror, size ↔ colour): the shared models are identical by construction; labelled and separate
   models move by at most 0.8 points (they learn the symmetry from the symmetric data).
 - One seed each.
@@ -266,3 +309,33 @@ Distribute 93.4 / 87.7, Arithmetic 64.4 / 69.4.
 | center, L-R, U-D, in-out | 100.00 | 100.00 |
 | 2×2 / 3×3 / in-out grid | 99.99 / 96.02 / 96.34 | 99.90 / 76.45 / 71.55 |
 | overall | 98.91 | 92.56 |
+
+## 9. Weight counts
+
+Learnable parameters, counted on 2026-10-31 from the saved checkpoints (`template_best.bin`, `model_best.pt`).
+All 102 torch checkpoints agree with their `best.json`.
+
+| model | I-RAVEN | 3×3, 0–10 | 3×10, 0–50 | 3×10, 0–100 | 3×10, 0–1000 |
+|---|---|---|---|---|---|
+| facet, named columns (60–80 or 150 epochs) | 266,528 | 266,528 | 1,410,632 | 1,425,082 | 1,685,182 |
+| + copy links, per-panel gates (also shuffled control at 0–50) | – | – | 1,597,682 | 1,799,182 | 5,426,182 |
+| + copy links, content gates | – | – | 1,436,332 | – | – |
+| column roles | – | – | 288,328 | – | – |
+| column roles + content gates | – | – | 314,028 | – | – |
+| column roles, wide | – | – | 1,389,960 | – | – |
+| column roles + content gates, wide | – | – | 1,447,660 | – | – |
+| row fold | 282,912 | – | 304,712 | – | – |
+| row fold + content gates | – | – | 330,412 | – | – |
+| value axis | – | 10,817 | 10,817 | same checkpoint | – |
+| value axis, without plus | – | – | 10,689 | same checkpoint | – |
+| value axis, weights per value | – | – | 335,475 | – | – |
+| symbolic template, rules / primitives | 41 / 94 | – | – | – | – |
+| MLP | 264,061 | 267,037 | 1,596,930 | 1,802,348 | 5,383,288 |
+| MLP, regularized (adds LayerNorm) | 264,343 | 265,813 | 1,598,766 | 1,803,482 | 5,383,642 |
+| object GNN, plain and regularized | 264,898 | 265,454 | 1,593,366 | 1,798,274 | 5,430,102 |
+| attribute GNN A | 266,252 | – | 1,595,743 | – | – |
+| attribute GNN B | 267,008 | – | 1,599,256 | – | – |
+| MLP 4× / 16× / 64× | 1,065,247 / 4,265,311 / 17,062,612 | – | 6,392,322 / 25,555,878 / 102,255,930 | – | – |
+| MLP, regularized 4× / 16× | 1,066,333 / 4,261,042 | – | 6,389,662 / 25,556,476 | – | – |
+| object GNN 4× / 16× / 64× (regularized: 4×, 16×) | 1,062,942 / 4,257,502 / 17,069,122 | – | 6,387,276 / 25,567,296 / 102,226,074 | – | – |
+| ViT, width 64 / width 224 | 335,038 / 3,752,958 | – | – | – | – |

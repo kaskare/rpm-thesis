@@ -47,9 +47,11 @@ Options of `bench_hub_grounding.py --template facet`:
 
 | file | what it is |
 |---|---|
+| `prepare_baseline_images.py` | nvsa env: the eight context panels of every I-RAVEN puzzle at 80×80, in `iraven.npz`'s order (`experiments/baselines/data/iraven_images.npz`), for `--arch vit`. |
 | `prepare_baseline_data.py` | pynl env: writes the facet model's puzzles, splits and weight counts as arrays (`experiments/baselines/data/<dataset>.npz`), plus `bench_hub_grounding`'s own targets for a check. |
-| `train_baseline.py` | nvsa env, GPU: on the facet model's task (same targets, selection and metrics), sized to the facet model's weights (`--scale` for more). Architectures: `mlp`, `gnn` (all-to-all over objects), `attr-abs` and `attr-rel` (all-to-all over object attributes, absolute or relative labels: plan models A and B). Regularization: `--norm`, `--dropout`, `--drop-edge`, `--wd`, `--schedule cosine`, `--warmup`, `--clip`, `--augment rows`. `--check-symmetry`, and transformed test sets after training or with `--eval-only`. |
-| `submit_baselines.sh`, `submit_sweep.sh`, `submit_regularized.sh`, `submit_attr_gnn.sh`, `submit_final.sh` | equal weights (2 seeds); 4×, 16×, 64×; the regularization grid; models A and B; the regularized setting on every dataset, second seeds and 4×/16×. |
+| `train_baseline.py` | nvsa env, GPU: on the facet model's task (same targets, selection and metrics), sized to the facet model's weights (`--scale` for more). Architectures: `mlp`, `gnn` (all-to-all over objects), `attr-abs` and `attr-rel` (all-to-all over object attributes, absolute or relative labels: plan models A and B). `vit`: a plain vision transformer over the I-RAVEN matrix as one image, end to end (the black-box vision reference). Regularization: `--norm`, `--dropout`, `--drop-edge`, `--wd`, `--schedule cosine`, `--warmup`, `--clip`, `--augment rows`. `--check-symmetry`, and transformed test sets after training or with `--eval-only`. |
+| `rule_eval.py` | nvsa env, GPU: an I-RAVEN baseline run by rule and layout on the unseen puzzles, with `facet_rule_eval.py`'s definitions (`rule_eval.json` in the run directory). |
+| `submit_baselines.sh`, `submit_sweep.sh`, `submit_regularized.sh`, `submit_attr_gnn.sh`, `submit_final.sh`, `submit_vit.sh` | equal weights (2 seeds); 4×, 16×, 64×; the regularization grid; models A and B; the regularized setting on every dataset, second seeds and 4×/16×; the ViT at 1× and 16×. |
 | `summarize_baselines.py` | the table, next to the facet model; `--per-rule`. |
 
 ## The symbolic models (ground-truth attributes, notes §15)
