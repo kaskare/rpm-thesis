@@ -30,4 +30,4 @@ archive/*/experiments/
 llm/results/*.jsonl
 
 # private working outline of the thesis (not tracked)
-thesis/THESIS_OUTLINE.md
+docs/THESIS_OUTLINE.md

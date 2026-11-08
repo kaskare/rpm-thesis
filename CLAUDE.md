@@ -1,9 +1,10 @@
 # I-RAVEN and I-RAVEN-X: symmetries as inductive bias in PyNeuraLogic models (thesis)
 
-Findings in order: `thesis/FINDINGS.md`. All result tables: `thesis/RESULTS.md` (update it with every new
-result). Plan: `thesis/THESIS_PLAN_symmetry.md`. Lab notes:
-`thesis/PYNEURALOGIC_NOTES.md`. Code map: `thesis/CODE_INDEX.md`. Project summary for Claude projects:
-`thesis/claude_project/PROJECT_KNOWLEDGE.md`.
+Findings in order: `docs/FINDINGS.md`. All result tables: `docs/RESULTS.md` (update it with every new
+result); what each symmetry buys, by model and dataset: `docs/SYMMETRY_RESULTS.md` (update it too); per rule
+with and without Arithmetic: `docs/ARITHMETIC.md`. Plan: `docs/THESIS_PLAN_symmetry.md`. Lab notes:
+`docs/PYNEURALOGIC_NOTES.md`. Code map: `docs/CODE_INDEX.md`. Project summary for Claude projects:
+`docs/claude_project/PROJECT_KNOWLEDGE.md`.
 
 ## Environment
 - PyNeuraLogic work: conda env `pynl` (Python 3.11, neuralogic 0.9.2, CPU/JVM only, never a GPU).
@@ -31,22 +32,35 @@ result). Plan: `thesis/THESIS_PLAN_symmetry.md`. Lab notes:
 - The user prefers "end to end" over "from pixels", and compact notebooks.
 
 ## Key code
-Scripts live in folders but run from the repo root (`python3 pynl/bench_hub_grounding.py ...`), so `data/`
-and `experiments/` paths are unchanged. Python puts a script's own folder on `sys.path` and scripts add the
-root, so imports stay bare (`from train_pynl import parse`).
-- `pynl/bench_hub_grounding.py --template facet`: the main model, a generative facet model on per-puzzle
-  graphs (copy links, content gates, column roles); `facet_symmetry_check.py`, `dataset_symmetry_check.py`,
-  `facet_rule_eval.py`, `facet_viz.py`; jobs `submit_facet_long.sh`, `submit_column_roles.sh`.
-- `baselines/`: torch MLP, all-to-all object GNN and attribute-level GNNs (A/B) on the facet model's task.
-- `pynl/pynl_symbolic.py` + `rpm_symbolic.py`: symbolic models; `rpm_reference_solvers.py`: non-learned
+Layout (since 2026-11-08):
+- `core/`: the models, their training and their scoring, nothing else. `core/pynl/` (PyNeuraLogic),
+  `core/baselines/` (torch), `core/frontend/` (ResNet-18 perception), `core/gnn/` (the inherited I-RAVEN data
+  package, slot fix). Nothing in `core/` imports from outside it, except IBM's `raven/` and `torch_gnn/`.
+- `analysis/`: checks, inspections and drawings that read models or data (symmetry checks, viz, sanity checks).
+- `data_prep/`: data generation and conversion (rule twins, Arithmetic-only sets, arrays and images for torch).
+- `jobs/pynl/`, `jobs/baselines/`: SLURM job scripts only.
+- `notebooks/`: all notebooks. `docs/`: all written output (results, findings, notes, plan, executed notebook
+  pages, figures); `docs/private/` is git-excluded.
+- `red_team/`: one critical review per markdown file in `docs/`.
+
+Scripts run from the repo root (`python3 core/pynl/bench_hub_grounding.py ...`), so `data/` and `experiments/`
+paths are unchanged. Scripts outside `core/` put the `core/` folder they need on `sys.path`, so imports stay bare
+(`import bench_hub_grounding as B`).
+- `core/pynl/bench_hub_grounding.py --template facet`: the main model, a generative facet model on per-puzzle
+  graphs (copy links, content gates, column roles, row fold); `core/pynl/facet_rule_eval.py` scores
+  checkpoints, `core/pynl/facet_symmetry_check.py` (the transforms), `core/pynl/facet_stream.py` (streaming
+  with weight decay); jobs `jobs/pynl/submit_facet_long.sh`, `jobs/pynl/submit_column_roles.sh`.
+- `core/baselines/train_baseline.py`: torch MLP, all-to-all object GNN, attribute-level GNNs (A/B) and ViT on
+  the facet model's task; data from `data_prep/prepare_baseline_data.py`.
+- `core/pynl/pynl_symbolic.py` + `rpm_symbolic.py`: symbolic models; `rpm_reference_solvers.py`: non-learned
   references; `pynl_symbolic_e2e.py`: end to end.
-- `pynl/pixel_pipeline.py` + `submit_pixels.sh`: the ResNet-18 frontend over every panel
-  (`experiments/frontend_preds/`); `frontend/`: the frontend itself; `gnn/`: the inherited data package
-  (slot fix), still imported.
-- `pynl/value_axis.py`: the value-axis model (values as constants, a convolution along them; notes §27);
-  drawings `value_axis_viz.py`; jobs `submit_value_axis.sh`.
+- `core/pynl/pixel_pipeline.py` + `jobs/pynl/submit_pixels.sh`: the ResNet-18 frontend over every panel
+  (`experiments/frontend_preds/`); `core/frontend/`: the frontend itself.
+- `core/pynl/value_axis.py`: the value-axis model (values as constants, a convolution along them; notes §27);
+  drawings `analysis/value_axis_viz.py`; jobs `jobs/pynl/submit_value_axis.sh`.
 - `notebooks/facet_model.ipynb` and `notebooks/value_axis.ipynb` (they `chdir` to the repo root); executed
-  copies `thesis/facet_model.html`, `thesis/value_axis.html`.
+  copies `docs/facet_model.html`, `docs/value_axis.html`. `notebooks/symmetry_briefing.ipynb` goes with the
+  supervisor briefing page (`docs/symmetry_briefing.html`).
 - `llm/`: LLM benchmark on I-RAVEN (images end to end, or text with XML labels); see `llm/README.md`.
 - Superseded code is in `archive/` (the GNN-style PyNeuraLogic model and the original torch GNN in
   `archive/superseded_2026-10-28/`); not runnable from there as is.
