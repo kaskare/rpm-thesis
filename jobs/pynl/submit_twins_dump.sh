@@ -6,8 +6,9 @@
 #SBATCH --job-name=twins_dump
 #SBATCH --output=log/twins_dump_%j.out
 
-# The generated values of trained rule-twin checkpoints on the unseen puzzles 6300..7299, for analysis/rule_orbits.py
+# The generated values of trained rule-twin checkpoints on the unseen puzzles 6300..7299, for analysis/twins_seeds.py
 # --dumps: are rows whose first step no training row had answered right (docs/ARITHMETIC.md, "Sum and midpoint compared")?
+# RUNS: run directories under experiments/twins; --scale, --gate and --steps come back from each run's best.json.
 #   sbatch jobs/pynl/submit_twins_dump.sh
 
 export JAVA_HOME=/mnt/appl/software/Java/21.0.8
@@ -22,7 +23,7 @@ mkdir -p ${OUT}
 for run in ${RUNS:-shared_midpoint_n100 shared_midpoint_n300 shared_midpoint_n600 shared_mirror_n100 shared_mirror_n600 pervalue_midpoint_n100 pervalue_midpoint_n600}; do
   rule=$(echo ${run} | cut -d_ -f2)
   case "${run}" in
-    shared_*)   FLAGS="--pair --kernel 50 --ring" ;;
+    shared_*|scaled_*|doubled_*|sharedgate_*|scaledgate_*|sharedsteps_*|doubledsteps_*|scaledsteps_*) FLAGS="--pair --kernel 50 --ring" ;;
     lplus_*)    FLAGS="--pair --kernel 50 --ring" ;;
     pervalue_*) FLAGS="--pair --kernel 50" ;;
   esac

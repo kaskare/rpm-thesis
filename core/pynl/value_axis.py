@@ -53,6 +53,24 @@ reached in every Arithmetic row and 1-4% of Progression and Distribute rows: the
 rule. --state-next lets the state also move along next (the offsets -K..K, one weight matrix each), so it reaches
 many more values (5.0 of 11 on 3x3, 43.3 of 51 on 3x10), and the weights have to pick the plus steps.
 
+--scale (with --ring --no-plus): the kernel's offsets counted in each row's own unit, V = U + k S, so that the scale
+is one more thing the template does not name (docs/ARITHMETIC.md, "The scaling kernel"). Background facts
+mul(bk, S, D): the step D is k units of S on the ring. The ring has 2 maxval + 1 values, a prime for maxval 50, so
+every step has every multiple and every fraction, a half-step included. A row's unit rs(Rw, A, S) is derived from
+its first two panels through unit(U, W, S): their step itself (--scale step), or the largest power of two in it
+(--scale pow2). The kernel keeps one weight per k and names the k only. With step, multiplying every value by any number
+and adding any number renames values and steps and leaves mul and off in place, so the model is equivariant to all
+of it, exactly: it can only answer c = b + g (b - a), one learned g per context. With pow2 the same holds for
+doubling, as long as the doubled first steps stay within +-maxval (unit reads a step's integer). A row whose first
+two values are equal has no unit and no kernel atoms; the counts carry it.
+
+--gate: the rule descriptor gates the answer (docs/ARITHMETIC.md, "The rule gate"). By default o(A, V) adds ctx2(A) to
+the kernel's features of the question row at V. With --gate those features, kf(A, V) = h(qlast, A, V) and the last
+pair's pv, each through its weights, are multiplied feature by feature with gt(A) = sigmoid(W ctx2(A) + b), and the
+product goes into o in their place. gt names no value and is the same at every V, so every value symmetry of the
+template stays. The reason: two rules whose question rows start the same (a midpoint row with first step 2 and a
+Progression by 2) differ only in the complete rows, which ctx reads.
+
 --peano: the plus table (1,326 facts at values 0..50) replaced by what it follows from, the zero and next on the
 values (succ(v_i, v_i+1), 50 facts) and two rules with no weights, Peano's definition of addition:
   plus(U, v0, U)    :- val(U).                              u + 0 = u
@@ -77,13 +95,24 @@ OFFSETS = (-2, -1, 0, 1, 2)
 RULES = ("Constant", "Progression", "Distribute_Three", "Arithmetic")
 oname = lambda k: f"o{'m' if k < 0 else 'p'}{abs(k)}"
 sname = lambda k: f"s{'m' if k < 0 else 'p'}{abs(k)}"       # a shift by k along the whole axis
+bname = lambda k: f"b{'m' if k < 0 else 'p'}{abs(k)}"       # an offset of k of a row's own units (--scale)
 
 
 def build_value_template(d, maxval, plus=True, per_value=False, find_zero=False, chain_rules=False, attrs=ATTRS,
-                         offsets=OFFSETS, ring=False, pair=False, learned_plus=False, state_next=False, peano=False):
+                         offsets=OFFSETS, ring=False, pair=False, learned_plus=False, state_next=False, peano=False,
+                         scale=None, gate=False, steps=False):
     """learned_plus=True (with plus): the plus facts, used by learned rules instead of the weight-free sums, checks
     and answers (see the module docstring); state_next=True: the state also moves along next. peano=True: no plus
     table; plus is derived from the zero and next (succ) by two rules with no weights, the same atoms.
+    scale="step" or "pow2" (with ring, no plus): the kernel's offsets counted in each row's own unit, its first step
+    or the largest power of two in it (see the module docstring).
+    gate=True: the answer reads the kernel's features of the question row through a gate, a sigmoid per feature
+    computed from the rule descriptor ctx2 (the same at every value, so the value symmetries stay). Without it the
+    descriptor is only added to those features. d * d + d more weights.
+    steps=True: the row descriptor also reads each neighbouring pair's step directly, as the first panel's kernel
+    feature at the second panel's value: that is the kernel weight of exactly the pair's step (of the step in the
+    row's unit with scale). The pooled pair descriptor pd sums over every value and can lose the step
+    (docs/ARITHMETIC.md, "The rule gate"). Value-free, so the value symmetries stay. 2 d * d more weights.
     attrs: the attributes answered, in the order of the output. offsets: the kernel. ring: the axis closes on
     itself, so no value lies near an end (maxval is then the ring's last value, past the data's). pair: the answer
     also reads the question row's last two panels together, seen from V. per_value=True: the ablation of the value
@@ -118,9 +147,24 @@ def build_value_template(d, maxval, plus=True, per_value=False, find_zero=False,
         m += R.plus(V.U, V.W2, V.V2) <= (R.plus(V.U, V.W, V.V), S.succ(V.W, V.W2), S.succ(V.V, V.V2))
     if plus and find_zero:                     # the axis over its whole range, upwards; no zero marked
         m += [R.sh(vals[u], vals[v], sname(v - u)) for u in range(maxval + 1) for v in range(u, maxval + 1)]
+    if scale:                                  # multiples of a step on the ring, and each row's unit
+        n, half = maxval + 1, maxval // 2
+        cen = lambda x: (x + half) % n - half
+        m += [R.mul(bname(k), oname(s), oname(cen(k * s))) for k in offsets for s in offsets if s]
+        # unit(U, W, S): the unit S of a row that starts with the values U, W: their step (step), or the largest power
+        # of two in it (pow2; s & -s, also for s < 0). No fact for U = W: such a row has no unit.
+        part = (lambda s: s & -s) if scale == "pow2" else (lambda s: s)
+        m += [R.unit(vals[i], vals[(i + s) % n], oname(part(s))) for i in range(n) for s in offsets if s]
+        m += R.rs(V.Rw, V.A, V.S) <= (S.inrow(V.P, V.Rw), S.col(V.P, "first"), S.next(V.P, V.Q), R.x(V.P, V.A, V.U),
+                                      S.x(V.Q, V.A, V.W), S.unit(V.U, V.W, V.S))
+        m += (R.rs / 3) | ident
 
     # the convolution along the value axis: one weight per offset, the same at every value
     for k in offsets:
+        if scale:                              # the same kernel in the row's unit: V = U + k S, k named, S not
+            m += R.h(V.P, V.A, V.V) <= (S.inrow(V.P, V.Rw), S.rs(V.Rw, V.A, V.S), R.x(V.P, V.A, V.U)[d, 1],
+                                         S.off(V.U, V.V, V.D), S.mul(bname(k), V.S, V.D))
+            continue
         for i, v in enumerate(vs):
             if not per_value or 0 <= i - k <= maxval:
                 m += R.h(V.P, V.A, v) <= (R.x(V.P, V.A, V.U)[d, 1], S.off(V.U, v, oname(k)))
@@ -134,6 +178,10 @@ def build_value_template(d, maxval, plus=True, per_value=False, find_zero=False,
         m += (R.pd(V.P, V.Q, V.A) <= R.pv(V.P, V.Q, V.A, v)[d, d]) | meta(aggregation=Aggregation.SUM)
     m += (R.pd / 3) | tanh
     m += (R.rd(V.Rw, V.A) <= (S.inrow(V.P, V.Rw), R.pd(V.P, V.Q, V.A)[d, d])) | meta(aggregation=Aggregation.AVG)
+    if steps:                                  # the pair's step itself: P's kernel feature at Q's value
+        m += R.ps(V.P, V.Q, V.A) <= (S.next(V.P, V.Q), R.h(V.P, V.A, V.V)[d, d], S.x(V.Q, V.A, V.V))
+        m += (R.ps / 3) | tanh
+        m += (R.rd(V.Rw, V.A) <= (S.inrow(V.P, V.Rw), R.ps(V.P, V.Q, V.A)[d, d])) | meta(aggregation=Aggregation.AVG)
     m += (R.rd / 2) | tanh
 
     # values per row: counts, distinct values, overlap of a complete row with the question row
@@ -255,11 +303,18 @@ def build_value_template(d, maxval, plus=True, per_value=False, find_zero=False,
     m += (R.ctx2 / 1) | tanh
 
     # the answer at every value: the same two layers at every V (a 1x1 convolution), then a softmax over V
+    if gate:                                   # which of the kernel's features the answer reads, by the rule descriptor
+        m += R.gt(V.A) <= R.ctx2(V.A)[d, d]
+        m += R.gt(V.A) <= (S.attr(V.A), R.one[d, 1])
+        m += (R.gt / 1) | meta(transformation=Transformation.SIGMOID)
+    kf = R.kf if gate else R.o                 # the question row's kernel features at V: gated, or added as they are
     for v in vs:
         m += R.o(V.A, v) <= (S.val(v), R.ctx2(V.A)[d, d])
-        m += R.o(V.A, v) <= (S.qlast(V.P), R.h(V.P, V.A, v)[d, d])
+        m += kf(V.A, v) <= (S.qlast(V.P), R.h(V.P, V.A, v)[d, d])
         if pair:
-            m += R.o(V.A, v) <= (S.qlast(V.Q), S.next(V.P, V.Q), R.pv(V.P, V.Q, V.A, v)[d, d])
+            m += kf(V.A, v) <= (S.qlast(V.Q), S.next(V.P, V.Q), R.pv(V.P, V.Q, V.A, v)[d, d])
+        if gate:
+            m += (R.o(V.A, v) <= (R.gt(V.A), R.kf(V.A, v))) | meta(combination=Combination.ELPRODUCT)
         m += (R.o(V.A, v) <= (S.full(V.Rw), R.pr(V.Rw, V.A, v)[d, 1])) | meta(aggregation=Aggregation.SUM)
         m += R.o(V.A, v) <= R.pr("r3", V.A, v)[d, 1]
         if plus and not learned_plus:
@@ -267,6 +322,8 @@ def build_value_template(d, maxval, plus=True, per_value=False, find_zero=False,
             m += R.o(V.A, v) <= R.ma(V.A, v)[d, 1]
         if learned_plus:                        # the question row's state at V, back to the missing panel
             m += R.o(V.A, v) <= R.st(ql, V.A, v)[d, d]
+    if gate:
+        m += (R.kf / 2) | ident
     m += (R.o / 2) | tanh
     for v in vs:
         m += R.o2(V.A, v) <= R.o(V.A, v)[d, d]
@@ -392,15 +449,33 @@ def main():
                     help="close the axis into a ring of 2 maxval + 1 values, with --kernel maxval: every offset at every "
                          "value, so pooling cannot read how far a value is from the ends (exactly shift-equivariant)")
     ap.add_argument("--pair", action="store_true", help="the answer also reads the question row's last two panels together")
+    ap.add_argument("--scale", choices=("step", "pow2"), default=None,
+                    help="with --ring --no-plus: the kernel's offsets counted in each row's own unit, its first step (step: "
+                         "equivariant to every scaling and shift of the values) or the largest power of two in it (pow2: "
+                         "to doubling)")
+    ap.add_argument("--gate", action="store_true",
+                    help="the rule descriptor gates the kernel's features in the answer (a sigmoid per feature) instead of "
+                         "only being added to them")
+    ap.add_argument("--steps", action="store_true",
+                    help="the row descriptor also reads each neighbouring pair's step directly (the first panel's kernel "
+                         "feature at the second panel's value), not only pooled over all values")
     ap.add_argument("--save-dir", default=None)
+    ap.add_argument("--seed", type=int, default=None, help="seed of the backend's random generator (initial weights, "
+                    "order of the training samples); default: a fresh random one per run")
+    ap.add_argument("--select", choices=("matched", "exact"), default="matched", help="what picks the saved epoch on the "
+                    "selection puzzles; exact is the whole puzzle's (the rule twins use it: matched sits near 100 there)")
     ap.add_argument("--jvm-gb", type=int, default=16)
     ap.add_argument("--check-shift", action="store_true", help="random weights: outputs of shifted puzzles")
     ap.add_argument("--check-ring", action="store_true", help="random weights: outputs of puzzles shifted around the ring")
+    ap.add_argument("--check-scale", action="store_true",
+                    help="random weights: outputs of puzzles whose values are multiplied and shifted on the ring")
     ap.add_argument("--eval", default=None, help="score this run directory on --iravenx (any value range)")
     args = ap.parse_args()
 
     import neuralogic
     neuralogic.set_max_memory_size(args.jvm_gb)
+    if args.seed is not None:
+        neuralogic.manual_seed(args.seed)                     # before the first Settings, which hands it to the backend
     from neuralogic.logging import clear_handlers
     clear_handlers()
     from neuralogic.core import R, Settings
@@ -415,6 +490,7 @@ def main():
         args.dim, args.no_plus, args.per_value = a["dim"], a["no_plus"], a.get("per_value", False)
         args.find_zero, args.learned_plus = a.get("find_zero", False), a.get("learned_plus", False)
         args.state_next, args.peano = a.get("state_next", False), a.get("peano", False)
+        args.scale, args.gate, args.steps = a.get("scale"), a.get("gate", False), a.get("steps", False)
         if args.per_value and maxval != maxval_of(a["iravenx"]):
             raise SystemExit(f"{args.eval}: weights per value are tied to values 0..{maxval_of(a['iravenx'])}")
     if args.find_zero and (args.no_plus or args.per_value):
@@ -429,10 +505,15 @@ def main():
         raise SystemExit("--ring needs --kernel maxval, shared weights, and --no-plus or --learned-plus (the plus "
                          "facts do not wrap, so with them only the kernel is a ring)")
     top = 2 * maxval if args.ring else maxval                # the last value on the axis
+    if args.scale and not (args.ring and args.no_plus):
+        raise SystemExit("--scale needs --ring and --no-plus")
+    if args.scale and any((top + 1) % p == 0 for p in range(2, int((top + 1) ** 0.5) + 1)):
+        raise SystemExit(f"--scale needs a ring of prime size (every step a unit); 2 maxval + 1 = {top + 1} is not")
     model = build_value_template(args.dim, top, plus=not args.no_plus, per_value=args.per_value,
                                  find_zero=args.find_zero, offsets=tuple(range(-args.kernel, args.kernel + 1)),
                                  ring=args.ring, pair=args.pair, learned_plus=args.learned_plus,
-                                 state_next=args.state_next, peano=args.peano)
+                                 state_next=args.state_next, peano=args.peano, scale=args.scale, gate=args.gate,
+                                 steps=args.steps)
     model.build(Settings(optimizer=Adam(lr=args.lr), error_function=MSE(), iso_value_compression=False,
                          chain_pruning=False))
     n_w = sum(np.asarray(v).size for v in model.state_dict()["weights"].values())
@@ -444,6 +525,9 @@ def main():
 
     if args.check_ring:
         check_ring(model, samples_of, top, args.iravenx)
+        return
+    if args.check_scale:
+        check_scale(model, samples_of, top, args.iravenx, min(args.n_val, 100))
         return
     if args.check_shift:
         check_shift(model, samples_of, maxval, args.iravenx,
@@ -466,7 +550,7 @@ def main():
     rules = {"train": rules_of(args.iravenx, 0, args.n), "sel": rules_of(args.iravenx, 6000, args.n_sel),
              "unseen": rules_of(args.iravenx, 6300, args.n_val)}
     built = {k: list(model.build_dataset(Dataset(samples_of(s, k)))) for k, s in sets.items()}
-    print(f"value-axis model{'' if not args.no_plus else ', no plus'}{', plus used by learned rules' if args.learned_plus else ''}{', the state also along next' if args.state_next else ''}{', plus from the zero and next' if args.peano else ''}{', weights per value' if args.per_value else ''}{', zero found per puzzle' if args.find_zero else ''}: dim {args.dim}, {n_w} weights, values 0..{maxval}, "
+    print(f"value-axis model{'' if not args.no_plus else ', no plus'}{', plus used by learned rules' if args.learned_plus else ''}{', the state also along next' if args.state_next else ''}{', plus from the zero and next' if args.peano else ''}{', weights per value' if args.per_value else ''}{', zero found per puzzle' if args.find_zero else ''}{', rows in units of ' + ('their first step' if args.scale == 'step' else 'the power of two in their first step') if args.scale else ''}{', answer gated by the rule descriptor' if args.gate else ''}{', row descriptor reads the steps' if args.steps else ''}: dim {args.dim}, {n_w} weights, values 0..{maxval}, "
           f"rows of {len(B.COLS)}; {args.n} training puzzles; grounded in {time.time() - t:.0f}s", flush=True)
 
     best, hist = (-1, 0), []
@@ -481,8 +565,8 @@ def main():
             res[k] = {"matched": matched / len(sets[k]), "exact": exact["all"] / len(sets[k]),
                       "per_rule": {r: hits[r][0] / max(1, hits[r][1]) for r in RULES}}
         hist.append({"epoch": ep, **res})
-        if res["sel"]["matched"] > best[0]:
-            best = (res["sel"]["matched"], ep)
+        if res["sel"][args.select] > best[0]:
+            best = (res["sel"][args.select], ep)
             if args.save_dir:
                 model.save(os.path.join(args.save_dir, "template_best.bin"))
                 json.dump({"epoch": ep, "args": vars(args), "weights": n_w, **hist[-1]},
@@ -525,6 +609,35 @@ def check_ring(model, samples_of, top, path):
                 diff.append(np.abs(p0 - p1).max())
             print(f"  {a} {k:+d}: {len(data)} puzzles, max {max(diff):.1e}; not rolled (control): mean {np.mean(ctrl):.1e}",
                   flush=True)
+
+
+def check_scale(model, samples_of, top, path, n_puzzles=100):
+    """Random weights: every value of one attribute multiplied by k and moved by s on the ring. With --scale step the
+    output should follow for every k and s; with --scale pow2 for k = 2 in the puzzles whose first steps stay within
+    the data's range when doubled ("small"); without --scale only for k = 1."""
+    from neuralogic.dataset import Dataset
+    n = top + 1
+    data = B.load_iravenx(path, 6300, n_puzzles)
+    print("random weights on the ring; max |output difference| after moving the original output the same way", flush=True)
+    o0 = model.test(list(model.build_dataset(Dataset(samples_of(data, "b")))))
+    for k, s in ((1, 9), (2, 0), (2, 7), (3, 0), (n // 2 + 1, 0), (n - 1, 5)):
+        perm = [(k * v + s) % n for v in range(n)]
+        for i, a in enumerate(ATTRS):
+            moved = [([[{**o, a: perm[o[a]]} for o in p] for p in pz], y, c) for pz, y, c in data]
+            o1 = model.test(list(model.build_dataset(Dataset(samples_of(moved, "s")))))
+            diff, ctrl, small = [], [], []
+            for (pz, _, _), x0, x1 in zip(data, o0, o1):
+                p0 = np.asarray(x0, dtype=float).reshape(len(ATTRS), n)
+                p1 = np.asarray(x1, dtype=float).reshape(len(ATTRS), n)
+                ctrl.append(np.abs(p0 - p1).max())                  # control: not moved
+                q = p0.copy()
+                q[i, perm] = p0[i]
+                diff.append(np.abs(q - p1).max())
+                small.append(all(abs(pz[ps[1]][0][a] - pz[ps[0]][0][a]) <= top // 4 for ps in B.ROWS.values()))
+            diff, small = np.array(diff), np.array(small)
+            print(f"  {a} x{k} {s:+d}: {len(data)} puzzles, max {diff.max():.1e}, exact (< 1e-12) in {int((diff < 1e-12).sum())}; "
+                  f"small first steps: {int(small.sum())} puzzles, max {diff[small].max():.1e}; not moved (control): "
+                  f"mean {np.mean(ctrl):.1e}", flush=True)
 
 
 def check_shift(model, samples_of, maxval, path, what):

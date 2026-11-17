@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Sum against midpoint: what a built-in symmetry does to each rule's table (docs/ARITHMETIC.md, "Sum and midpoint
-compared"). No network: three learners that know only a symmetry, fit by counting on the rule-twin puzzles
+compared"). No network: learners that know only a symmetry, fit by counting on the rule-twin puzzles
 (data_prep/rule_twins.py, rows of 3, values 0..50).
 
 A learner predicts the answer c of the question row (a, b, ?) from a and b. Its built-in symmetry is a group H of moves of
@@ -9,6 +9,12 @@ answer per orbit of inputs under H, and a training row teaches every row of its 
   table     H = nothing: one answer per pair (a, b). This is memorising.
   diagonal  H = every panel +s, the convolution's symmetry: c = b + g(b - a), one answer per first step b - a.
   operand   H = a +s with c +s, and b +s with c +s, addition's own moves: c = a + b + k, one number k for the whole table.
+  doubling  H = every panel +s, and every panel doubled: c = b + S g(m), where the first step is b - a = m S with m odd
+            and S a power of two. One answer per odd part m ("The scaling kernel", value_axis.py --scale pow2).
+  scaling   H = every panel +s, and every panel times any number: c = b + g (b - a), one number g for the whole table
+            (value_axis.py --scale step).
+The last two count on the ring of 101 values the model uses (value_axis.py --ring): 101 is prime, so every step has
+an inverse and a half-step is a ring element. A row with a = b has one answer under either, c = a.
 Each learner is fit on the question rows of the first N puzzles (those are the rows with a loss in every model here), by
 majority vote per orbit, and scored on the unseen puzzles 6300..7299, attributes that follow the test rule. An input whose
 orbit no training row reached counts as wrong. "ceiling" fits the learner on every row of the rule's table: the most an
@@ -19,9 +25,17 @@ import argparse, collections, json
 
 ATTRS = ("Type", "Size", "Color")
 SIZES = (10, 30, 100, 300, 600, 1000, 6000)
-ORBIT = {"table": lambda a, b: (a, b), "diagonal": lambda a, b: b - a, "operand": lambda a, b: 0}
+RING = 101                                            # the model's ring of values, 2 * 50 + 1: a prime
+inv = lambda x: pow(x % RING, -1, RING)
+pow2 = lambda d: (d & -d) if d else 0                 # the largest power of two in a step (d & -d works for d < 0 too)
+unit = {"doubling": pow2, "scaling": lambda d: d}     # the unit a row is read in
+ORBIT = {"table": lambda a, b: (a, b), "diagonal": lambda a, b: b - a, "operand": lambda a, b: 0,
+         "doubling": lambda a, b: (b - a) // pow2(b - a) if a != b else 0, "scaling": lambda a, b: a != b}
 ANSWER = {"table": lambda a, b, c: c, "diagonal": lambda a, b, c: c - b, "operand": lambda a, b, c: c - a - b}
 PREDICT = {"table": lambda a, b, r: r, "diagonal": lambda a, b, r: b + r, "operand": lambda a, b, r: a + b + r}
+for _k, _u in unit.items():                           # the answer in units of the row: (c - b) / unit on the ring
+    ANSWER[_k] = lambda a, b, c, u=_u: (c - b) * inv(u(b - a)) % RING if a != b else 0
+    PREDICT[_k] = lambda a, b, r, u=_u: (b + r * u(b - a)) % RING if a != b else a
 
 
 def rows(path, start, n, complete):
