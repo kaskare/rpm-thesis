@@ -38,7 +38,7 @@ Layout (since 2026-11-08):
   package, slot fix). Nothing in `core/` imports from outside it, except IBM's `raven/` and `torch_gnn/`.
 - `analysis/`: checks, inspections and drawings that read models or data (symmetry checks, viz, sanity checks).
 - `data_prep/`: data generation and conversion (rule twins, Arithmetic-only sets, arrays and images for torch).
-- `jobs/pynl/`, `jobs/baselines/`: SLURM job scripts only.
+- `jobs/pynl/`, `jobs/baselines/`, `jobs/frontend/`: SLURM job scripts only.
 - `notebooks/`: all notebooks. `docs/`: all written output (results, findings, notes, plan, executed notebook
   pages, figures); `docs/private/` is git-excluded.
 - `red_team/`: one critical review per markdown file in `docs/`.
@@ -48,16 +48,24 @@ paths are unchanged. Scripts outside `core/` put the `core/` folder they need on
 (`import bench_hub_grounding as B`).
 - `core/pynl/bench_hub_grounding.py --template facet`: the main model, a generative facet model on per-puzzle
   graphs (copy links, content gates, column roles, row fold); `core/pynl/facet_rule_eval.py` scores
-  checkpoints, `core/pynl/facet_symmetry_check.py` (the transforms), `core/pynl/facet_stream.py` (streaming
+  checkpoints, `core/pynl/facet_e2e_eval.py` scores them end to end on the ViT recognizer's panels
+  (`jobs/pynl/submit_facet_e2e.sh`), `core/pynl/facet_symmetry_check.py` (the transforms), `core/pynl/facet_stream.py` (streaming
   with weight decay); jobs `jobs/pynl/submit_facet_long.sh`, `jobs/pynl/submit_column_roles.sh`.
 - `core/baselines/train_baseline.py`: torch MLP, all-to-all object GNN, attribute-level GNNs (A/B) and ViT on
-  the facet model's task; data from `data_prep/prepare_baseline_data.py`.
+  the facet model's task; data from `data_prep/prepare_baseline_data.py`. `core/baselines/test_eval.py` scores a
+  checkpoint once on the test split (`test.json`; the main-table baselines and the plain facet checkpoint have had
+  their pass, RESULTS §1).
 - `core/pynl/pynl_symbolic.py` + `rpm_symbolic.py`: symbolic models; `rpm_reference_solvers.py`: non-learned
   references; `pynl_symbolic_e2e.py`: end to end.
 - `core/pynl/pixel_pipeline.py` + `jobs/pynl/submit_pixels.sh`: the ResNet-18 frontend over every panel
   (`experiments/frontend_preds/`); `core/frontend/`: the frontend itself.
 - `core/pynl/value_axis.py`: the value-axis model (values as constants, a convolution along them; notes §27);
-  drawings `analysis/value_axis_viz.py`; jobs `jobs/pynl/submit_value_axis.sh`.
+  drawings `analysis/value_axis_viz.py`; jobs `jobs/pynl/submit_value_axis.sh`. On the rule twins (sum, midpoint;
+  `jobs/pynl/submit_rule_twins.sh`, `analysis/twins_seeds.py`, `analysis/rule_orbits.py`): `--seed`, `--select exact`,
+  `--scale step|pow2` for rows read in their own unit (`docs/ARITHMETIC.md`, "The scaling kernel"), and `--gate`
+  ("The rule gate"; `analysis/twins_probe.py` reads a checkpoint's row descriptor) and `--steps` ("The row
+  descriptor reads the steps"). Proofs for the twins in plain words: `docs/thesis/ch3_pricing_proofs.md`, checked by
+  `analysis/pricing_checks.py`.
 - `notebooks/facet_model.ipynb` and `notebooks/value_axis.ipynb` (they `chdir` to the repo root); executed
   copies `docs/facet_model.html`, `docs/value_axis.html`. `notebooks/symmetry_briefing.ipynb` goes with the
   supervisor briefing page (`docs/symmetry_briefing.html`).

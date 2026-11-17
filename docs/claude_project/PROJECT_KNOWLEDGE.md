@@ -66,8 +66,9 @@ same task (MLP, all-to-all GNNs) are the references.
   10), values 0..maxval for type, size and colour alike. Puzzles 0–5999 train, 6000–6299 selection,
   6300–7299 unseen.
 * Arithmetic: plus c_n = c_1 + … + c_{n−1}, minus c_1 = c_2 + … + c_n. Distribute rows are cyclic shifts of
-  row 1 by ±1. Distribute draws values up to maxval **inclusive**, one more than the codes hold, so the
-  facet model's I-RAVEN-X exact scores are slightly off. Matching is unaffected.
+  row 1 by ±1. Distribute draws values up to maxval **inclusive**, one more than the codes hold. Until
+  2026-11-08 this capped the facet model's I-RAVEN-X exact at 95.6% on 3×3 and 98.4% on 3×10 (a scorer bug,
+  fixed and rescored: 3×3 facet exact 97.0, copy links 99.3). Matching was never affected.
 
 ### Protocol
 The epoch is picked on selection puzzles (I-RAVEN val 0–299 per constellation; I-RAVEN-X 6000–6299).
@@ -141,8 +142,8 @@ checkpoint.
 | model | I-RAVEN matched (exact) | I-RAVEN-X 3×10, values 0–50 |
 |---|---|---|
 | facet | **97.3** (69.1); per layout 99.3 / 95.5 / 89.8 / 99.5 / 99.7 / 99.6 / 97.8 | 85.4 (15.0); 89.1 after 150 epochs |
-| facet + copy links, per-panel gates | – | **97.8** (60.0), but 39.5% on Distribute puzzles after a row swap |
-| facet + copy links, content gates | – | 94.9 (51.7), unchanged by a row swap |
+| facet + copy links, per-panel gates | – | **97.8** (60.6), but 39.5% on Distribute puzzles after a row swap |
+| facet + copy links, content gates | – | 94.9 (52.3), unchanged by a row swap |
 | shuffled-copy control | – | 87.3 |
 | torch MLP, equal weights / best regularized | 60.6 / 72.8 | 83.5 / 84.4 (exact 2.6) |
 | torch all-to-all object GNN, equal / best regularized | 87.2 / 91.3 | 71.6 / 84.0 (exact 3.3) |
@@ -164,6 +165,21 @@ checkpoint.
 * CONCAT follows the grounder's order. Every sample needs its own query atom. `build_dataset` may be called
   once. Embeddings must be weighted facts.
 * Copy gates must start closed (bias −6). A weight given as values must be a flat list to act as a vector.
+* A rule body that can only fail through a large fact table makes the grounder search every binding (minutes per
+  puzzle). Give such cases no atom to start from (2026-11-15, notes §27, "Pitfall").
+- A descriptor pooled over the whole value ring can be a constant: in the value-axis model the pair features summed
+  over all values depend on the pair's step only through the tanh, and in 22 of 24 trained rule-twin runs the row
+  descriptor was the same vector for every row (2026-11-16, `docs/ARITHMETIC.md`, "The rule gate"). Probe a hidden
+  atom by making it a sample's query before blaming a later layer. Fix: read a pair's step directly, as one panel's
+  kernel feature at the next panel's value (`value_axis.py --steps`, 2026-11-17); the scaled model then learns
+  midpoint at every seed.
+- Say whose symmetry a ceiling belongs to. "A shift-equivariant model cannot fit sum" holds for a learner that answers
+  from the question row. The shift of the whole puzzle alone does not cap sum: c₃ = b₃ + (c₁ − b₁) + (a₃ − a₁) uses
+  only differences and is always right. The value-axis template is capped because it never measures from the question
+  row to another row (2026-11-17, `docs/thesis/ch3_pricing_proofs.md`, Statement 5).
+- The rule twins compare models that treat values as symbols. With values as numbers, a linear fit on a puzzle's two
+  complete rows solves sum, midpoint and mirror with no training (2026-11-17, `analysis/twins_linear_fit.py`). State
+  that scope wherever sum is called hard.
 
 ## 7. Files
 See `docs/CODE_INDEX.md`. In short:

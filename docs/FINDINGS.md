@@ -28,7 +28,10 @@ are untouched except where marked.
    - rules with one head add up;
    - an unweighted body atom adds its value;
    - chain pruning drops the transformation of single-rule atoms;
-   - native training needs `iso_value_compression=False`.
+   - native training needs `iso_value_compression=False`;
+   - `Transformation.NORM` rescales any non-zero vector to full size and leaves a zero vector at zero, so a template
+     without biases jumps at an all-zero input: in the facet model value 0 is the all-zero thermometer code, and 1e-6
+     in its place flips outputs by 1.0 (found 2026-11-13 with soft codes from the recognizer; item 39).
 
 ## October 2026, first half: perception and the symbolic models
 6. **Perception is nearly solved** (§11.1–11.3). The ResNet-18 frontend, trained on RAVEN, reads 98.9% of
@@ -73,7 +76,7 @@ are untouched except where marked.
 
     | dataset | matched (exact) | notes |
     |---|---|---|
-    | I-RAVEN, all 7 layouts | **97.3%** (69.1%) | test split not yet scored |
+    | I-RAVEN, all 7 layouts | **97.3%** (69.1%) | test split: 97.19 (68.35), item 40 |
     | I-RAVEN-X 3×3 | **99.2%**, 100% from epoch 15 | |
     | I-RAVEN-X 3×10, values 0–50 / 0–100 / 0–1000 | 85.4 / 84.9 / 81.2 | 89.1 / 86.3 / 85.4 after 150 epochs |
 
@@ -117,7 +120,7 @@ are untouched except where marked.
 17. **Breaking a symmetry lets a shortcut in** (§21.5–21.6). Per-panel copy gates name panels, and they
     learned Distribute by address.
     - Swapping rows 1 and 2 drops their Distribute puzzles from 98.3% to 39.5%.
-    - Content gates keep the symmetry: 94.9% (51.7 exact), unchanged by the swap.
+    - Content gates keep the symmetry: 94.9% (52.3 exact), unchanged by the swap.
     - A shuffled-source control with the same weights and connections gains only 1.9 points (87.3), so
       the copy-link gain (12.4) is the information carried, not extra connections. Extra connections can
       even hurt: gates that start open swamped the model. A blank-code control would close the last gap.
@@ -153,8 +156,10 @@ are untouched except where marked.
     - **Regularization:** weight decay helps most. Teaching the row symmetry by augmentation adds 1–3
       points.
 20. **I-RAVEN-X's generator draws Distribute values up to maxval inclusive**, one more than the codes
-    hold (§23). The facet model's I-RAVEN-X exact scores are therefore slightly off, most at 3×3. Matching
-    is unaffected.
+    hold (§23). The facet model's exact scorer decoded the answer through a description that cannot hold
+    maxval, so it capped exact at 95.6% on 3×3 and 98.4% on 3×10; fixed and rescored 2026-11-08. The facet
+    model's 3×3 exact is 97.0, not 92.7 (copy links 99.3, content gates 98.5, row fold 98.9); 3×10 moved at
+    most 0.6. Matching, epoch choice and the per-rule exact values were never affected.
 21. **Thesis framing:** built-in symmetries as inductive bias, measured on training data needed, accuracy
     at fixed weights, and generalization. What a symmetry σ does to valid puzzles decides its cost:
     - **σ keeps puzzles valid** (a data symmetry): building it in is free.
@@ -168,14 +173,14 @@ are untouched except where marked.
     | 3×10, values 0–50 | matched | exact | Arithmetic exact | weights |
     |---|---|---|---|---|
     | named columns | 85.4 | 15.0 | 18.6 | 1,411k |
-    | **column roles** | **94.1** | **29.0** | **40.5** | 288k |
-    | copy links, content gates | 94.9 | 51.7 | 30.0 | 1,436k |
+    | **column roles** | **94.1** | **29.2** | **40.5** | 288k |
+    | copy links, content gates | 94.9 | 52.3 | 30.0 | 1,436k |
 
     - The predicted gain on Arithmetic is there, and beyond what copy links reached.
     - Progression (+17), Distribute (+12) and Constant (+5) improved too, which was not predicted.
     - Swapping middle columns or rows changes nothing on the trained model. The named models lose 15–20
       points of matching under the same swaps.
-    - With content gates: 96.3% matched, but 43.3% exact (Distribute falls). Still a quarter of the weights.
+    - With content gates: 96.3% matched, but 43.7% exact (Distribute falls). Still a quarter of the weights.
     - At equal weights (widths 64/144/288, 1,390k) the roles model matches 94.9% against 85.4% for named
       columns: the gain is the symmetry, not the smaller model. Width does not help it (94.1 at 288k).
     - **No transfer to other row lengths.** On rows of 5 and 20 they match 66 and 50%; only Constant
@@ -207,7 +212,7 @@ are untouched except where marked.
     - The strongest object-level baseline on I-RAVEN is the regularized GNN at 16× the weights: 93.8 (63.7),
       3.5 points below the facet model and 14.6 below on the 3×3 grid.
     - On I-RAVEN-X 3×10 no size or setting generates exactly more than 4%; more weights hurt.
-    - 3×3, values 0–10 is closest: regularized MLP 95.1 (74.3) against 99.2 (92.7).
+    - 3×3, values 0–10 is closest: regularized MLP 95.1 (74.3) against 99.2 (97.0).
     - The attribute-level GNNs are stronger: on I-RAVEN, B (symmetric) 96.8 (67.9) and A 95.0 (62.5), so
       granularity does most of the work there and the built-in symmetries add a little. On 3×10, B learned
       much worse than A (85.8 vs 95.0, one seed), and A's lead partly comes from reading Distribute by
@@ -224,7 +229,7 @@ are untouched except where marked.
     | value axis, 600 puzzles | 99.9 | 99.9 | 99.8 | 100.0 (99.9) |
     | value axis, 6000 puzzles | **100.0** | **100.0** | **100.0** | **100.0** (100.0) |
     | value axis without `plus`, 6000 puzzles | 84.0 | 59.6 | 11.1 | 78.9 (60.5) |
-    | facet, column roles, 6000 puzzles | 94.1 | 29.0 | 40.5 | cannot run |
+    | facet, column roles, 6000 puzzles | 94.1 | 29.2 | 40.5 | cannot run |
 
     - No weight belongs to a value, so a model trained on values 0–50 runs on 0–100 at the same accuracy.
     - Rows of another length transfer only partly: rows of 5 give 60–90% matched (more with more training
@@ -234,7 +239,7 @@ are untouched except where marked.
       the sums come from the given relation, not from the convolution. The facet model learns approximate
       sums (40.5% exact, mostly within ±2), which is why it matches more often (94.1 vs 84.0).
     - **Trained on 3×3** (values 0–10, rows of 3): 99.8% matched (99.7 exact) against the facet model's 99.2
-      (92.7); exact 100 / 100 / 100 / 99.4 per rule. The same checkpoint on 3×10 with values 0–50, never seen:
+      (97.0); exact 100 / 100 / 100 / 99.4 per rule. The same checkpoint on 3×10 with values 0–50, never seen:
       65.2% (46.2); Distribute 100 and Arithmetic 76.7 exact carry over, Progression does not (36.9). The
       76.7 goes through the given `plus`, so it does not rank against models that learn the sum.
     - Exact here is the argmax of the value distribution (corrected 2026-10-31, §27): read through the facet
@@ -277,8 +282,8 @@ are untouched except where marked.
     | components (I-RAVEN left-right + up-down) | 100 per layout | **86.6** (40.4) | 87.3 (41.3) | 75.6 (22.2) | 74.6 (19.6) |
     | | 1000 | **99.3** (95.6) | 99.6 (95.7) | 97.9 (84.5) | 98.5 (84.5) |
     | | 6000 | 99.9 (97.7) | 99.8 (98.7) | 100.0 (97.8) | 100.0 (98.8) |
-    | attributes (I-RAVEN-X 3×10, column roles) | 600 | **66.3** (16.4) | 64.6 (14.1) | 52.5 (4.1) | 53.0 (3.6) |
-    | | 6000 | **94.1** (29.0) | 93.9 (28.5) | 90.5 (17.8) | 88.1 (17.6) |
+    | attributes (I-RAVEN-X 3×10, column roles) | 600 | **66.3** (16.4) | 64.6 (14.2) | 52.5 (4.1) | 53.0 (3.6) |
+    | | 6000 | **94.1** (29.2) | 93.9 (28.6) | 90.5 (17.8) | 88.1 (17.6) |
 
     | value symmetry, value-axis model (same given primitives) | shared across values (10.8k weights) | weights per value (335k) |
     |---|---|---|
@@ -411,7 +416,8 @@ are untouched except where marked.
     is no easier than sum, so a rule's symmetry pays only if the model has it, and weights per value stay close to
     plain memorising of answered rows. Mirror, midpoint's triples with the columns moved, is harder than sum
     without the symmetry, for a reason the test does not separate. The MLP does not show lookup as easier (17.7
-    against 26.4 at 6000), but it barely learns any rule here. One seed per model except the MLP.
+    against 26.4 at 6000), but it barely learns any rule here. One seed per model except the MLP; three seeds for
+    sum and midpoint at 100 and 600 puzzles are item 42.
 
 ## 2026-11-05/06: after the meeting
 31. **Given `plus` as background knowledge, learned rules learn to use it (3×3) (notes §27, `docs/ARITHMETIC.md`).**
@@ -435,9 +441,150 @@ are untouched except where marked.
     Trained on rows of 5 and 10 together, rows of 20 get 47.7% matched (fold) and 54.0 (column roles), against 55.1 and
     50.1 after rows of 10 alone. The prediction was a clear rise if the single training length were the cause; there is
     none, and Progression exact at rows of 20 falls to 2.9 in the fold.
+34. **Sum and midpoint are equally symmetric; only midpoint's symmetry lies along the convolution (2026-11-08,
+    `docs/ARITHMETIC.md`, "Sum and midpoint compared").** Each rule is one row moved by a two-parameter group of
+    moves: (s₁, s₂, s₁ + s₂) for sum, (s₁, s₂, (s₁ + s₂)/2) for midpoint. The convolution's move, every panel +s, is
+    in midpoint's group and not in sum's; one operand moved with the answer is in sum's and not midpoint's.
+    - Learners that know only one move (`analysis/rule_orbits.py`, no network), 100 puzzles: sum 100 with its own
+      move and 3.6 with the convolution's; midpoint 80.0 with the convolution's and 3.4 with sum's.
+    - The shared value axis given sum's move (`plus` used by learned rules): sum 97.6 at 100 puzzles and 99.8 at 600,
+      against 4.7 / 6.9 without it; midpoint unchanged (70.5 / 91.5).
+    - The network learns one answer per orbit: of the midpoint rows whose first step no training row had, it gets
+      0 of 101 right at 100 puzzles, against 58.9% of the others.
+    - Three seeds of these cells: item 42.
+35. **The row fold does not grok Arithmetic in the first round (2026-11-08).** On 1000 Arithmetic-only 3×10 puzzles (a
+    diagnostic: the rule is known, so this asks whether it can learn the sum, not how it does on the benchmark),
+    without decay it memorises (train 98) while unseen peaks at 63.4 and falls; with decoupled decay 1 at one update
+    per puzzle it never fits (train ≤ 27). With decay 0.03 and 0.01 it memorises as without decay: unseen peaks at 65.7
+    and 58.7 near epoch 100 and settles at 43–46 while train reaches 86–97, over 600,000 updates. No grokking at any decay.
+
+36. **A wrong symmetry costs what the data predicts (2026-11-08, plan E4, RESULTS §7).** Facet model, I-RAVEN-X 3×3,
+    values 0–10, each symmetry built in exactly.
+    - Out of support, columns 1 ↔ 2 tied: 98.6 (95.1) at 6000 puzzles against 99.2 (92.7). No ceiling, as predicted;
+      Distribute and Arithmetic lose 3 and 5 points exact. At 600 puzzles 92.1 (79.2) against 95.1 (82.2): Arithmetic
+      loses 14 points exact and Distribute gains 5.
+    - Conflicting, v and 10 − v given the same input code: 46.6 (13.4) at 6000 and 39.7 (14.0) at 600. 50–53% of
+      attribute values are exact, just under the 54–56 ceiling the count gives.
+    - So the three kinds of symmetry (F 21) behave as the classification says: a data symmetry is free, an out-of-support
+      one costs little, a conflicting one sets a ceiling that more data does not lift.
+
+37. **Without dropout and decay, the symmetric torch GNN is level with the best facet variant on 3×10 and has the best
+    learned Arithmetic (2026-11-09, RESULTS §12).** Attribute GNN B at 1× (1.6M weights), 6000 mixed-rule puzzles, 425
+    epochs, two seeds: 97.9 (45.5) and 98.2 (56.5) at the epoch picked on selection, Arithmetic exact 45.1 and 54.0; at
+    the last epoch 99.2 (63.9) and 99.3 (61.5), Arithmetic 50.6 and 49.2. The regularized run had 85.8 (3.5) and 22.7.
+    The facet family's best are 97.8 (60.6) with per-panel copy links and 40.5 on Arithmetic with column roles.
+    - The symmetries are GNN B's too, so this supports them and not PyNeuraLogic as such.
+    - The regularized recipe was chosen on I-RAVEN. GNN A, the object GNN and the MLP were not rerun without it, and
+      the facet models trained for 60–150 epochs. The 3×10 comparisons with the baselines are open until that is done.
+38. **A ViT slot recognizer reads 99.35% of panels exactly (2026-11-09, RESULTS §8).** The black-box ViT's backbone
+    reading one panel, 325,718 weights: all 16 panels right in 95.69% of unseen puzzles (ResNet-18: 98.91% and 92.56%),
+    3×3 grid panels 99.92% (ResNet-18: 96.02). The facet model has not been scored on its output yet.
+
+39. **End to end, the facet model loses 0.18 points (2026-11-13, RESULTS §8).** On the recognizer's panels, candidates
+    included, it matches 97.13% of the 7000 unseen puzzles (68.8 exact) against 97.31 from the labels; all 13 lost
+    puzzles are in the in-out grid. The labels pass reproduces the checkpoint's record exactly. Soft codes add
+    nothing, and raw ones break the model: value 0 is the all-zero code, the template has no biases, and `NORM`
+    rescales any non-zero vector to full size, so 1e-6 in place of 0 flips outputs. That is a limit of the template as
+    built: it cannot take graded inputs without retraining.
+
+40. **On the test split the facet model scores 97.19% from labels and 97.03% end to end (2026-11-14, one pass,
+    RESULTS §8).** 68.35 and 68.09 exact, 14,000 puzzles. Both are 0.1 below the validation numbers, so the validation
+    puzzles were not overfitted by selection. The pass for this checkpoint is spent.
+
+41. **The baselines' test pass confirms the validation table (2026-11-14, one pass each, RESULTS §1).** On the same
+    14,000 test puzzles: GNN B 96.79 (67.84), GNN A 95.09 (62.51), object GNN regularized 90.8 ± 1.2 (2 seeds; 93.44 at
+    16×), MLP regularized 72.7 ± 1.2, ViT width 224 93.10 (64.36), width 64 78.69. Every checkpoint first reproduced its
+    validation record exactly. No checkpoint moves by more than 0.8 points between the splits and the order is unchanged. The
+    facet model leads GNN B by 0.4 points (all of it on the 3×3 grid, 89.1 against 85.5) and, end to end, the ViT by 3.9
+    points with a sixth of the weights.
+42. **Three seeds leave the sum and midpoint results where they were (2026-11-14, `docs/ARITHMETIC.md`, "Three seeds",
+    RESULTS §11).** Seeds 1–3 of the shared, per-value and `plus` models at 100 and 600 puzzles, 36 runs, one selection
+    rule fixed beforehand (whole-puzzle exact on the selection puzzles). Exact % on the test rule, mean ± sd, at 100 /
+    600 puzzles:
+    - shared: sum 4.5 ± 2.3 / 6.2 ± 0.8 (ceiling 7.9), midpoint 60.3 ± 2.7 / 91.0 ± 3.4;
+    - per value: sum 4.8 ± 0.6 / 19.4 ± 1.1, midpoint 5.0 ± 0.5 / 18.0 ± 0.9, so the twins are matched;
+    - shared with `plus`: sum 98.2 ± 0.8 / 99.7 ± 0.4, midpoint 63.9 ± 3.9 / 91.7 ± 1.8.
+    - Midpoint rows with a first step no training question had: 0 of 101 right at every seed, now from the checkpoints
+      in the table; 72–78% of the 404 others.
+    - One sentence changes: `plus` does not help midpoint (the first run's 70.5 at 100 puzzles was a high draw). The
+      older `plus` cells on sum, 97.6 / 99.8, had been picked by exact on the test rule; by the common rule 98.2 / 99.2.
+    - The 6000-puzzle cells, mirror, lookup and the facet rows are still one run each.
+43. **A scaling symmetry reaches the unseen first steps a count named, and costs accuracy by merging midpoint with
+    Progression; the cost is revised in item 47 (2026-11-15, `docs/ARITHMETIC.md`, "The scaling kernel", RESULTS §11).** The shared model with each row
+    read in its own unit, the unit an unnamed constant: the first step (scaled; equivariant to v → kv + s on the ring
+    of 101) or the largest power of two in it (doubled). Same 14,785 weights, symmetry exact with random weights.
+    Predictions were made by counting before the 24 runs (seeds 1–3, sum and midpoint, 100 and 600 puzzles).
+    - Held: of the 101 unseen midpoint rows with a new first step (100 puzzles), the doubled model is right on 50 / 43 /
+      39 of the 72 whose odd part was seen and on 0 / 0 / 0 of the other 29; the shared model on none of the 101.
+    - Held in one seed: the scaled model is right on all 505 midpoint rows from 100 puzzles in seed 2. In seeds 1 and 3
+      it is right on a fifth to three tenths and continues the rest as a Progression.
+    - Not predicted: the totals fall, doubled 49.9 ± 5.3 and 67.5 ± 2.0 against shared 60.3 ± 2.7 and 91.0 ± 3.4. A
+      midpoint row whose first step is one unit starts like a Progression row (the data's Progression steps are ±1 and
+      ±2), and the network continues it as one: 0 of 33 right for the shared model (first step ±2), 1 / 11 / 1 of 152
+      for doubled (a power of two), 149 / 505 / 102 of 505 for scaled (every row), at 600 puzzles.
+    - So the shared model's plateau near 93% on midpoint is its 33 rows with first step ±2: seeds 2 and 3 are right on
+      470 and 469 of the other 472. The size of the first step was the cue for the rule; the complete rows also name
+      the rule, and the network used them at one seed of three.
+    - Sum: doubled 3.6 ± 0.2 / 4.1 ± 0.3 (ceiling 7.2); scaled at most 3.4, which is the 17 unseen rows with b = 2a, where continuing a row by its first step is right (the most one multiple can reach on these rows).
+44. **The scaled model's failure at two seeds is the row descriptor's, not the answer layer's (2026-11-16,
+    `docs/ARITHMETIC.md`, "The rule gate", RESULTS §11).** Item 43 left open why the network reads the rule from the
+    complete rows at one seed of three.
+    - Tested first, with predictions written before the runs: a gate from the rule descriptor on the answer layer's
+      kernel features (`--gate`, 1,056 more weights, symmetries unchanged). Both predictions failed. Scaled with the
+      gate: 23.2 / 20.2 / 24.0 and 20.2 / 20.2 / 30.5 on midpoint at 100 and 600 puzzles. Shared with the gate: none
+      of its 33 rows with first step ±2 at any seed, totals 66.6 ± 5.5 and 90.3 ± 2.2.
+    - Measured on the 24 saved checkpoints (`analysis/twins_probe.py`): the row descriptor `rd`, the pairs' features
+      summed over all values. In the 22 runs that fail it is the same vector for a midpoint row and a Progression row
+      (largest difference per feature 1e-14 to 7e-05). In the two runs that learn midpoint (scaled, seed 2, both sizes)
+      it differs by 1.4 and 1.5.
+    - The failed scaled runs use the value overlap instead: right on 90 to 107 of the 108 midpoint rows whose question
+      row shares a value with a complete row, on 0 to 47 of the 397 others.
+    - One cause for two failures: the shared model's 33 rows (every seed and size) and the scaled model's two outcomes.
+      The cost in item 43 is therefore not shown to be a cost of scaling. A row descriptor that reads a pair's step
+      directly was built next (item 47).
+
+45. **The rule twins are a test for models that treat values as constants; with values as numbers they need no
+    training** (2026-11-17; `docs/ARITHMETIC.md`, "Two checks without training"; nothing trained).
+    - A least-squares fit of c = p·a + q·b on a puzzle's two complete rows, applied to its question row, gets sum 99.6,
+      midpoint 99.8, mirror 99.8, Progression 98.6 to 99.3 and Constant 100 on the unseen puzzles. It gets 1.7 on lookup
+      and 0 on Distribute Three.
+    - So the comparison between sum and midpoint holds for models whose values are constants with an order. The thesis
+      has to state that scope.
+    - Row by row, the count holds: no training row in a row's orbit, never right (0 of 306, three seeds pooled); one
+      training row, right 74% of the time at 100 puzzles and 99% at 600.
+
+46. **The price of a symmetry on the twins is proved statement by statement, and one earlier claim was too strong**
+    (2026-11-17; `docs/thesis/ch3_pricing_proofs.md`, `analysis/pricing_checks.py`; nothing trained).
+    - The data saved has a formula from the table alone: the expected share of unseen rows reached by n training rows
+      is the sum over orbits of P(o)·(1 − (1 − P(o))ⁿ). It gives the counting learner within 6 points (74.8 against
+      80.0 with the shift at 100 puzzles, 22.0 against 21.6 without a symmetry at 600). Rows needed for 90%: 2,878
+      with nothing built in, 107 with the shift, 55 with doubling, 1 with scaling.
+    - **Too strong before:** "a shift-equivariant model cannot fit sum". The puzzle-wide shift alone does not cap sum:
+      c₃ = b₃ + (c₁ − b₁) + (a₃ − a₁) uses only differences and is right on 507 of 507 sum rows. The 7.9% ceiling holds
+      for learners that answer from the question row, and for the shared model because it never measures from the
+      question row to another row. Chapter 7 (7.3, 7.4) is corrected.
+    - **Also too strong:** "sum stays under its ceiling". It is 7.1 or less at every picked epoch, but 8 of 172
+      evaluated epochs are above 7.9 (9.7 at the most), and 507 rows fix the rate only to 1.2 points. The model sits at
+      the ceiling.
+    - With scaling built in, every question row is the same input, so the rule can only come from the complete rows.
+      That is proved (Statement 7) and is the reason behind item 43's cost.
+
+47. **Scaling does not cost accuracy: the row descriptor did** (2026-11-17, 18 runs, predictions written first;
+    `docs/ARITHMETIC.md`, "The row descriptor reads the steps"; RESULTS §11).
+    - The change: the row descriptor also reads each neighbouring pair's step directly, as the first panel's kernel
+      feature at the second panel's value (`value_axis.py --steps`, 2,048 more weights, the symmetries unchanged).
+    - Midpoint, three seeds, 100 / 600 puzzles: scaled 100.0 at every seed at both sizes (it was 19.0 / 100.0 / 21.0 and
+      29.5 / 100.0 / 20.2); doubled 89.2 ± 2.7 / 99.2 ± 0.2 (49.9 / 67.5); shared 59.9 ± 4.5 / 98.3 ± 1.9 (60.3 / 91.0).
+    - The shared model's 33 rows with first step ±2, never right in twelve earlier runs, are all right at 600 puzzles
+      at every seed, and 17 to 27 of them at 100.
+    - The probe: the row descriptor separates midpoint from Progression in all 18 runs (0.87 to 2.0 per feature;
+      below 0.0001 in 22 of 24 runs before). So items 43 and 44 are closed: one cause, one change.
+    - The ladder of built-in moves now rises at every rung, as counted: 5.0, 59.9, 89.2, 100.0 at 100 puzzles.
+    - Six predictions met; one missed by one row (the shared model right on 1 of 303 rows with an unseen first
+      step, the rate of guessing). Not run: sum in these models. Not studied: why the pooled descriptor collapses.
 
 ## Still open
-- Score the facet model once on the I-RAVEN test split, and end to end.
+- Rerun GNN A, the object GNN and the MLP on 3×10 without dropout and decay, and train a facet model as long (item 37).
 - Seeds for the facet runs: most numbers are one run.
-- The attribute-level torch GNN pair (with and without symmetries), learning curves, transformed test
-  sets, and the wrong-symmetry controls (plan E1–E4).
+- The attribute-level torch GNN pair (with and without symmetries), learning curves and transformed test
+  sets (plan E1–E3). The wrong-symmetry controls (E4) are done (item 36).

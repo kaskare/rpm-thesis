@@ -111,6 +111,29 @@ Each of these turns adding into composing elements of a group, and each has a ze
   a cocycle. Learnability correlates with the carry function's structure, and recurrence helps through "weight sharing over
   time", like our running sum. It is about digits, and the link is a correlation across carry functions.
 
+Added 2026-11-17 for `docs/thesis/ch3_pricing_proofs.md` (found by search, abstracts only):
+
+- [ ] ★ **Tahmasebi & Jegelka (2023)**, *The exact sample complexity gain from invariances for kernel regression*. NeurIPS.
+  [arXiv:2303.14269](https://arxiv.org/abs/2303.14269). Abstract. For a finite group the gain is as if the number of samples
+  were multiplied by the group's size. The general form of our coverage count (Statement 3); ours is exact on a finite
+  table with orbits of unequal size.
+- [ ] **Sannai, Imaizumi & Kawano (2021)**, *Improved generalization bounds of group invariant / equivariant deep networks via
+  quotient feature spaces*. UAI. [arXiv:1910.06552](https://arxiv.org/abs/1910.06552). Abstract. The bound improves with the
+  volume of the quotient space, by √(n!) for permutations.
+- [ ] ★ **Abbe, Bengio, Lotfi & Rizk (2023)**, *Generalization on the unseen, logic reasoning and degree curriculum*. ICML;
+  JMLR 25. [arXiv:2301.13105](https://arxiv.org/abs/2301.13105). Abstract. What trained networks do on a part of the input
+  space that training never showed: for Boolean targets several model classes converge to the interpolator of lowest
+  degree. The closest general study to "the network learns the orbits and nothing more" (Statement 11).
+- [ ] ★ **Boix-Adserà, Saremi, Abbe, Bengio, Littwin & Susskind (2024)**, *When can transformers reason with abstract
+  symbols?* ICLR. [arXiv:2310.09753](https://arxiv.org/abs/2310.09753). Abstract. Tasks tested on symbols never seen in
+  training: fully connected networks provably fail, transformers need very much data. Bears on models that treat values
+  as symbols.
+- [ ] **van der Wilk, Bauer, John & Hensman (2018)**, *Learning invariances using the marginal likelihood*. NeurIPS.
+  [arXiv:1808.05563](https://arxiv.org/abs/1808.05563); **Benton, Finzi, Izmailov & Wilson (2020)**, *Learning invariances in
+  neural networks* (Augerino). [arXiv:2010.11882](https://arxiv.org/abs/2010.11882). Abstracts. Choosing a symmetry from the
+  training data by model selection or learned augmentation. Prior work for the idea of picking the symmetry by
+  counting, which was dropped on 2026-11-17 (it turns into rule search and its candidates stay a hand-made list).
+
 ## How networks learn addition
 
 - [ ] ★ **Nanda, Chan, Lieberum, Smith & Steinhardt (2023)**, *Progress measures for grokking via mechanistic interpretability*.

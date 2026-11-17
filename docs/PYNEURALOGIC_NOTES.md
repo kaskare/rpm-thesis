@@ -474,7 +474,7 @@ Training-side changes did not help (cross-entropy 23.5, training on all three ro
 ### 18.5 Where it stands against the literature
 | setting | ours | reference |
 |---|---|---|
-| learned rules, ground-truth attributes, I-RAVEN | 97.3 (val 300–1299; test not yet scored) | ARLC 92.6 (trained on 2×2 only!), MLP 87.1, GPT-3 86.5, Learn-VRF 79.5 |
+| learned rules, ground-truth attributes, I-RAVEN | 97.3 (val 300–1299); 97.19 on the test split, 97.03 end to end (2026-11-14) | ARLC 92.6 (trained on 2×2 only!), MLP 87.1, GPT-3 86.5, Learn-VRF 79.5 |
 | hand-written rules, same input | – | our symbolic template 98.33 (test), NVSA backend about 97–99 (RAVEN) |
 | pixels, classifying candidates | not run | Triple-CFN 99.1, RS-Tran 98.7, SAViR-T 98.1, DRNet 97.6 (self-reported). Independent re-runs (A-I-RAVEN, IJCAI 2025): DRNet 90.9, PredRNet 88.8, SCL 83.4, CPCNet 70.4, STSN 59.0 |
 | I-RAVEN-X 3×3 | 99.2 / 100 | ARLC learned 98.4, programmed 97.2, GPT-4 93.2, Llama-3 85.0 |
@@ -577,7 +577,7 @@ to 198/200 exact in 50 epochs. The model learns rules that do not carry over to 
 ### 20.3 Results (3×10, unseen 6300–7299, epoch picked on 6000–6299)
 | values | facet, 60 epochs | facet, 150 epochs | **facet + copy links, 60 epochs** | ARLC learned | best LLM/LRM |
 |---|---|---|---|---|---|
-| 0–50 | 85.4 (exact 15.0) | 89.1 (23.8) | **97.8 (60.0)**, job 11899232 | 95.0 | – |
+| 0–50 | 85.4 (exact 15.0) | 89.1 (23.8) | **97.8 (60.6)**, job 11899232 | 95.0 | – |
 | 0–100 | 84.9 (6.4) | 86.3 (6.5) | **96.2 (30.8)**, epoch 45, job 11901474 | 95.0 | DeepSeek R1 84.0 |
 | 0–1000 | 81.2 (0.0) | 85.4 (0.1) | **94.3 (15.0)**, epoch 45, job 11904250 (11901475 ran out of memory at 180 GB while grounding; 420 GB worked) | 90.6 | DeepSeek R1 82.8 |
 
@@ -779,8 +779,8 @@ Results, 1000 unseen puzzles, epoch picked on selection (45 for both new runs):
 | run | matched | exact, all three attributes |
 |---|---|---|
 | plain | 85.4 | 15.0 |
-| copy links, per-panel gates | 97.8 | 60.0 |
-| copy links, content gates | **94.9** | 51.7 |
+| copy links, per-panel gates | 97.8 | 60.6 |
+| copy links, content gates | **94.9** | 52.3 |
 | shuffled control | **87.3** | 21.5 |
 
 * **The gain is the bias, not the capacity.** The control has the same weights as the copy model and gains
@@ -979,14 +979,22 @@ H is the width whose weight count is closest to the facet model's: 264k on I-RAV
 
 Caveat on exact scores. I-RAVEN-X Distribute draws values up to maxval inclusive, one more than the codes
 hold. The baselines score exact generation against the decoded true code, so they are unaffected. The facet
-model's I-RAVEN-X exact scores are slightly off, most at 3×3 with values 0–10.
+model's scorer (`B.evaluate`) decoded the answer through `describe`, whose one-hot blocks hold 0..maxval−1, so a
+value of maxval was written into the next attribute: perfect outputs scored 95.6% exact on 3×3 (0–10), 98.4% on
+3×10 (0–50), 99.3 / 98.7 on rows of 5 / 20, 99.6 on 0–100, 99.9 on 0–1000 and 96.3–97.6 on the rule twins.
+*Fixed 2026-11-08:* the answer is now decoded from its own code (`facet_decode(facet_target(answer))`), as the
+output is and as the baselines do; perfect outputs score 100 on every file, and on I-RAVEN the two decodings agree on
+every answer. Rescored (jobs 11977983–86, every run reproducing its matched): 3×3 facet 92.7 → 97.0, copy links
+95.0 → 99.3, content gates 94.2 → 98.5, row fold 94.5 → 98.9; on 3×10 0–50 at most +0.6 (copy links 60.0 → 60.6,
+content gates 51.7 → 52.3, roles + content gates 43.3 → 43.7). Matching, the epoch choice (by matched) and the
+per-rule exact values (bits summed) were never affected. Tables of transformed puzzles keep the old exact.
 
 ### 23.1 At the facet model's weight count (2 seeds, unseen puzzles, matched % (exact %))
 | dataset | facet | facet + copy links | MLP | all-to-all GNN |
 |---|---|---|---|---|
 | I-RAVEN | **97.3** (69.1) | – | 60.6 ± 0.8 (17.1) | 87.2 ± 1.1 (51.5) |
-| I-RAVEN-X 3×3, values 0–10 | **99.2** (92.7) | – | 92.8 ± 0.2 (64.8) | 92.0 ± 0.4 (58.5) |
-| 3×10, values 0–50 | 85.4 (15.0) | **97.8** (60.0) | 83.5 ± 0.4 (3.9) | 71.6 ± 0.1 (1.2) |
+| I-RAVEN-X 3×3, values 0–10 | **99.2** (97.0) | – | 92.8 ± 0.2 (64.8) | 92.0 ± 0.4 (58.5) |
+| 3×10, values 0–50 | 85.4 (15.0) | **97.8** (60.6) | 83.5 ± 0.4 (3.9) | 71.6 ± 0.1 (1.2) |
 | 3×10, values 0–100 | 84.9 (6.4) | **96.2** (30.8) | 80.0 ± 2.3 (0.5) | 64.7 ± 5.4 (0.0) |
 | 3×10, values 0–1000 | 81.2 (0.0) | **94.3** (15.0) | 74.3 ± 3.2 (0.0) | 54.1 ± 3.1 (0.0) |
 
@@ -1073,8 +1081,8 @@ per dataset: LayerNorm (MLP), weight decay 0.5, dropout 0 on I-RAVEN and 0.3 on 
 | dataset | facet (best variant) | MLP | MLP, regularized | GNN | GNN, regularized |
 |---|---|---|---|---|---|
 | I-RAVEN | **97.3** (69.1) | 60.6 ± 0.8 (17.1) | 72.0 ± 1.1 (27.5) | 87.2 ± 1.1 (51.5) | 90.5 ± 1.2 (55.1) |
-| I-RAVEN-X 3×3, 0–10 | **99.2** (92.7) | 92.8 ± 0.2 (64.8) | 95.1 ± 0.4 (74.3) | 92.0 ± 0.4 (58.5) | 93.9 ± 0.2 (67.7) |
-| 3×10, 0–50 | **97.8** (60.0) | 83.5 ± 0.4 (3.9) | 84.5 ± 0.1 (2.7) | 71.6 ± 0.1 (1.2) | 85.3 ± 1.9 (4.2) |
+| I-RAVEN-X 3×3, 0–10 | **99.2** (97.0) | 92.8 ± 0.2 (64.8) | 95.1 ± 0.4 (74.3) | 92.0 ± 0.4 (58.5) | 93.9 ± 0.2 (67.7) |
+| 3×10, 0–50 | **97.8** (60.6) | 83.5 ± 0.4 (3.9) | 84.5 ± 0.1 (2.7) | 71.6 ± 0.1 (1.2) | 85.3 ± 1.9 (4.2) |
 | 3×10, 0–100 | **96.2** (30.8) | 80.0 ± 2.3 (0.5) | 76.3 ± 1.4 (0.1) | 64.7 ± 5.4 (0.0) | 76.8 ± 2.1 (0.2) |
 | 3×10, 0–1000 | **94.3** (15.0) | 74.3 ± 3.2 (0.0) | 73.8 ± 0.2 (0.0) | 54.1 ± 3.1 (0.0) | 55.1 ± 1.0 (0.0) |
 
@@ -1102,7 +1110,7 @@ I-RAVEN by layout, regularized at 16×: GNN 99.5 / 89.6 / 75.2 / 99.8 / 99.7 / 9
   stays at 1–4% at every size and setting.
 * **3×3, values 0–10 is the dataset where the baselines come closest:** the regularized MLP matches 95.1
   (74.3), exact per rule 99.7 / 94.7 / 93.4 / 64.4 (Constant / Progression / Distribute / Arithmetic), against
-  the facet model's 99.2 (92.7). Few values and three columns leave little to generalize across.
+  the facet model's 99.2 (97.0). Few values and three columns leave little to generalize across.
 
 **Are they fair baselines?** Yes, for what they are meant to show: the same puzzles, splits, inputs, targets,
 metrics and selection rule as the facet model; matched weights, then 4–64× more; a 40-run regularization grid
@@ -1173,8 +1181,8 @@ points of matching there, which a model with roles cannot lose, by construction.
 | | matched | exact | exact value: Constant | Progression | Distribute | Arithmetic |
 |---|---|---|---|---|---|---|
 | named columns, 1,411k w | 85.4 | 15.0 | 93.4 | 77.4 | 9.8 | 18.6 |
-| **column roles, 288k w** | **94.1** | **29.0** | **98.6** | **94.3** | **22.0** | **40.5** |
-| (copy links, content gates, 1,436k w) | 94.9 | 51.7 | 100 | 98.2 | 59.8 | 30.0 |
+| **column roles, 288k w** | **94.1** | **29.2** | **98.6** | **94.3** | **22.0** | **40.5** |
+| (copy links, content gates, 1,436k w) | 94.9 | 52.3 | 100 | 98.2 | 59.8 | 30.0 |
 
 * **The prediction holds for Arithmetic:** 18.6 → 40.5% exact, more than copy links with content gates reach
   (30.0). Building the operand-order symmetry in did what copy links could not.
@@ -1190,8 +1198,8 @@ points of matching there, which a model with roles cannot lose, by construction.
 
 | | matched | exact | Constant | Progression | Distribute | Arithmetic |
 |---|---|---|---|---|---|---|
-| named columns + content gates, 1,436k w | 94.9 | 51.7 | 100 | 98.2 | 59.8 | 30.0 |
-| **roles + content gates, 314k w** | **96.3** | 43.3 | 99.6 | 94.8 | 42.8 | **37.5** |
+| named columns + content gates, 1,436k w | 94.9 | 52.3 | 100 | 98.2 | 59.8 | 30.0 |
+| **roles + content gates, 314k w** | **96.3** | 43.7 | 99.6 | 94.8 | 42.8 | **37.5** |
 
 * Matching and Arithmetic improve over the named-column copy model (+1.4, +7.5); exact generation falls (−8.4),
   all of it in Distribute (−17) and a little in Progression (−3.4). A possible reason, not tested: the gates
@@ -1204,7 +1212,7 @@ rows of 5 and 20 (values 0–50; same weights, the template names no column):
 
 | rows of | model | matched | exact | Constant | Progression | Distribute | Arithmetic |
 |---|---|---|---|---|---|---|---|
-| 10 (trained) | roles / + content gates | 94.1 / 96.3 | 29.0 / 43.3 | 98.6 / 99.6 | 94.3 / 94.8 | 22.0 / 42.8 | 40.5 / 37.5 |
+| 10 (trained) | roles / + content gates | 94.1 / 96.3 | 29.2 / 43.7 | 98.6 / 99.6 | 94.3 / 94.8 | 22.0 / 42.8 | 40.5 / 37.5 |
 | 5 | roles / + content gates | 65.6 / 66.3 | 4.0 / 5.2 | 99.0 / 99.8 | 23.8 / 9.8 | 4.2 / 16.7 | 4.3 / 5.1 |
 | 20 | roles / + content gates | 50.1 / 49.2 | 4.6 / 4.6 | 98.7 / 99.8 | 11.0 / 2.8 | 7.3 / 11.2 | 6.5 / 4.5 |
 
@@ -1219,9 +1227,9 @@ rows of 5 and 20 (values 0–50; same weights, the template names no column):
 | 3×10, values 0–50 | weights | matched | exact | Constant | Progression | Distribute | Arithmetic |
 |---|---|---|---|---|---|---|---|
 | named columns | 1,411k | 85.4 | 15.0 | 93.4 | 77.4 | 9.8 | 18.6 |
-| column roles | 288k | 94.1 | 29.0 | 98.6 | 94.3 | 22.0 | 40.5 |
-| column roles, wide (epoch 55) | 1,390k | **94.9** | 28.5 | 97.1 | 94.8 | 20.9 | 36.6 |
-| roles + content gates | 314k | **96.3** | **43.3** | 99.6 | 94.8 | 42.8 | 37.5 |
+| column roles | 288k | 94.1 | 29.2 | 98.6 | 94.3 | 22.0 | 40.5 |
+| column roles, wide (epoch 55) | 1,390k | **94.9** | 28.6 | 97.1 | 94.8 | 20.9 | 36.6 |
+| roles + content gates | 314k | **96.3** | **43.7** | 99.6 | 94.8 | 42.8 | 37.5 |
 | roles + content gates, wide (epoch 30) | 1,448k | 93.1 | 30.0 | 99.4 | 80.2 | 27.5 | 25.1 |
 
 * **At equal weights the operand-order symmetry is worth 9.5 points of matching** (94.9 vs 85.4) and 13.5 of exact.
@@ -1280,7 +1288,7 @@ on unseen rows of 10, and on rows of 5 and 20. The roles checkpoints get the sam
 |---|---|---|---|
 | fold, epoch 30 | 91.1 (22.8); 99.9 / 94.8 / 15.1 / 26.7 | 49.6 (0.2); 38.6 / 9.9 / 9.2 / 0.0 | 48.9 (4.6); 99.7 / 5.9 / 12.4 / 2.6 |
 | fold + content gates, epoch 20 | 93.2 (32.1); 99.9 / 86.5 / 28.8 / 21.5 | 57.5 (6.8); 97.4 / 19.2 / 16.9 / 2.0 | 48.4 (9.5); 100 / 10.5 / 25.2 / 2.8 |
-| column roles (final, for reference) | 94.1 (29.0); 98.6 / 94.3 / 22.0 / 40.5 | 65.6 (4.0) | 50.1 (4.6) |
+| column roles (final, for reference) | 94.1 (29.2); 98.6 / 94.3 / 22.0 / 40.5 | 65.6 (4.0) | 50.1 (4.6) |
 
 * At rows of 10 the fold equals the roles on Constant and Progression, and is below them on Arithmetic (26.7 vs
   40.5), as predicted from its order sensitivity.
@@ -1311,8 +1319,8 @@ Arithmetic 95.3 vs 97.3, without 96.5 vs 97.3.
 * Training: ahead of the facet model at epoch 5 (94.5 vs 92.9), level at 10, then flat and noisy (94.4–96.1 from
   epoch 15), while the facet model climbs to 97.3 at epoch 55.
 * Decision (2026-10-30): the fold stays an I-RAVEN-X model; on I-RAVEN the facet model is the main model.
-| column roles | 94.1 (29.0); 98.6 / 94.3 / 22.0 / 40.5 | 65.6 (4.0) | 50.1 (4.6) |
-| column roles + content gates | 96.3 (43.3); 99.6 / 94.8 / 42.8 / 37.5 | 66.3 (5.2) | 49.2 (4.6) |
+| column roles | 94.1 (29.2); 98.6 / 94.3 / 22.0 / 40.5 | 65.6 (4.0) | 50.1 (4.6) |
+| column roles + content gates | 96.3 (43.7); 99.6 / 94.8 / 42.8 / 37.5 | 66.3 (5.2) | 49.2 (4.6) |
 
 * **Progression: 99.2% exact, the best of any model** (copy links with content gates 98.2, roles 94.3). The step
   symmetry the fold builds in is Progression's own.
@@ -1383,8 +1391,8 @@ selection puzzles):
 | I-RAVEN L-R + U-D | 100 per layout | 86.6 (40.4) | 87.3 (41.3) | 86.6 (40.4) | 87.1 (41.1) |
 | | 1000 | 99.3 (95.6) | 99.6 (95.7) | 99.3 (95.6) | 99.6 (95.7) |
 | | 6000 | 99.9 (97.7) | 99.8 (98.7) | 99.9 (97.7) | 99.8 (98.7) |
-| I-RAVEN-X 3×10 0–50, roles | 600 | 66.3 (16.4) | 64.6 (14.1) | 66.3 (16.4) | 65.1 (14.3) |
-| | 6000 | 94.1 (29.0) | 93.9 (28.5) | identical | 93.9 (29.1) |
+| I-RAVEN-X 3×10 0–50, roles | 600 | 66.3 (16.4) | 64.6 (14.2) | 66.3 (16.4) | 65.1 (14.3) |
+| | 6000 | 94.1 (29.2) | 93.9 (28.6) | identical | 93.9 (29.1) |
 
 Transformed = mirrored (L-R + U-D) or size ↔ colour swapped (I-RAVEN-X). Exact value per rule, I-RAVEN-X: at 600,
 symmetric 99.8 / 84.7 / 5.3 / 8.7 vs labelled 98.3 / 77.3 / 5.0 / 8.1 (Constant / Progression / Distribute /
@@ -1438,8 +1446,8 @@ Jobs 11916358–67 (sep: 58–62, sepm: 63–67).
 | L-R + U-D | 100 | **86.6** (40.4) | 87.3 (41.3) | 75.6 (22.2) | 74.6 (19.6) |
 | | 1000 | **99.3** (95.6) | 99.6 (95.7) | 97.9 (84.5) | 98.5 (84.5) |
 | | 6000 | 99.9 (97.7) | 99.8 (98.7) | 100.0 (97.8) | 100.0 (98.8) |
-| I-RAVEN-X roles | 600 | **66.3** (16.4) | 64.6 (14.1) | 52.5 (4.1) | 53.0 (3.6) |
-| | 6000 | **94.1** (29.0) | 93.9 (28.5) | 90.5 (17.8) | 88.1 (17.6) |
+| I-RAVEN-X roles | 600 | **66.3** (16.4) | 64.6 (14.2) | 52.5 (4.1) | 53.0 (3.6) |
+| | 6000 | **94.1** (29.2) | 93.9 (28.6) | 90.5 (17.8) | 88.1 (17.6) |
 
 * **Removing the sharing costs what removing the invariance did not.** Separate weights per component lose 11–12
   points of matching and 18–21 of exact at 100 puzzles per layout, 11 points of exact at 1000, and nothing at
@@ -1452,7 +1460,7 @@ Jobs 11916358–67 (sep: 58–62, sepm: 63–67).
   bias of these symmetries is the weight sharing they allow.
 
 * The separate attribute weights at the same widths (932k) peaked at the last epoch, 60: 90.5 (17.8), still below
-  the shared 94.1 (29.0); exact per rule 93.4 / 80.4 / 16.2 / 25.7 against 98.6 / 94.3 / 22.0 / 40.5. The
+  the shared 94.1 (29.2); exact per rule 93.4 / 80.4 / 16.2 / 25.7 against 98.6 / 94.3 / 22.0 / 40.5. The
   components at 6000 are level in every arm (99.9–100.0).
 
 
@@ -1504,7 +1512,7 @@ puzzles; each scored also on values 0–100 and rows of 5 and 20.
 **Smoke run** (500 training puzzles, 20 epochs, 300 unseen puzzles 6300..; job 11916971): best on selection at
 epoch 5, unseen **99.3% matched, 98.3% exact**; exact value per rule Constant 100 / Progression 100 / Distribute
 100 / Arithmetic 98.5. Every epoch from 5 to 20 is within 0.7 points. The facts hold only the 29 context panels.
-For scale: the column-roles facet model reaches 94.1 (29.0) with 6000 puzzles.
+For scale: the column-roles facet model reaches 94.1 (29.2) with 6000 puzzles.
 
 * What does the work is not settled by this run: the model has the value symmetry *and* primitives the facet
   model lacks (exact sums, per-row value counts, offsets of ±2 from the last panel). `noplus` takes out the sums;
@@ -1566,7 +1574,7 @@ template names every value, as the facet model does with a weight per code bit, 
 **Trained on 3×3** (2026-10-30, job 11926965, `submit_value_axis.sh` RUN=n3: I-RAVEN-X
 `center_single_shuffle_n_3_maxval_10.json`, values 0–10, 6000 puzzles, 60 epochs, 10,817 weights). Epoch 10 picked
 on selection. Unseen 3×3: 99.8% matched (99.7 exact; decoded through the facet code 95.3); exact per rule Constant 100 /
-Progression 100 / Distribute 100 / Arithmetic 99.4 (facet model: 99.2 (92.7)). On 3×10, values 0–50: 65.2% (46.2);
+Progression 100 / Distribute 100 / Arithmetic 99.4 (facet model: 99.2 (97.0)). On 3×10, values 0–50: 65.2% (46.2);
 93.9 / 36.9 / 100 / 76.7.
 * Distribute and Arithmetic carry over to rows 3× longer and values 5× wider: the counts and the running sum
   work at any length, and no weight belongs to a value. Arithmetic 76.7 exact is above every model trained on 3×10
@@ -1579,10 +1587,14 @@ Progression 100 / Distribute 100 / Arithmetic 99.4 (facet model: 99.2 (92.7)). O
   `B.evaluate`, after turning the value distribution into a thermometer code (bit k = P(value > k)), and *all three
   values right*, the argmax per attribute. The code path decodes the distribution's median, which misses where the
   mass is spread even though the peak is right: 3×3 95.3 vs 99.7, 3×10 98.4 vs 100.0, 600 puzzles on rows of 5
-  52.5 vs 68.8. It is not a range cap (the facet code holds 0..maxval; its 3×3 ceiling is 100% exact, and on some
-  sets the code path scores higher, e.g. 24.4 vs 23.9). The argmax is the model's own answer, and the per-rule
-  exacts used it already, so every value-axis exact in these notes, FINDINGS and RESULTS is now the argmax. Matched
-  is unchanged (it uses the code, as for every model).
+  52.5 vs 68.8. The argmax is the model's own answer, and the per-rule exacts used it already, so every value-axis
+  exact in these notes, FINDINGS and RESULTS is now the argmax. Matched is unchanged (it uses the code, as for every
+  model).
+  *Corrected 2026-11-08:* this said the gap was not a range cap and that the code path's 3×3 ceiling was 100%. It was
+  95.6% on 3×3 and 98.4% on 3×10 (perfect outputs, scored as above), because `B.evaluate` decoded the answer
+  through the one-hot description, which cannot hold the value maxval (§23 caveat, fixed that day). So on 3×3 and
+  3×10 the gap above is that cap (95.3 vs 99.7, 98.4 vs 100.0); on rows of 5, where the cap was 99.3%, it is the
+  median decoding. Choosing the argmax is unaffected.
 
 **Plus used by learned rules** (2026-11-05, plan M4: the supervisor's numbers as objects that know `next` and
 `plus`). The value axis's Arithmetic 100 is the rule given: `acc`/`accm`, `pchk`/`mchk` and `sa`/`ma` carry no
@@ -1637,3 +1649,33 @@ o(A, V)      :- st(p_qlast, A, V)                                          [d x 
   (5.5 s a puzzle), since every puzzle derives the sums again, so 3×10 runs keep the table. 3×3 from scratch: n3peano (job
   11962979, epoch 15) 99.9 (99.8), Arithmetic 99.6; n3peanonext (11962980, epoch 5) 99.8 (99.5), Arithmetic 100.0.
   Level with the table runs; runs are not seeded, so the epoch logs differ between the two groundings.
+* **Rows in their own unit** (2026-11-15, `--scale step|pow2`, with `--ring --no-plus`; results in
+  `docs/ARITHMETIC.md`, "The scaling kernel"). The kernel rule becomes
+  `h(P, A, V) :- inrow(P, Rw), rs(Rw, A, S), x(P, A, U), off(U, V, D), mul(bk, S, D)`, one rule and one weight per base
+  offset k; `mul(bk, S, D)` are background facts (D is k units of S on the ring of 101), and
+  `rs(Rw, A, S) :- inrow(P, Rw), col(P, first), next(P, Q), x(P, A, U), x(Q, A, W), unit(U, W, S)` gives a row its
+  unit from the table `unit` (the first step, or the largest power of two in it). The unit is never named, so the
+  theorem of §21 gives equivariance to v → kv + s (`--check-scale`: 2e-17 on 100 puzzles). Same 14,785 weights.
+  Grounding 0.5–1.0 s a puzzle (0.45 s without).
+* **Pitfall: a body that can only fail through a large table hangs the grounder.** The first version gave rows with
+  equal first values the unit "zero step", for which `mul` has no fact. The grounder then searched every binding of
+  the kernel rule's body before failing (`SubsumptionEngineJ2.allSolutions` in a thread dump), and one puzzle with two
+  Constant attributes did not finish in 12 minutes. Give such rows no atom at all: `unit` has no fact for U = W, so
+  `rs` is never derived and the kernel rule fails at its second literal.
+* **The answer gated by the rule descriptor** (2026-11-16, `--gate`; results in `docs/ARITHMETIC.md`, "The rule
+  gate"). `gt(A) :- ctx2(A)` with a bias and a sigmoid; the question row's kernel features go to their own atom
+  `kf(A, V)` (identity), and `o(A, V) :- gt(A), kf(A, V)` with `Combination.ELPRODUCT`. 15,841 weights. `gt` has no
+  value argument, so `--check-scale` stays at 2e-17. It did not change the results: the rule was not reaching `ctx2`.
+* **The pooled pair descriptor can be a constant.** `pd(P, Q, A)` sums `pv(P, Q, A, V) = tanh(W₁ h(P, A, V) + W₂ h(Q, A, V))`
+  over V. On the ring every kernel weight appears once in `Σ_V h(P, A, V)` wherever P's value is, so the sum's linear
+  part is `(W₁ + W₂) Σ_k w_k` for every pair, and the pair's step enters only through the tanh. In 22 of 24 trained
+  rule-twin checkpoints `rd` then differs by less than 1e-4 between rows of different rules, and between rows with
+  different steps (`analysis/twins_probe.py`). The value axis without the ring (kernel ±2) was not probed.
+* **Any atom can be the query of a sample.** `Sample(R.rd("r1", "color")[[0.0] * d], facts)` on the built, loaded
+  template returns that atom's vector from `model.test`. This is how the probe reads hidden layers; no second template.
+* **The step read directly** (2026-11-17, `--steps`; results in `docs/ARITHMETIC.md`, "The row descriptor reads the
+  steps"). `ps(P, Q, A) :- next(P, Q), h(P, A, V)[d, d], x(Q, A, V)` with tanh: P's kernel feature at the one value
+  Q has, which is the kernel weight of exactly the pair's step (in the row's unit with `--scale`). `rd` averages a
+  second matrix over the row's `ps` beside the pooled `pd`. 16,833 weights; no value is named, so `--check-scale` stays
+  at 4e-17. In all 18 trained checkpoints `rd` then separates midpoint rows from Progression rows (0.87 to 2.0 per
+  feature), and the scaled model is at 100% at every seed. Reading a pair at one value avoids the pooling's loss.

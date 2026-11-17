@@ -88,6 +88,11 @@ To credit a gain to symmetry rather than to the facet model's sparser graph, cro
     learning or lower accuracy at a fixed size.
   - Value-reflection invariance: v and max − v get the same code (I-RAVEN-X), which conflicts with the data.
     Prediction: about 50% exact on Constant, Progression and Distribute values; Arithmetic unaffected.
+  - *Built 2026-11-08* on I-RAVEN-X 3×3 (cheaper than I-RAVEN, same rows of three): `--columns tie12` and
+    `--fold-values` in `core/pynl/bench_hub_grounding.py`, both exact with random weights. The fold's caps from the data:
+    54.4 / 56.0 / 55.0 exact (only answers at the middle value survive). Jobs 11978039, 11978041–42, 11978387–88, `jobs/pynl/submit_wrong_symmetry.sh`;
+    results in `docs/RESULTS.md` §7. *Done 2026-11-08:* tie12 98.6 (95.1) against 99.2 (92.7), no ceiling; fold 46.6
+    (13.4), 50–53% of attribute values exact, just under the caps (FINDINGS 36).
 
 ## 4. Order of work
 1. E4 operand order for Arithmetic (notes §24): plain run done, Arithmetic exact 18.6 → 40.5%; the rest
@@ -201,6 +206,40 @@ The notebook's checks back each step: the shift test p + q = 1, the convolution'
 4. M4's test (done).
 5. M4–M6, writing alongside the runs.
 6. M7 before the next meeting.
+
+**End to end with a ViT recognizer** (2026-11-08, user's choice over the ResNet-18 frontend). The black-box ViT's
+architecture (`core/baselines/train_baseline.py`: patch embedding, position embeddings, `vit_blocks`) reading one panel
+and naming its objects: one query token per universal slot, one shared head for occupancy, type, size and colour
+(`core/frontend/train_vit_recognizer.py`, width 64, 325,718 weights, against the black-box ViT 64's 335,038). The same
+backbone then appears twice: as a black-box solver (79.1 matched at width 64, 93.4 at 224) and as perception for the facet
+model. Mapping to the facet model's input: hard (an object where P(occupied) > 0.5, argmax attributes), and soft
+(thermometer bit k = P(value ≥ k), the facet code's own meaning). Candidates go through perception too. Trained on
+2000 puzzles per layout (224,000 panels), picked on val 0–299, scored on val 300–1299 and once on test. Jobs
+11978381–83 (`jobs/frontend/submit_recognizer.sh`); the facet scoring on perceived panels is still to write.
+
+**Limitations to state in the thesis** (2026-11-08): PyNeuraLogic's memory and time. The largest facet runs peak at
+327–344 GB and 15–16 hours on CPU (values 0–1000 with copy links; all seven I-RAVEN layouts with content gates),
+where the torch baselines of the same size train on one GPU; grounding keeps every puzzle's network in memory and
+training updates one puzzle at a time. Table: `docs/RESULTS.md` §9, "Compute cost".
+
+## 4c. General priors vs generator priors (2026-11-09)
+Every prior here was chosen by reading the generator. Sort each one by where it comes from, and price it with the
+three kinds of §1 (thesis outline 3.6 and Ch 7, which has the full table and Chollet's quotes):
+
+| prior | kind |
+|---|---|
+| objects as nodes; the same rule in every row (rows 1 ↔ 2); any attribute can carry any rule; only value differences matter | **general**: what a person brings |
+| `plus` (or the zero and `next`) | general on small numbers: Chollet 2019 (§II.1.3, §III.1.2) puts addition and subtraction of small numbers in Core Knowledge, quantities below about 10 in ARC; 3×10 with values 0–50 is past that |
+| rules along rows only; the two components of left-right / up-down; the fixed attribute list and value range; middle columns as operands (column roles) | **generator**: read from how RAVEN is built |
+| one step per column (row fold); the answer may be a context value (copy links) | mixed |
+
+- **Suggestive pattern:** the general priors carry the largest prices (value shift about 60× the data; `plus` on sum
+  4.7 → 97.6 at 100 puzzles), the generator priors smaller ones that mostly vanish at full data.
+- **Not priced:** "rules along rows only", in every model. Cheapest test: transpose I-RAVEN's unseen puzzles and score
+  the existing checkpoints, no training. Not run; only if the user asks.
+- **Claim it supports:** RAVEN-family scores are bought with priors or with data, partly with the generator's own
+  structure (Chollet §III.1.3 names this risk for generated tests). Nothing about human tests. How loudly to say it
+  in Chapter 1 is the user's choice.
 
 ## 5. Already in the notes
 | evidence | where |

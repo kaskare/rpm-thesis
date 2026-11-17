@@ -349,7 +349,8 @@ is at most 11 points ahead of sum without the symmetry, and behind it on the fac
   57.4 / 62.2 / 42.5 / 85.0 and MLP 21.7 / 20.8 / 8.8 / 18.9. The verdict is the same.
 - **6000 is not converged.** Per value and facet are still rising at their last epochs. The gaps at 100 and 600 are the firm
   ones.
-- **Noise.** One seed each except the MLP, about 500 rows per cell, so roughly ±4.
+- **Noise.** One seed each except the MLP, about 500 rows per cell, so roughly ±4. Three seeds of the shared and
+  per-value models on sum and midpoint at 100 and 600 puzzles came later ("Three seeds" below): sd 0.5 to 3.4.
 - **One row, not the whole puzzle.** Sum breaks shift symmetry as a relation within a row. Across five panels,
   c3 = a3 + b3 + c1 − a1 − b1 has coefficients summing to 1, so a shift-equivariant model could reach it. `--find-zero` tries
   this and has no finished result.
@@ -427,9 +428,30 @@ puzzles, against 80.0 / 99.8 / 100 for the learner with the same move. Two thing
 - **The learner is told the rule.** The network must also tell midpoint rows from Progression rows, and with a first
   step of ±1 or ±2 it cannot from the question row alone: at 6000 puzzles that is 33 of the 505 rows, 32 answered as
   Progression. The other 472 it gets 469 right, which is the learner's 100.
-- **At 100 puzzles the network gets less out of the orbits it has seen** (57.4 against 80.0). Does it answer rows
-  whose first step no training row had, which would mean it learned "halfway" as a law rather than one answer per
-  first step? The trained checkpoints' answers are being dumped for this (job 11974989): *running*.
+- **At 100 puzzles the network gets less out of the orbits it has seen** (57.4 against 80.0).
+
+**It learns one answer per first step, not the law "halfway".** The saved checkpoints' answers on the unseen puzzles
+(job 11974989), split by whether the row's first step b − a occurs in any training question row. The saved
+checkpoint is the epoch picked by matched, so its totals differ from the table's (47.1 at 100 puzzles, not 57.4).
+The same split from checkpoints picked by exact, at three seeds, is under "Three seeds" below: the zero holds in each.
+
+| checkpoint | first step seen in training | first step never seen |
+|---|---|---|
+| shared, midpoint, 100 puzzles | 58.9 (of 404) | **0.0** (of 101) |
+| shared, midpoint, 300 | 77.0 (of 499) | 0.0 (of 6) |
+| shared, midpoint, 600 | 89.5 (of 504) | 0.0 (of 1) |
+| shared, mirror, 100 | 62.4 (of 356) | 0.0 (of 147) |
+| shared, mirror, 600 | 79.9 (of 493) | 0.0 (of 10) |
+
+| checkpoint | pair (a, b) seen in training | pair never seen |
+|---|---|---|
+| per value, midpoint, 100 | 88.0 (of 25) | 1.7 (of 480) |
+| per value, midpoint, 600 | 64.2 (of 109) | 2.0 (of 396) |
+
+Not one row with an unseen first step is right, at any size. The answer −(b − a) / 2 is linear in the first step, but
+the network does not carry it from one first step to the next: it fills the orbits the convolution gives it, one by
+one, as the counting learner does, only less efficiently. Weights per value do the same with pairs. So the collapse
+is exactly the built-in symmetry's, and nothing beyond it is learned here.
 
 Weights per value follow the table learner: 5.7 / 17.8 / 75.2 against 5.0 / 21.6 / 90.5. Sum on the shared model:
 4.7 / 6.9 / 7.1, at the cap.
@@ -440,7 +462,584 @@ u + (w + 1) = (u + w) + 1 is the same move with s = 1. A state that walks throug
 as objects" above) therefore moves one operand with the answer. Prediction from the learners: with it, sum should come
 from as few puzzles as midpoint does with the convolution. Runs: the shared ring model of the results above with
 `--learned-plus` added (19,937 weights; the kernel stays a ring, only the `plus` facts do not wrap), on sum and
-midpoint at 100 and 600 puzzles (jobs 11974990–93): *running*.
+midpoint at 100 and 600 puzzles (jobs 11974990–93). Exact % on the test rule, epoch picked by exact on the
+selection puzzles, as in the results table:
+
+| shared ring model | sum, 100 / 600 puzzles | midpoint, 100 / 600 puzzles |
+|---|---|---|
+| without `plus` (results above) | 4.7 / 6.9 | 57.4 / 89.3 |
+| **with `plus` used by learned rules** | **97.6 / 99.8** | 70.5 / 91.5 |
+| counting learner, addition's moves | 100 / 100 | 3.4 / 2.2 |
+| counting learner, every panel +s | 3.6 / 6.3 | 80.0 / 99.8 |
+
+**The prediction holds.** Given its own moves, sum comes from 100 puzzles (97.6), as midpoint does from the
+convolution's; without them it is stuck below 8. Midpoint keeps what the convolution gave it (the network still has
+it), and is no worse for the extra facts. It is no better either: over three seeds 63.9 ± 3.9 against 60.3 ± 2.7 at
+100 puzzles ("Three seeds" below), so the 70.5 here was a high draw.
+Picked by matched instead, the cells are 98.2 / 99.0 and 70.5 / 90.1. The sum cells in this table were picked by exact
+on the test rule; by exact on the whole puzzle, as everywhere else, that run gives 98.2 / 99.2. One seed each here;
+three seeds: sum 98.2 ± 0.8 / 99.7 ± 0.4, midpoint 63.9 ± 3.9 / 91.7 ± 1.8.
+
+So "Arithmetic has no symmetry" was wrong as stated: it has one, of the same size as midpoint's, and a model that has
+it learns sum as easily. What it lacks is the shift symmetry the convolution builds in.
+
+**Three cautions on this comparison (2026-11-13).**
+- **"Equally symmetric" is true of every rule c = pa + qb.** Its rows stay valid under (s₁, s₂, p·s₁ + q·s₂), always two
+  free parameters. What separates the rules is whether the common shift (s, s, s) is among them, and that holds exactly
+  when p + q = 1: midpoint, mirror, Progression and Constant yes, sum no. That is the statement to make.
+- **Sum's full group is the rule up to one number.** A function that respects every move (s₁, s₂, s₁ + s₂) is a + b + k,
+  which is why the counting learner with addition's moves has a single orbit. So `plus` gives sum its whole group, while
+  the convolution gives midpoint a one-parameter part of its group (50 orbits). 97.6 against 57.4 at 100 puzzles reflects
+  that, not an easier rule. `plus` is the relation given as background facts; calling it "sum's symmetry" undersells how
+  much is given.
+- **The moves are groups on the integers, not on 0–50.** A shift can leave the range, midpoint needs a + b even, and
+  the shared model's ring wraps where the data does not. The orbit counts above are made on the actual tables, so the
+  numbers stand; the group language is exact only away from the edges.
+
+### Three seeds (2026-11-14)
+
+Every cell above is one run. Here: seeds 1–3 of the shared, per-value and `plus` models on sum and midpoint at 100 and
+600 puzzles (36 runs, jobs 12034883–12034918, 13 to 82 minutes each, peak 66 GB). `--seed` calls
+`neuralogic.manual_seed`; the same seed reproduces a run exactly, and earlier runs drew a fresh random seed each.
+
+**One rule for every cell, fixed before the runs:** the epoch with the highest whole-puzzle exact on the selection
+puzzles, the first at that maximum; the cell is exact % on the test rule on the unseen puzzles. The seeded runs save
+that checkpoint. `analysis/twins_seeds.py` prints the table. "First run" is the earlier unseeded run under the same rule.
+
+| model | rule | puzzles | seed 1 / 2 / 3 | mean ± sd | first run |
+|---|---|---|---|---|---|
+| shared | sum | 100 | 5.9 / 5.7 / 1.8 | 4.5 ± 2.3 | 4.7 |
+| shared | sum | 600 | 5.5 / 7.1 / 6.1 | 6.2 ± 0.8 | 6.9 |
+| shared | midpoint | 100 | 57.2 / 62.0 / 61.8 | **60.3 ± 2.7** | 57.4 |
+| shared | midpoint | 600 | 87.1 / 93.1 / 92.9 | **91.0 ± 3.4** | 89.3 |
+| per value | sum | 100 | 4.1 / 5.3 / 4.9 | 4.8 ± 0.6 | 4.9 |
+| per value | sum | 600 | 20.7 / 18.7 / 18.7 | 19.4 ± 1.1 | 19.3 |
+| per value | midpoint | 100 | 5.5 / 5.0 / 4.6 | 5.0 ± 0.5 | 5.7 |
+| per value | midpoint | 600 | 19.0 / 17.6 / 17.4 | 18.0 ± 0.9 | 17.8 |
+| shared + `plus` | sum | 100 | 98.4 / 98.8 / 97.2 | **98.2 ± 0.8** | 98.2 |
+| shared + `plus` | sum | 600 | 99.8 / 100.0 / 99.2 | **99.7 ± 0.4** | 99.2 |
+| shared + `plus` | midpoint | 100 | 66.1 / 66.1 / 59.4 | 63.9 ± 3.9 | 70.5 |
+| shared + `plus` | midpoint | 600 | 89.7 / 93.3 / 92.3 | 91.7 ± 1.8 | 91.5 |
+
+- **Every conclusion stands.** The largest sd is 3.9 points. The effects are 55 and 73 points (midpoint, shared against
+  per value, at 100 and 600 puzzles) and 94 points (sum, with `plus` against without, at 100).
+- **The twins are matched without the symmetry:** per value 4.8 ± 0.6 against 5.0 ± 0.5, and 19.4 ± 1.1 against 18.0 ± 0.9.
+- **Sum under the shift stays under its ceiling in all six cells** (1.8 to 7.1 against 7.9). Over all 120 evaluations of
+  the six runs, four are above 7.9, the highest 8.7 (44 of 507 rows). The ceiling is a count on the whole table; on 507
+  sampled rows it is 7.9 ± 1.2, so these are within sampling error.
+- **Seed 3's 1.8 at 100 puzzles is an arbitrary epoch, not a worse model.** Whole-puzzle exact on selection stays at
+  57–58% in these runs, since only the puzzles without sum come out right, so its maximum (epoch 10 here) says nothing
+  about sum. That run's 20 evaluations average 4.6.
+- **`plus` does not help midpoint.** 63.9 ± 3.9 against 60.3 ± 2.7 at 100 puzzles and 91.7 ± 1.8 against 91.0 ± 3.4 at
+  600. The first run's 70.5 was a high draw, above all three seeds.
+- **The older `plus` cells on sum (97.6 / 99.8) were picked differently:** by exact on the test rule, not on the whole
+  puzzle. Under the rule here that run gives 98.2 / 99.2.
+- **Still one run each:** the 6000-puzzle column, mirror, lookup, the facet rows.
+
+**Rows by whether training covered them, from the checkpoints in the table** (job 12034926,
+`analysis/twins_seeds.py --dumps experiments/twins_eval`). The totals of each split equal the cells above. Seeds 1 / 2 / 3:
+
+| checkpoint | first step seen in training | first step never seen |
+|---|---|---|
+| shared, midpoint, 100 puzzles | 71.5 / 77.5 / 77.2 % (of 404) | **0 / 0 / 0** (of 101) |
+| shared, midpoint, 600 | 87.3 / 93.3 / 93.1 % (of 504) | 0 / 0 / 0 (of 1) |
+
+| checkpoint | pair (a, b) seen in training | pair never seen |
+|---|---|---|
+| per value, midpoint, 100 | 24 / 21 / 20 (of 25) | 4 / 4 / 3 (of 480) |
+| per value, midpoint, 600 | 88 / 83 / 80 (of 109) | 8 / 6 / 8 (of 396) |
+
+The zero holds at every seed, and now comes from the model in the table (the earlier split used checkpoints picked by
+matched, 47.1 in total). The counting learner with the same move gets 80.0 at 100 puzzles by being right on every
+covered row; the network is right on 72–78% of them.
+
+Figure: `docs/figures/twins_sum_midpoint.png` (and `.pdf`), drawn by `analysis/twins_figure.py` from the tables above
+(100 and 600 puzzles: means of the three seeds with one sd; 6000 and the counting learner: one run).
+
+### The scaling kernel (2026-11-15)
+
+The shared model learns one answer per first step, and gets 0 of 101 rows whose first step is new. Midpoint has a second
+symmetry the model lacks: multiply every value by the same number k and the row stays valid (ka + kb = 2kc). Sum has it
+too. If the count is right, building it in must make new first steps answerable, and the count says which.
+
+**How it is built.** The kernel's offsets are counted in each row's own unit: V = U + k·S, one weight per k as before.
+The unit S is a constant the template does not name, like the values. Background facts `mul(bk, S, D)` say that step D
+is k units of S on the model's ring of 101 values. 101 is prime, so every step has every multiple and every fraction on
+the ring, a half-step included. One rule derives a row's unit from its first two panels:
+
+- **scaled** (`--scale step`): the unit is the row's first step. Multiplying every value by any number and adding any
+  number then renames values and steps and keeps every background fact, so the model is exactly equivariant to all of
+  it (the theorem of notes §21). It can only answer c = b + g·(b − a), one number g per context.
+- **doubled** (`--scale pow2`): the unit is the largest power of two in the first step. The model is equivariant to
+  doubling, as long as the doubled first steps stay within ±50, and learns one answer per odd part of the first step.
+
+Both have the shared model's 14,785 weights and its ring. A row whose first two values are equal has no unit and no
+kernel atoms; the counts carry it (Constant).
+
+**Checked with random weights** (`--check-scale`, max difference between the output of a transformed puzzle and the
+transformed output):
+
+| model | every value +9 | ×2 | ×3, ÷2, reflected |
+|---|---|---|---|
+| shared | 2e-17 | 2e-2 (not equivariant) | 2e-2 |
+| doubled | 2e-17 | 2e-17 in the 68 to 81 of 100 puzzles where the doubled first steps stay in range, 1e-2 in the others | 1e-2 |
+| scaled | 2e-17 | 2e-17 | 2e-17 |
+
+On 100 puzzles per attribute (job 12039067, `log/check_scale_12039067.out`); a puzzle that is not moved differs from
+itself moved by about 1e-2, so 1e-2 means no symmetry.
+
+**Predictions by counting, made before the runs** (`analysis/rule_orbits.py`, learners "doubling" and "scaling"; no
+network):
+
+| | shared | doubled | scaled |
+|---|---|---|---|
+| midpoint: orbits of first steps | 50 | 26 | 1 |
+| midpoint: counting learner at 100 / 600 puzzles | 80.0 / 99.8 | 94.3 / 99.8 | 100 / 100 |
+| the 101 unseen rows with a new first step, 100 puzzles | 0 right (measured) | 72 answerable (their odd part was seen), 29 not | all 101 answerable |
+| sum: ceiling on the whole table | 97 of 1,225, 7.9% | 88, 7.2% | 17, 1.4% |
+
+The counting learner is told the rule; the network must also recognise it, so it will fall short of the learner's
+totals, as the shared model does (60 against 80).
+
+**The predictions fail if** the doubled model gets rows right among the 29 or none among the 72, if the scaled model
+leaves the rows with a new first step at zero, or if sum goes clearly above its ceiling.
+
+**Results** (24 runs, jobs 12039041–12039065, 26 to 93 minutes each; seeds 1–3, the selection rule of "Three seeds";
+`analysis/twins_seeds.py --dumps experiments/twins_eval`). Exact % on the test rule, unseen puzzles:
+
+| model | rule | puzzles | seed 1 / 2 / 3 | mean ± sd |
+|---|---|---|---|---|
+| shared | midpoint | 100 | 57.2 / 62.0 / 61.8 | 60.3 ± 2.7 |
+| doubled | midpoint | 100 | 55.6 / 48.7 / 45.3 | 49.9 ± 5.3 |
+| scaled | midpoint | 100 | 19.0 / **100.0** / 21.0 | two outcomes, see below |
+| shared | midpoint | 600 | 87.1 / 93.1 / 92.9 | 91.0 ± 3.4 |
+| doubled | midpoint | 600 | 65.5 / 69.5 / 67.5 | 67.5 ± 2.0 |
+| scaled | midpoint | 600 | 29.5 / **100.0** / 20.2 | two outcomes |
+| shared | sum | 100 | 5.9 / 5.7 / 1.8 | 4.5 ± 2.3 |
+| doubled | sum | 100 | 3.7 / 3.6 / 3.4 | 3.6 ± 0.2 |
+| scaled | sum | 100 | 3.2 / 0.8 / 2.0 | 2.0 ± 1.2 |
+| shared | sum | 600 | 5.5 / 7.1 / 6.1 | 6.2 ± 0.8 |
+| doubled | sum | 600 | 4.1 / 3.7 / 4.3 | 4.1 ± 0.3 |
+| scaled | sum | 600 | 3.4 / 1.0 / 3.4 | 2.6 ± 1.4 |
+
+**The rows with a new first step came out as counted.** Unseen midpoint rows right at 100 puzzles, seeds 1 / 2 / 3:
+
+| rows | shared | doubled | scaled |
+|---|---|---|---|
+| first step new, its odd part seen (72) | 0 / 0 / 0 | **50 / 43 / 39** | 18 / 72 / 19 |
+| first step and odd part new (29) | 0 / 0 / 0 | **0 / 0 / 0** | 4 / 29 / 4 |
+| first step seen (404) | 289 / 313 / 312 | 231 / 203 / 190 | 74 / 404 / 83 |
+
+- The doubled model is right on 39 to 50 of the 72 rows where the shared model is right on none, and on none of the 29,
+  at every seed. That is the line the count drew.
+- The scaled model has no zero group. In seed 2 it is right on all 101, and on every other row: 100.0% from epoch 20
+  with 100 puzzles. In seeds 1 and 3 it is right on about one row in five, the same share in each group, as a model
+  that cannot see the first step must be.
+
+**What the count missed: rows that start like a Progression row.** The totals fell (49.9 against 60.3 at 100 puzzles,
+67.5 against 91.0 at 600). The data's Progression has the steps ±1 and ±2. Read in a unit, a midpoint row whose first
+step is one unit has the same first two panels as a Progression row; only the two complete rows above it then say which
+rule it is. On those rows the network continues the row by its first step (it generates 2b − a). At 600 puzzles,
+seeds 1 / 2 / 3:
+
+| model | rows that start like a Progression row | right among them | continued as a Progression | right among the other rows |
+|---|---|---|---|---|
+| shared | 33 (first step ±2) | **0 / 0 / 0** | 33 / 33 / 33 | 440 / 470 / 469 of 472 |
+| doubled | 152 (first step ±2, ±4, ±8, ±16, ±32) | 1 / 11 / 1 | 148 / 139 / 150 | 330 / 340 / 340 of 353 |
+| scaled | 505 (every row) | 149 / **505** / 102 | 356 / 0 / 403 | none |
+
+- **Each symmetry merges more midpoint rows with Progression:** 6.5% of the rows, then 30%, then all of them. The
+  first step's size was the network's cue for the rule, and a scaling symmetry hides it by construction.
+- **The shared model has the same failure on fewer rows, and it was already recorded** (above, at 6,000 puzzles: none
+  of the 33 rows with first step ±2, 469 of the other 472). It holds at every seed and both sizes, and is the plateau
+  near 93%: seeds 2 and 3 are right on 470 and 469 of the other 472 rows. The count should have carried it over.
+- **The information is in the model's input.** The rule descriptor reads the complete rows, where midpoint and
+  Progression differ, and seed 2 of the scaled model uses it. The other runs do not. Why the network usually fails to
+  use it is not measured; the answer layer adds the context to the kernel's features and does not gate them.
+- **At 100 puzzles the doubled model is right on 80 / 70 / 62% of its other rows** (281, 246, 218 of 353); the shared
+  model on 61 / 66 / 66% of its other rows. With the 152 rows counted wrong the counting learner's total is 69.9%, not 94.3.
+
+**Sum.** The doubled model stays under its ceiling (3.6 ± 0.2 and 4.1 ± 0.3 against 7.2). The scaled model gets 2.0 ± 1.2
+and 2.6 ± 1.4, and no cell is above 3.4. With this symmetry a model can give one multiple g per context. On the whole
+table the best multiple is right on 17 of 1,225 rows (1.4%). On the 507 unseen rows the best is g = 1, continuing the
+row by its first step: it is right on the 17 rows with b = 2a (3.4%; the counting learner's 2.0 was the table's best
+multiple scored on these rows, not their own best). At 600 puzzles seeds 1 and 3 answer g = 1 on 496 of the 497 rows
+with a ≠ b and are right on exactly those 17 rows; seed 2 answers other multiples and is right on 5 rows (dumps: jobs
+12039193–95). So the scaled model treats sum as it treats midpoint in its failed seeds: as a Progression.
+
+**Each prediction:**
+
+| prediction | outcome |
+|---|---|
+| doubled: none of the 29 rows right | held, 0 of 29 at three seeds |
+| doubled: rows among the 72 right | held, 39 to 50 of 72 |
+| scaled: rows with a new first step not at zero | held: 22, 101 and 23 of 101; but only one seed in three learns the rule |
+| sum stays under its ceiling | held for doubled; held for scaled too: no cell above the 3.4% that one multiple reaches on these rows |
+| totals follow the counting learner | **failed**: the count did not include the rows that merge with Progression |
+
+**What this shows.** A scaling symmetry makes new first steps answerable in exactly the rows the count names. It also
+merges rows of different rules, which the count over one rule's table cannot see, and the network then has to tell the
+rules apart from the context, which it does at one seed of three. **What it does not show:** that the scaled model learns
+midpoint in general, or that scaling is a better bias than the shift alone; on the totals it is worse. The scaled
+variant is also given most of the rule, as `plus` gives sum: it can only learn the one number g. Three seeds, 200
+epochs, no tuning.
+
+### The rule gate (2026-11-16)
+
+Two failures above have the same shape. The scaled model learns midpoint at one seed of three, and the shared model is
+wrong on every midpoint row whose first step is ±2. In both, the question row's first two panels do not tell midpoint
+from Progression. The two complete rows do, and the rule descriptor reads them. One explanation was open: the answer
+layer only adds the descriptor to the kernel's features, so it cannot switch a feature off by the rule.
+
+**The change** (`--gate`). A gate `gt(A) = sigmoid(W·ctx2(A) + b)`, one number per feature, multiplies the question
+row's kernel features (`h` at its last panel and `pv` of its last pair, through their weights) before the answer
+layer's tanh. The descriptor is also still added. The gate names no value and is the same at every value, so the value
+symmetries stay. It adds one matrix and a bias, 1,056 weights (15,841 in all). The facet model's content gates are the
+same construction (notes §21).
+
+**Predictions, made before the runs.** Midpoint, 100 and 600 puzzles, seeds 1–3, the data and the selection rule of
+"Three seeds".
+
+| model | without the gate | with the gate, if the answer layer is the cause |
+|---|---|---|
+| scaled, 100 and 600 puzzles | 100.0 at seed 2; 19 to 30 at seeds 1 and 3 | 100 at every seed |
+| shared, 600 puzzles | 91.0 ± 3.4, none of the 33 rows with first step ±2 | the 33 rows right, about 99 |
+| shared, 100 puzzles | 60.3 ± 2.7, none of the 33 | no prediction |
+
+The second prediction is the weaker one. In the scaled model every midpoint row teaches the gate, and the descriptor of
+a midpoint row is the same whatever its first step. In the shared model only the training question rows with first
+step ±2 teach it: 18 of them at 600 puzzles, 4 at 100 (213 at 6,000, where the model without the gate got none of the
+33 right). And the descriptor of a midpoint row differs with its first step, so the gate must also carry over to
+complete rows it was not taught on.
+
+**The predictions fail if** the scaled model with the gate stays below 100 at some seed, or the shared model with the
+gate is still right on none of the 33 rows at 600 puzzles.
+
+**Found in the old dumps while the gated runs were training** (before any of their results;
+`analysis/twins_seeds.py --dumps`, third split). The failed seeds of the scaled model without the gate do follow the
+context, through a different input. Unseen rows right, by whether the question row shares a value with one of the
+complete rows (the overlap `ov`, an input of the rule descriptor), seeds 1 / 2 / 3:
+
+| rows, scaled model without the gate | 100 puzzles | 600 puzzles |
+|---|---|---|
+| midpoint, no shared value (397) | 0 / 397 / 16 | 47 / 397 / 0 |
+| midpoint, a shared value (108) | 96 / 108 / 90 | 102 / 108 / 102 |
+| Progression, no shared value (710) | 710 / 710 / 679 | 663 / 710 / 710 |
+| Progression, a shared value (124) | 98 / 124 / 96 | 93 / 124 / 99 |
+
+In seeds 1 and 3 a midpoint row with no shared value is continued as a Progression, and one with a shared value is
+answered as a midpoint in 90 to 102 of 108 rows. With a shared value the model also tells Progression from midpoint in
+most rows (93 to 99 of 124). So the answer layer can switch on the context without a gate; what the failed seeds do not
+use is the complete rows' step pattern (`rd`) when nothing else marks the puzzle. That speaks against the explanation
+the gate tests, and was not known when the predictions were written.
+
+**Results** (12 runs, jobs 12043421–32, 21 to 82 minutes; dumps 12043446–57). Exact % on midpoint, unseen puzzles,
+seeds 1 / 2 / 3:
+
+| model | 100 puzzles | 600 puzzles |
+|---|---|---|
+| shared | 57.2 / 62.0 / 61.8 (60.3 ± 2.7) | 87.1 / 93.1 / 92.9 (91.0 ± 3.4) |
+| shared with the gate | 72.5 / 65.7 / 61.6 (66.6 ± 5.5) | 90.3 / 88.1 / 92.5 (90.3 ± 2.2) |
+| scaled | 19.0 / 100.0 / 21.0 | 29.5 / 100.0 / 20.2 |
+| scaled with the gate | 23.2 / 20.2 / 24.0 | 20.2 / 20.2 / 30.5 |
+
+| rows right, seeds 1 / 2 / 3 | 100 puzzles | 600 puzzles |
+|---|---|---|
+| shared with the gate: the 33 rows with first step ±2 | 0 / 0 / 0 (all continued as a Progression) | 0 / 0 / 0 (all continued) |
+| shared with the gate: the other 472 rows | 366 / 332 / 311 | 456 / 445 / 467 |
+| scaled with the gate: midpoint, no shared value (397) | 19 / 1 / 19 | 1 / 0 / 47 |
+| scaled with the gate: midpoint, a shared value (108) | 98 / 101 / 102 | 101 / 102 / 107 |
+
+| prediction | outcome |
+|---|---|
+| scaled with the gate: 100 at every seed | **failed**: no run of six learns the rule; the highest cell at any evaluated epoch is 30.5 |
+| shared with the gate, 600 puzzles: the 33 rows right | **failed**: none of the 33 at any seed, at either size |
+
+- The gate changes nothing that can be told from three seeds. The shared model's totals are within its spread (the 66.6
+  at 100 puzzles is 1.2 sd of the gated runs above 60.3). The scaled model without the gate learned the rule at seed 2,
+  with it at no seed; a seed draws different initial weights in the two templates, so this is two runs of six against
+  none of six and does not show that the gate hurts.
+- The gated scaled runs fail as the others did: right when the question row shares a value with a complete row.
+- The symmetries are kept (job 12043433, random weights, 100 puzzles): scaled with the gate 2e-17 for all six
+  transforms in 100 of 100 puzzles; shared with the gate 3e-17 for the shift and 2e-2 for every scaling, as without it.
+
+**Where the rule is lost: the row descriptor is a constant** (`analysis/twins_probe.py`, job 12043845; saved
+checkpoints, 30 unseen puzzles, no training). The model reads a complete row through `rd(Rw, A)`: the features of each
+neighbouring pair, summed over the 101 values (`pd`), averaged over the row's pairs. The probe asks a checkpoint for
+`rd` of the first row and compares the attributes under midpoint with those under Progression: the largest difference
+per feature between the two means (features lie in −1..1).
+
+| runs | learns midpoint | `rd` of a midpoint row against a Progression row | `rd` among midpoint rows with different steps |
+|---|---|---|---|
+| scaled, seed 2, 100 and 600 puzzles | 100.0, 100.0 | **1.5, 1.4** | 0 (one unit: every midpoint row is the same row) |
+| scaled, seeds 1 and 3 (4 runs) | 19.0 to 29.5 | 5e-11 to 7e-05 | 0 |
+| scaled with the gate (6 runs) | 20.2 to 30.5 | 1e-14 to 2e-05 | 0 |
+| shared (6 runs) | none of the 33 rows | 6e-14 to 1e-05 | 9e-13 to 4e-06 |
+| shared with the gate (6 runs) | none of the 33 rows | 1e-13 to 2e-07 | 7e-12 to 2e-06 |
+
+- **In all 22 runs that fail, the descriptor of a midpoint row and of a Progression row is the same vector** to four
+  decimals or more. In the shared runs it is also the same for midpoint rows with different first steps: it says
+  nothing about the row's steps at all. In the two runs that learn the rule it differs by 1.4 and 1.5.
+- So the rule never reaches the answer layer in the failed runs, and no gate on that layer could have helped. In the
+  failed runs the means of the rule descriptor `ctx2` under the two rules differ by at most 0.1 to 0.2 per feature,
+  against a spread of 0.6 to 1.7 among the midpoint attributes (the overlap and the counts change from puzzle to
+  puzzle). In the two working runs the means differ by 1.8, with a spread of 0.4 to 0.5.
+- **Why the descriptor can be constant** (read off the template, not measured). `pd` sums the pair's features over
+  every value of the ring: Σ_V tanh(W₁·h(P, V) + W₂·h(Q, V)). On the ring each panel's kernel weights appear once in
+  that sum wherever the panel's value is, so without the tanh the sum is (W₁ + W₂)·Σ_k w_k for every pair. The pair's
+  step enters only through the curvature of the tanh. Why training grows that part at one initialisation and not at
+  the others is not measured.
+- This explains both earlier failures with one cause: the shared model's 33 rows (every seed, every size, 6,000
+  puzzles included) and the scaled model's two outcomes. The doubled model's 152 rows were not probed.
+
+**What this shows.** The scaled model's failure at two seeds of three is not shown to be a cost of the scaling
+symmetry. It is a model that cannot read which rule the complete rows follow, in every run but two; scaling only made
+that reading necessary on every row, where the shared model needs it on 33 of 505. The symmetry prediction itself, the
+split of the unseen first steps, is untouched. **What it does not show:** that a row descriptor which carries the
+steps would make the scaled model learn midpoint at every seed. The next change (run on 2026-11-17, "The row descriptor reads the steps" below): read a pair's step directly,
+as the first panel's kernel feature at the second panel's value (`h(P, A, V)` at Q's value is the kernel weight of
+exactly that step), instead of pooled over all values.
+
+### Two checks without training (2026-11-17)
+
+Both read data that was already there; nothing was trained. They were made to judge two ideas for the thesis: to lead
+with which unseen rows a model reaches, and to order the built-in moves as a ladder of priors.
+
+**One training row in an orbit is enough.** `analysis/twins_seeds.py --dumps`, fourth split. The unseen midpoint rows by
+how many training question rows fall in their orbit (the first step for the shared model, the pair (a, b) for weights
+per value), rows right, three seeds pooled. There are 57 midpoint question rows in 100 training puzzles and 311 in 600.
+
+| training rows in the orbit | 0 | 1 | 2 | 3–4 | 5–8 | 9+ |
+|---|---|---|---|---|---|---|
+| shared, 100 puzzles | 0 of 303 | 422 of 573 (74%) | 286 of 417 (69%) | 172 of 186 (92%) | 34 of 36 | – |
+| shared, 600 puzzles | 0 of 3 | 71 of 72 (99%) | 2 of 3 | 89 of 90 (99%) | 696 of 768 (91%) | 521 of 579 (90%) |
+| per value, 100 puzzles | 11 of 1,440 (1%) | 65 of 75 (87%) | – | – | – | – |
+| per value, 600 puzzles | 22 of 1,188 (2%) | 200 of 270 (74%) | 45 of 51 (88%) | 6 of 6 | – | – |
+
+- **No training row in the orbit, no answer.** 0 of 306 for the shared model, and 1 to 2% for weights per value, where
+  guessing one of 101 values gives 1%. The count's "not reachable" holds row by row.
+- **One row is enough for most of an orbit:** 74% at 100 puzzles and 99% at 600. More rows in the orbit help at 100
+  puzzles (92% from three or four) and add nothing at 600. So what a single row teaches depends on how much the rest
+  of the model has been trained, and the network's shortfall against the counting learner (60 against 80 at 100
+  puzzles) is not a fixed number of rows an orbit needs.
+- **The two lowest cells at 600 puzzles are the Progression-like rows.** First steps −2 and +2 have 8 and 10 training
+  rows, so their 33 unseen rows a seed (14 and 19), all continued as a Progression ("The rule gate"), sit in the last two
+  bins. They are 99 of the 133 wrong rows. Without them the bins are 696 of 726 (96%) and 521 of 522.
+
+**Values read as numbers: a fit with no training** (`analysis/twins_linear_fit.py`). For each attribute, c = p·a + q·b
+is fitted on the puzzle's own two complete rows by least squares and applied to the question row. No other puzzle is
+used. Exact % on the unseen puzzles:
+
+| data | its fourth rule | Progression | Constant | Distribute Three |
+|---|---|---|---|---|
+| sum | 99.6 (505 of 507) | 98.7 | 100 | 0 |
+| midpoint | 99.8 (504 of 505) | 99.3 | 100 | 0 |
+| mirror | 99.8 (502 of 503) | 98.7 | 100 | 0 |
+| lookup | 1.7 (8 of 479) | 98.6 | 100 | 0 |
+
+- **The three linear twins are solved without one training puzzle,** once values are numbers and the rule's form,
+  linear in the two operands, is given. In the terms of "What a built-in move does" this is the far end: the whole form
+  is built in, and the two complete rows fix its two numbers.
+- **It gets nothing where the rule is not linear:** 0 on Distribute Three and 1.7 on lookup.
+- **Its few misses are puzzles that do not fix the rule.** On the sum, midpoint and mirror puzzles all 32 misses on
+  the linear rules (13, 7 and 12) are puzzles whose two complete rows have rank below 2, so they leave p and q open.
+- **So the twins measure what a model pays for treating values as constants with an order,** as every template here
+  does. That is the scope of the comparison between sum and midpoint, and the thesis has to state it. A reader from the
+  vector-symbolic side will ask: as far as I remember, the neuro-symbolic model that I-RAVEN-X was built around
+  (Hersche et al. 2024) works on value encodings with additive structure. Check the paper before citing it.
+- **What it adds to the ladder of built-in moves** for midpoint at 100 puzzles, orbits left to learn against exact %:
+  1,250 (per value) 5.0; 50 (shift) 60.3; 26 (doubled) 49.9; 1 (scaled) 19.0 / 100.0 / 21.0; the form given, values as
+  numbers, 99.8 with no training. The counting learners say the middle of the ladder should rise (80.0, 94.3, 100);
+  the trained models fall there, for the reason found in "The rule gate". A row descriptor that carries the steps
+  restores the order: 59.9, 89.2 and 100.0 ("The row descriptor reads the steps" below).
+
+### The counts behind the proofs (2026-11-17)
+
+`docs/thesis/ch3_pricing_proofs.md` states eleven claims about the twins with a proof in plain words each. Three
+needed a count that was not here yet (`analysis/pricing_checks.py`, nothing trained).
+
+**Coverage from the table alone.** With rows drawn evenly from the table (the generator samples three of its rows
+per attribute), the expected share of unseen rows whose orbit n training rows reach is the sum over orbits of
+P(o)·(1 − (1 − P(o))ⁿ), with P(o) the orbit's share of the table. Midpoint, expected / reached by the counting learner
+on the actual training puzzles (57, 311 and 3,040 question rows):
+
+| built in | orbits | 100 puzzles | 600 | 6,000 | rows for 90% |
+|---|---|---|---|---|---|
+| nothing (one answer per pair) | 1,250 | 4.5 / 5.0 | 22.0 / 21.6 | 91.2 / 90.5 | 2,878 |
+| every panel +s | 50 | 74.8 / 80.0 | 98.7 / 99.8 | 100 / 100 | 107 |
+| +s and ×2 | 26 | 90.5 / 94.3 | 99.3 / 99.8 | 100 / 100 | 55 |
+| +s and ×k | 1 | 100 / 100 | 100 / 100 | 100 / 100 | 1 |
+
+The formula gives the counting learner within 6 points before a puzzle is drawn. The shift cuts the rows needed for
+90% by a factor of 27.
+
+**Which table keeps which move** (rows that are rows again, of those that stay in range): the shift, sum 0 of 30,325,
+midpoint and mirror 40,400 of 40,400; scaling by 2, 3 and 5, all three rules every row; one operand with the answer,
+sum 39,200 of 40,425 (the rest land on a = 0, which the table leaves out), midpoint and mirror 0 of 51,450.
+
+**The ceiling on sum belongs to learners that answer from the question row.** The function
+c₃ = b₃ + (c₁ − b₁) + (a₃ − a₁) uses only differences, follows a shift of the whole puzzle, and is right on 507 of 507
+unseen sum rows, because c₁ − b₁ = a₁ in a sum row. So the puzzle-wide shift alone does not cap sum at 7.9%. The
+shared model stays under the ceiling because of how it reads the puzzle: a value's offsets to the question row's two
+panels, the count of panels at that value in each row, and a descriptor that is the same at every value. It never
+measures from the question row to another row. "Sum and midpoint compared" above said "a shift-equivariant model
+cannot fit sum"; read it as "a learner that answers from the question row". Chapter 7 (7.3, 7.4) is corrected.
+
+**How sharp "under the ceiling" is** (a fact check of the earlier wording, 2026-11-17). Every cell of the shared model
+on sum is 7.1 or less at the epoch picked on the selection puzzles. Over all 172 evaluated epochs of its nine runs
+(six seeded, three first runs), 8 are above 7.9, the highest 9.7 in the run on 6,000 puzzles, whose epochs average
+7.9. The 507 unseen sum rows fix a 7.9% rate to about 1.2 points, and the ceiling is on the expected accuracy: fitted
+to the unseen rows themselves, one answer per orbit would get 28.4% of them. In 48 of the 507 rows the answer is a
+value already in the puzzle, which the template can see. So the model sits at the ceiling; "under it" was too strong.
+
+### The row descriptor reads the steps (2026-11-17)
+
+"The rule gate" ended on a change that was not built. It is built here, and it decides the middle of the ladder above.
+
+**The change** (`value_axis.py --steps`). The row descriptor `rd` also reads each neighbouring pair's step directly:
+`ps(P, Q, A) = tanh(W h(P, A, V))` at the one value V that panel Q has. `h(P, A, V)` is the kernel weight of the
+offset from P's value to V, so at Q's value it is the weight of exactly the pair's step, and with `--scale` of the step
+in the row's unit. `rd` averages a second weight matrix over a row's `ps`, next to the pooled `pd`. No value is named,
+so the symmetries stay. 2,048 more weights: 16,833.
+
+What a complete row then looks like to the model, as the two steps of its pairs:
+
+| row | shared | doubled | scaled |
+|---|---|---|---|
+| Progression, step δ | δ, δ | ±1, ±1 | 1, 1 |
+| midpoint, first step d = m·2^j with m odd | d, −d/2 | m, −m/2 | 1, −1/2 |
+
+In the scaled model every midpoint row gives one pair of kernel weights and every Progression row another.
+
+**Predictions, written before the runs.** Midpoint, 100 and 600 puzzles, seeds 1 to 3, the selection rule of "Three
+seeds": 18 runs (`sharedsteps`, `doubledsteps`, `scaledsteps`).
+
+| | predicted | fails if |
+|---|---|---|
+| scaled with the steps | 100 at every seed and both sizes, as seed 2 reached without them | any of the six runs is below 90 |
+| doubled with the steps, the 152 rows that begin like a Progression row, 600 puzzles | more than half right at every seed (they were 1 / 11 / 1); the total above 67.5 at every seed | 11 or fewer at two seeds |
+| shared with the steps, the 33 rows with first step ±2, 600 puzzles | some right at two seeds or more (18 training rows teach them; the weaker test) | none at all three seeds |
+| the probe, all 18 runs | a midpoint row's `rd` differs from a Progression row's by more than 0.1 in some feature (it was below 0.0001 in 22 runs of 24) | below 0.01 in any run |
+| unseen first steps, 100 puzzles | shared still 0 of 101; doubled none of the 29 and more of the 72 than 39 to 50; scaled all 101 | shared or doubled right on a row the count excludes |
+| the symmetries, random weights | unchanged, 1e-16 | – |
+
+No prediction for the shared model at 100 puzzles: 4 training rows have first step ±2.
+
+**What each outcome would mean.** If the scaled model learns midpoint at every seed, the accuracy lost in "The scaling
+kernel" was the row descriptor's and the ladder's order is restored in its middle. If its descriptor separates the
+rules and it still fails, the cause is somewhere else again and the cost may be the symmetry's after all.
+
+**Wired in, before the runs** (random weights, 40 unseen puzzles): 16,833 weights in all three models. The largest
+difference between the mean `rd` of a midpoint row and of a Progression row is 0.26, 0.34 and 0.39 with the steps
+(shared, doubled, scaled) against 0.04, 0.06 and 0.15 without. In the scaled model all midpoint rows still give one
+`rd` (spread 7e-16).
+
+**Runs:** training jobs 12049211 to 12049245 (odd numbers), their dumps 12049212 to 12049246 (even), the symmetry
+check 12049210 (`log/check_steps_12049210.out`), the probe 12049249. Submitted 2026-11-17.
+
+**Results, 100 puzzles.** Exact % on midpoint, unseen puzzles, seeds 1 / 2 / 3.
+
+| model | without the steps | with the steps |
+|---|---|---|
+| shared | 57.2 / 62.0 / 61.8 (60.3 ± 2.7) | 54.9 / 63.4 / 61.4 (59.9 ± 4.5) |
+| doubled | 55.6 / 48.7 / 45.3 (49.9 ± 5.3) | **90.1 / 91.3 / 86.1** (89.2 ± 2.7) |
+| scaled | 19.0 / 100.0 / 21.0 | **100.0 / 100.0 / 100.0** |
+
+| unseen midpoint rows right, with the steps, seeds 1 / 2 / 3 | shared | doubled | scaled |
+|---|---|---|---|
+| first step seen in training (404) | 277 / 319 / 310 | 391 / 392 / 368 | 404 / 404 / 404 |
+| new first step, odd part seen (72) | 0 / 1 / 0 | 64 / 69 / 67 | 72 / 72 / 72 |
+| new first step, new odd part (29) | 0 / 0 / 0 | 0 / 0 / 0 | 29 / 29 / 29 |
+| rows that begin like a Progression row in the model's unit | 17 / 27 / 19 of 33 | 152 / 149 / 147 of 152 | 505 / 505 / 505 of 505 |
+
+- **The scaled model learns midpoint at every seed:** all 505 unseen rows from 100 puzzles, the 101 rows with a new
+  first step included, and every Progression row beside them (834 of 834). The prediction is met at this size.
+- **The doubled model rises from 49.9 to 89.2,** against 94.3 for its counting learner. It is right on 64 to 69 of the
+  72 rows the count allows (39 to 50 without the steps) and on none of the 29 it excludes. It no longer continues a
+  midpoint row as a Progression: 147 to 152 of the 152 rows that begin like one are right, where 1 to 11 were at 600
+  puzzles without the steps.
+- **The shared model's 33 rows, for which no prediction was made at this size:** 17 / 27 / 19 right. In the twelve
+  earlier shared runs, with and without the gate, none was ever right. Its total does not move (59.9 against 60.3):
+  it gains about 21 of the 33 rows and loses as many among the other 472 (260 / 293 / 291 right, against 289 / 313 /
+  312 without the steps).
+- **One row against the count.** The shared model at seed 2 is right on 1 of the 101 rows with a first step it never
+  saw; the prediction said none. Guessing among 101 values gives about 1 such row per seed, and the earlier shared
+  runs had 0 of 303, so this is at the rate of chance. As written, that prediction is missed by one row.
+
+**Results, 600 puzzles.** Exact % on midpoint, unseen puzzles, seeds 1 / 2 / 3. All 18 runs completed 200 epochs.
+
+| model | without the steps | with the steps |
+|---|---|---|
+| shared | 87.1 / 93.1 / 92.9 (91.0 ± 3.4) | **96.0 / 99.4 / 99.4** (98.3 ± 1.9) |
+| doubled | 65.5 / 69.5 / 67.5 (67.5 ± 2.0) | **99.4 / 99.0 / 99.2** (99.2 ± 0.2) |
+| scaled | 29.5 / 100.0 / 20.2 | **100.0 / 100.0 / 100.0** |
+
+| unseen midpoint rows right, with the steps, seeds 1 / 2 / 3 | shared | doubled | scaled |
+|---|---|---|---|
+| rows that begin like a Progression row in the model's unit | 33 / 33 / 33 of 33 | 152 / 151 / 152 of 152 | 505 / 505 / 505 of 505 |
+| the other rows | 452 / 469 / 469 of 472 | 350 / 349 / 349 of 353 | – |
+| the one row with a first step training never had | 0 / 0 / 0 | 0 / 0 / 0 | 1 / 1 / 1 |
+
+- **The scaled model is at 100.0 in all six runs,** at every evaluated epoch from the tenth on. With one number left
+  to learn (`docs/thesis/ch3_pricing_proofs.md`, Statement 7) it is right as soon as it can read which rule the
+  complete rows follow.
+- **The shared model's 33 rows are all right at every seed.** No run of the twelve without the steps had one of them.
+  Its total goes from 91.0 to 98.3, against 99.8 for its counting learner.
+- **The doubled model goes from 67.5 to 99.2,** against 99.8 for its counting learner.
+- **No model continues a midpoint row as a Progression any more:** 0 such answers in the nine runs at 600 puzzles,
+  where the shared model gave 33 of 33 and the doubled model 139 to 150 of 152.
+
+**The probe** (`analysis/twins_probe.py`, job 12049249, `log/twins_probe_12049249.out`; 30 unseen puzzles). The largest
+difference per feature between the mean `rd` of a midpoint row and of a Progression row:
+
+| runs | midpoint exact | `rd`: midpoint row against Progression row | spread among midpoint rows |
+|---|---|---|---|
+| shared with the steps (6) | 54.9 to 99.4 | 0.87 to 1.9 | 1.3 to 1.6 |
+| doubled with the steps (6) | 86.1 to 99.4 | 1.7 to 2.0 | 1.1 to 1.5 |
+| scaled with the steps (6) | 100.0 | 1.3 to 1.7 | below 5e-16 |
+| for comparison, 22 of the 24 runs without the steps | fail | below 0.0001 | – |
+
+The row descriptor now separates the two rules in every run. In the scaled model every midpoint row still has one
+descriptor, as it must.
+
+**The symmetries** (`log/check_steps_12049210.out`, random weights, 100 puzzles). Scaled with the steps: every scaling
+and shift tested, at most 3.6e-17, in 100 of 100 puzzles. Doubled with the steps: the shift 3e-17, doubling 3e-17 in
+the puzzles whose first steps stay in range, tripling 1.7e-2. Shared with the steps: the shift 3e-17, every scaling
+2e-2 to 3e-2. Unchanged from the models without the steps.
+
+**The predictions.**
+
+| prediction | outcome |
+|---|---|
+| scaled with the steps: 100 at every seed and both sizes | **met:** 100.0 in six runs of six |
+| doubled with the steps, 600 puzzles: more than half of the 152 rows right at every seed, total above 67.5 | **met:** 152 / 151 / 152; 99.4 / 99.0 / 99.2 |
+| shared with the steps, 600 puzzles: some of the 33 rows right at two seeds or more | **met,** by more than was predicted: 33 / 33 / 33 |
+| the probe: `rd` differs by more than 0.1 in all 18 runs | **met:** 0.87 at the least |
+| unseen first steps, 100 puzzles: doubled none of the 29 and more than 39 to 50 of the 72; scaled all 101 | **met:** 0 of 29, 64 / 69 / 67 of 72; 101 of 101 |
+| unseen first steps, 100 puzzles: shared still 0 of 101 | **missed by one row:** 0 / 1 / 0, the rate of guessing |
+| the symmetries unchanged | **met** |
+
+**What this shows.** The accuracy lost in "The scaling kernel" was the row descriptor's and not the symmetry's. With a
+descriptor that carries the steps, every rung of the ladder is above the one below it, as the count says:
+
+| midpoint, exact %, 3 seeds | weights per value | shared | doubled | scaled |
+|---|---|---|---|---|
+| orbits left to learn | 1,250 rows | 50 | 26 | 1 |
+| counting learner, 100 / 600 puzzles | 5.0 / 21.6 | 80.0 / 99.8 | 94.3 / 99.8 | 100 / 100 |
+| trained, with the steps, 100 / 600 puzzles | 5.0 ± 0.5 / 18.0 ± 0.9 (no steps) | 59.9 ± 4.5 / 98.3 ± 1.9 | 89.2 ± 2.7 / 99.2 ± 0.2 | 100.0 / 100.0 |
+
+The failure in "The rule gate" had one cause in both models, and one change removes it in both: the shared model's
+33 rows and the scaled model's two outcomes.
+
+**What it does not show.**
+- **Why the pooled descriptor collapses in training.** With random weights it differs between the two rules by 0.04
+  to 0.15 ("Wired in" above); after training it was below 0.0001 in 22 runs. That was not studied.
+- **That the shared model reaches its count at 100 puzzles.** It stays 20 points under (59.9 against 80.0), and the
+  steps do not move its total there. The gap is in rows whose first step training had: 277 to 319 of 404 right.
+- **Anything on sum.** The models with the steps were run on midpoint only. That sum stays at its ceiling in them is
+  expected and not measured.
+- **More than three seeds show.** The scaled result has no spread at all; the others have standard deviations of 0.2
+  to 4.5 points.
 
 ## Plus and minus apart
 
@@ -674,6 +1273,11 @@ exist, so a model that found u + (w + 1) = (u + w) + 1 by itself would need rule
 
 ## Does it grok?
 
+**Arithmetic-only training is a diagnostic, not a benchmark result** (2026-11-08). Every attribute of every puzzle,
+in training and in the test, follows Arithmetic, so the model is told the rule and no other rule shares its weights.
+These runs ask whether a model can learn the sum at all. How a model does on Arithmetic is judged only on the
+mixed-rule puzzles, where it must also recognise the rule (`docs/RESULTS.md` §1 and §5).
+
 Does Arithmetic on 3×10 fall to much more data and weight decay? 100,000 puzzles in which every attribute follows Arithmetic
 (`data_prep/arith_big_data.py`), with 300 selection and 1000 unseen puzzles of the same kind. Grokking would show as Arithmetic exact
 high on training puzzles long before it rises on unseen ones.
@@ -684,9 +1288,10 @@ high on training puzzles long before it rises on unseen ones.
 | attribute GNN B, 16×, no dropout | 25.6M | 0.1 at a constant learning rate, per batch of 64 | 11942529 | 99.2 / **99.3** (epoch 45 of 115); cancelled |
 
 **No grokking: train and unseen never part.** At every evaluation of both models the two agree within 6 points, so there is
-no memorised stage for a late generalisation to follow. With 100,000 puzzles GNN B learns Arithmetic outright: 42.3 at epoch 5,
-98.1 at epoch 10 (a million puzzles seen), 99.3 at its best. The same architecture at 1× gets 22.7 on the 6000 mixed-rule
-puzzles (`RESULTS.md` §5), so data and width are enough, with no symmetry added.
+no memorised stage for a late generalisation to follow. With 100,000 Arithmetic-only puzzles GNN B learns the sum: 42.3 at
+epoch 5, 98.1 at epoch 10 (a million puzzles seen), 99.3 at its best. The same architecture at 1× gets 22.7 on the 6000
+mixed-rule puzzles (`RESULTS.md` §5), so once it is told the rule, data and width are enough to learn the sum, with no
+symmetry added. That says nothing yet about Arithmetic among the other rules.
 
 **The GNN's evaluations swing because the weights spike, not because of dropout.** Unseen exact by epoch: 98.1, 5.9, 81.6,
 73.6, 62.7, 66.0, 64.3, 99.3, 98.0, ... 99.5, 69.5, 97.5, 73.3, 99.2, 43.8 (epochs 10 to 115). At epoch 15 the snapshot's error
@@ -735,6 +1340,18 @@ either. 1000 puzzles hold 3000 Arithmetic attributes (type, size and colour all 
 puzzles hold (1501 plus, 1477 minus), on which GNN B at 1× with dropout 0.3 and decay 0.5 gets 22.7. That gap is not
 explained: the rules are mixed there, the model is 16 times smaller, and dropout 0.3 is what sank the 100,000-puzzle runs.
 
+**Not the size** (2026-11-08). GNN B at 1× (1.6M weights) on the same first 1000 Arithmetic-only puzzles, no decay, the
+same recipe (job 11978018): unseen exact 98.6 / 97.5 / 98.0 per attribute (type, size, colour), 99.5 matched, train 100
+(epoch 1750 of 2500, picked on selection). Train and unseen rose together, with two collapses and recoveries on the way
+(epochs 625–750 and 1375), so this is no grokking either. So the gap to 22.7 is the mixing of rules or the earlier run's
+regularisation. GNN B at 1× on the mixed-rule
+puzzles with this recipe (no dropout, no decay, constant learning rate 1e-3, 40,000 steps, epoch picked by matched; seeds 0
+and 1, jobs 11978453–54) separates the two: Arithmetic exact **45.1 / 54.0** at the epoch picked by matched, 50.6 / 49.2 at
+the last epoch, with the whole puzzle at 99.2 (63.9) / 99.3 (61.5). So the 22.7 came from dropout and decay, not from the
+mixing. Mixing still costs: 98.0 when every attribute is Arithmetic, about 50 among the other rules. This is also the
+best Arithmetic of any model here that has to learn the sum on 3×10 (column roles: 40.5), and the other torch baselines
+have not been rerun with this recipe (RESULTS §12).
+
 Smaller still, run to the end (300,000 steps), Arithmetic exact, train / unseen:
 
 | N | weight decay | job | curve | best (step) |
@@ -774,6 +1391,7 @@ So the setting most likely to show it here is: a training set small enough to me
 weight decay of about 1, many updates, and optionally larger initial weights, with an MSE loss like ours.
 
 ### The row fold in that setting (2026-11-08)
+Arithmetic-only, as above: a diagnostic of whether the fold can learn the sum, not a benchmark result.
 The recursive row fold (`--columns fold`, 305k weights on 3×10, notes §25) gets Arithmetic exact 36.2 on the mixed 3×10 data.
 Here it trains on Arithmetic-only 3×10 puzzles (values 0–50, every attribute Arithmetic), with `core/pynl/facet_stream.py`:
 one update per puzzle, Adam at learning rate 3e-4, decoupled weight decay applied every 100 puzzles, a small training
@@ -782,10 +1400,27 @@ puzzles) on 300 training puzzles and 1000 unseen ones (`jobs/pynl/submit_grok_fo
 
 | run | training puzzles | weight decay | initial weights | updates | job | Arithmetic exact, train / unseen |
 |---|---|---|---|---|---|---|
-| control | 1000 | 0 | ×1 | 400,000 | 11974980 | *running* |
-| decay | 1000 | 1 | ×1 | 400,000 | 11974981 | *running* |
-| decay, large start | 1000 | 1 | ×3 | 400,000 | 11974982 | *running* |
-| decay, smaller set | 300 | 1 | ×1 | 300,000 | 11974983 | *running* |
+| control | 1000 | 0 | ×1 | 400,000 | 11974980 | best 90.7 / **63.4** (epoch 110); 97.9 / 47.8 at the end |
+| decay | 1000 | 1 | ×1 | 400,000 | 11974981 | best 25.7 / 24.6; train never above 26.6 |
+| decay, large start | 1000 | 1 | ×3 | 400,000 | 11974982 | best 23.9 / 24.5; train never above 25.2 |
+| decay, smaller set | 300 | 1 | ×1 | 300,000 | 11974983 | best 31.7 / 29.0; train never above 34.2 |
+| gentler decay | 1000 | 0.03 | ×1 | 600,000 | 11978016 | best 86.1 / **65.7** (epoch 125); last 100 epochs about 86 / 43 |
+| gentlest decay | 1000 | 0.01 | ×1 | 600,000 | 11978017 | best 81.1 / 58.7 (epoch 95); last 100 epochs about 97 / 46 |
 
-Learning rate times decay is 3e-4 per update, so weights that no gradient holds shrink e-fold every 3,300 updates.
-Grokking would show as train near 100 long before unseen rises.
+Learning rate times decay is 3e-4 per update at decay 1, so weights that no gradient holds shrink e-fold every 3,300
+updates. Grokking would show as train near 100 long before unseen rises.
+
+**No grokking in the first round, for two different reasons.**
+- **Without decay the fold memorises and stays there.** Train climbs to 95 by 155,000 updates and 98 by 300,000;
+  unseen peaks at 63.4 at 110,000 and then sinks to 44–53, while the unseen error rises (0.0102 → 0.0141) and the
+  weights grow (rms 0.104 → 0.206). That is the memorising stage the grokking papers start from, with no late turn in
+  400,000 updates. Note that 63.4 is well above the 36.2 the fold gets on the 6000 mixed-rule puzzles, which hold as
+  many Arithmetic attributes (2978 against 3000 here): Arithmetic with no other rules beside it is easier for it.
+- **With decay 1 it never memorises.** Within 10 epochs the weights fall from rms 0.10 to 0.02, and train and unseen
+  stay together at 10–25 for the whole run, with or without the larger start (the ×3 start is pulled in by epoch 10)
+  and at 300 puzzles too. One update per puzzle means 1000 decay steps an epoch, and the Adam noise each step adds
+  balances the decay at about √(lr / 2·wd) ≈ 0.012 per weight, far below what fitting needs. The papers' decay of 1
+  is for full or large batches, about a hundred times fewer steps per epoch than here.
+
+So the grid missed the window between them. The second round (decay 0.03 and 0.01, 600 epochs) keeps the equilibrium
+near 0.07–0.12, where the no-decay run memorised, while still pulling for 2 to 7 e-folds over the run.
