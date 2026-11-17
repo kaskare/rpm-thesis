@@ -6,6 +6,8 @@ index is stored as well, so the trainer can check that both files list the same 
 the repository root; a few minutes on CPU, so submit it rather than run it on the login node (jobs/baselines/submit_vit.sh
 shows how):
     python data_prep/prepare_baseline_images.py      # -> experiments/baselines/data/iraven_images.npz
+--test writes the test split alone (test 0..1999 per layout, data_prep/prepare_baseline_data.py --test's order) to
+iraven_test_images.npz, for core/baselines/test_eval.py.
 """
 import argparse, functools, json, os
 from multiprocessing import Pool
@@ -13,6 +15,7 @@ from multiprocessing import Pool
 import numpy as np
 
 SPLITS = {"train": ("train", 0, 6000), "sel": ("val", 0, 300), "unseen": ("val", 300, 1000)}   # prepare_baseline_data.py's
+TEST = {"test": ("test", 0, 2000)}
 
 
 def panels(size, stem):
@@ -29,18 +32,19 @@ def main():
     ap.add_argument("--data-dir", default="experiments/baselines/data")
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--size", type=int, choices=(80, 160), default=80)
+    ap.add_argument("--test", action="store_true", help="the test split only -> iraven_test_images.npz")
     args = ap.parse_args()
     meta = json.loads(str(np.load(os.path.join(args.data_dir, "iraven.npz"))["meta"]))
     out = {}
     with Pool(args.workers) as pool:
-        for s, (split, start, n) in SPLITS.items():
+        for s, (split, start, n) in (TEST if args.test else SPLITS).items():
             stems = [os.path.join(args.root, cfg, f"RAVEN_{i}_{split}")
                      for cfg in meta["constellations"] for i in range(start, start + n)]
             res = pool.map(functools.partial(panels, args.size), stems, chunksize=64)
             out[f"{s}_img"] = np.stack([r[0] for r in res])
             out[f"{s}_y"] = np.array([r[1] for r in res], np.int16)
             print(s, out[f"{s}_img"].shape, flush=True)
-    name = f"iraven_images{args.size if args.size != 80 else ''}"
+    name = f"iraven{'_test' if args.test else ''}_images{args.size if args.size != 80 else ''}"
     tmp = os.path.join(args.data_dir, f"{name}.tmp.npz")
     np.savez(tmp, **out)
     os.replace(tmp, os.path.join(args.data_dir, f"{name}.npz"))

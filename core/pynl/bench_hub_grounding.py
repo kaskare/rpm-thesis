@@ -62,8 +62,12 @@ def decode(v):
 def evaluate(outs, data, values=None):
     """outs: one dict {component: output} per puzzle; component None = the whole panel (the Python
     baselines, which output descriptions). With values set, outputs are facet
-    codes: generation is checked through facet_to_description, matching in the code space.
-    Generation: the decoded spec equals the answer's, per part and whole (every component).
+    codes: generation is checked through facet_decode, matching in the code space.
+    Generation: the decoded spec equals the answer's, per part and whole (every component). With facet
+    codes the answer is decoded from its own code, as the output is: I-RAVEN-X draws values up to maxval
+    inclusive, which the one-hot description (describe) cannot hold, so decode(describe()) wrote that value
+    into the next attribute and capped exact (perfect outputs: 95.6% on 3x3 0-10, 98.4% on 3x10 0-50; fixed
+    2026-11-08). On I-RAVEN the two decodings agree on every answer.
     Matching: the candidate closest summed over components; a tie counts as wrong."""
     exact = {k: 0 for k in PARTS}
     exact["all"] = matched = ties = 0
@@ -74,9 +78,11 @@ def evaluate(outs, data, values=None):
         for k, out in comp_out.items():
             out = np.asarray(out, dtype=float).flatten()
             o = facet_to_description(out, values) if values else out
-            t = describe(comp_objs(candidate(panels, y), cfg, k))
+            ans = comp_objs(candidate(panels, y), cfg, k)
+            t = describe(ans)
             sq.append(np.mean((o - t) ** 2))
-            got, want = (facet_decode(out, values) if values else decode(o)), decode(t)
+            got = facet_decode(out, values) if values else decode(o)
+            want = facet_decode(facet_target(ans, values), values) if values else decode(t)
             for part in PARTS:
                 ok[part] &= int(got[part] == want[part])
             if values:
@@ -151,8 +157,12 @@ def col_names(roles=False):
     """The constant of every column in the col(P, .) facts: c1..cn, or with roles=True first / mid / last. With
     roles the template names the first and the last column but no middle one, so any permutation of columns
     2..n-1 is built in (notes §24): the operands of I-RAVEN-X Arithmetic, c_n = c_1 + ... + c_{n-1} and
-    c_1 = c_2 + ... + c_n, are interchangeable there. For n = 3 the roles are the columns."""
+    c_1 = c_2 + ... + c_n, are interchangeable there. For n = 3 the roles are the columns.
+    roles="tie12", a wrong-symmetry control (plan E4): every column but the last is "mid", so for rows of 3 the template
+    cannot tell columns 1 and 2 apart. Swapping them takes Progression (and minus) rows out of the data's support."""
     n = len(COLS)
+    if roles == "tie12":
+        return ("mid",) * (n - 1) + ("last",)
     return tuple(COLS) if not roles else tuple("first" if j == 0 else "last" if j == n - 1 else "mid" for j in range(n))
 
 
@@ -168,11 +178,27 @@ def comp_objs(panel, cfg, k):
     return panel if k is None else [o for o in panel if comp_of(cfg, o["pos"]) == k]
 
 
+FOLD = False     # --fold-values: the value-reflection control (plan E4), set before any facts are written
+
+
+def fold_code(v):
+    """The input code with v and maxval - v made the same (value-reflection invariance, a wrong-symmetry control):
+    the mean of the two thermometer codes. It keeps |v - maxval / 2| and loses which side of the middle v is on.
+    Only the context facts use it; targets stay plain codes. I-RAVEN-X only (one value range for every attribute)."""
+    return [0.5 * (a + b) for a, b in zip(code(v), code(N_SHP - v))]
+
+
 def code(v, values="therm"):
     """therm: value v -> the first v bits on (ordinal); onehot: bit v on (categorical)."""
     if values == "therm":
         return [1.0] * v + [0.0] * (THERM - v)
     return [1.0 if k == v else 0.0 for k in range(THERM)]
+
+
+def obj_code(o, a, values="therm"):
+    """The code of object o's attribute a. A perceived object may carry soft codes, o["soft"][a], the recognizer's
+    P(value > k) per thermometer bit (core/pynl/facet_e2e_eval.py); objects read from the labels never do."""
+    return o["soft"][a] if "soft" in o else code(o[a], values)
 
 
 def facet_target(panel, values="therm"):
@@ -184,7 +210,7 @@ def facet_target(panel, values="therm"):
     occ = np.zeros(N_POS)
     for o in panel:
         occ[o["pos"]] = 1
-    return np.concatenate([np.mean([code(o[a], values) for o in panel], axis=0) for a in FACET_ATTRS]
+    return np.concatenate([np.mean([obj_code(o, a, values) for o in panel], axis=0) for a in FACET_ATTRS]
                           + [code(len(panel), values), occ])
 
 
@@ -290,8 +316,8 @@ def build_facet_template(d, layers, shared=True, rows=True, widths=None, hidden=
     cs = [V.C] if shared_comps else ["k0", "k1"]                  # one weight set for all components, or one each
     mine_c = lambda C: (S.obj(V.P, V.O), S.ocomp(V.O, C))
     oc = lambda C: () if shared_comps else (S.ocomp(V.O, C),)     # names the component where the rule has none
-    roles, fold = cols in ("roles", "fold"), cols == "fold"
-    names = col_names(roles)          # same-position partners: column pairs (named), role pairs (roles)
+    roles, fold = cols in ("roles", "fold", "tie12"), cols == "fold"
+    names = col_names("tie12" if cols == "tie12" else roles)   # same-position partners: column pairs (named), role pairs
     col_pairs = [(a, b) for a in COLS for b in COLS if a != b] if not roles else \
         [(a, b) for a in ROLES for b in ROLES if a != b or (a == "mid" and names.count("mid") > 1)]
 
@@ -475,7 +501,7 @@ def facet_facts(panels, values, cfg, copy=False, source=None, labels=()):
         for i, o in enumerate(panels[p]):
             oid = f"p{p}o{i}"
             facts.append(R.ocomp(oid, comp_of(cfg, o["pos"])))
-            facts += [R.fv(oid, a)[code(o[a], values)] for a in FACET_ATTRS]
+            facts += [R.fv(oid, a)[fold_code(o[a]) if FOLD else obj_code(o, a, values)] for a in FACET_ATTRS]
             facts.append(R.pos(oid)[[1.0 if s == o["pos"] else 0.0 for s in range(N_POS)]])
     return facts
 
@@ -635,11 +661,19 @@ def main():
                     help="facet: own weights for every component (k0, k1), removing their weight sharing (notes §26.1)")
     ap.add_argument("--label-attributes", action="store_true",
                     help="facet: one-hot facts tell the attributes apart, removing their symmetry (notes §26)")
-    ap.add_argument("--columns", choices=["named", "roles", "fold"], default="named",
+    ap.add_argument("--fold-values", action="store_true",
+                    help="I-RAVEN-X: v and maxval - v get the same input code (value-reflection invariance), a "
+                         "wrong-symmetry control that conflicts with the data (plan E4)")
+    ap.add_argument("--columns", choices=["named", "roles", "fold", "tie12"], default="named",
                     help="facet: weights per column (named), or per role first / middle / last, so that the middle "
                          "columns are interchangeable (roles; the operands of I-RAVEN-X Arithmetic, notes §24), or "
-                         "roles with a recursive fold along each row (fold, notes §25)")
+                         "roles with a recursive fold along each row (fold, notes §25), or every column but the last "
+                         "tied (tie12: columns 1 and 2 of rows of 3, a wrong-symmetry control, plan E4)")
     args = ap.parse_args()
+    if args.fold_values:
+        assert args.iravenx and not args.copy_links, "--fold-values: I-RAVEN-X only, and no copy links (they copy plain codes)"
+        global FOLD
+        FOLD = True
     cfgs = list(POS_MAP) if args.constellation == "all" else args.constellation.split(",")
     files, lengths = (args.iravenx.split(",") if args.iravenx else []), []
     if args.iravenx:
@@ -702,7 +736,8 @@ def main():
         gid = f"{name}{i}{k or ''}"
         if mixed:
             set_row_length(row_length(panels))
-        facts = puzzle_facts(panels, gid, col_roles=args.columns != "named", fold=args.columns == "fold")
+        facts = puzzle_facts(panels, gid, col_roles="tie12" if args.columns == "tie12" else args.columns != "named",
+                             fold=args.columns == "fold")
         target = facet_target(comp_objs(candidate(panels, y), cfg, k), values)
         src = sets[name][nxt[name][i]][0] if nxt else None
         facts += facet_facts(panels, values, cfg, args.copy_links, src, labels) + [R.qcomp(gid, k)]
@@ -754,7 +789,8 @@ def main():
                  f"{', per component' if args.per_comp_weights else ''}, "
                  f"{'no row relation' if args.no_rows else 'row relation'}"
                  + (f", copy links ({args.copy_gates} gates{', shuffled sources' if args.copy_shuffled else ''})"
-                    if args.copy_links else "") + ({"named": "", "roles": ", column roles", "fold": ", row fold"}[args.columns])
+                    if args.copy_links else "") + ({"named": "", "roles": ", column roles", "fold": ", row fold", "tie12": ", columns 1-2 tied"}[args.columns])
+                    + (", values folded" if args.fold_values else "")
                     + "".join(f", {k} labelled" for k in labels) + ")")
               + (f", widths {args.widths}" if args.widths else f", dim {args.dim}, layers {args.layers}")
               + f", lr {args.lr}; "

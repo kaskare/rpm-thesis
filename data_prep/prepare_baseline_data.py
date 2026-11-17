@@ -11,6 +11,7 @@ submit it as a job rather than running it on the login node):
 
 Splits are the facet runs': I-RAVEN train 0-5999 per constellation, val 0-299 pick the epoch, val
 300-1299 are unseen; I-RAVEN-X train 0-5999, 6000-6299 pick the epoch, 6300-7299 unseen.
+I-RAVEN's test split (test 0-1999 per constellation) is a file of its own, written with --test.
 """
 import argparse, json, os, sys
 
@@ -31,6 +32,7 @@ DATASETS.update({f"twin_{r}_m50": (f"data/iravenx_twins/{r}/center_single_shuffl
 DATASETS["iravenx_arith"] = ("data/iravenx_arith/center_single_shuffle_n_10_maxval_50.json", "copy")     # data_prep/arith_big_data.py
 SPANS = {"train": (0, 6000), "sel": (6000, 300), "unseen": (6300, 1000)}
 BIG_SPANS = {"iravenx_arith": {"train": (0, 100000), "sel": (100000, 300), "unseen": (100300, 1000)}}
+TEST = (0, 2000)                                               # I-RAVEN's test split, per layout: the facet model's test pass
 RULES = ["Constant", "Progression", "Distribute_Three", "Arithmetic"]
 N_CHECK = 20
 
@@ -82,8 +84,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", nargs="*", default=list(DATASETS))
     ap.add_argument("--out", default="experiments/baselines/data")
+    ap.add_argument("--test", action="store_true", help="only I-RAVEN's test split (test 0..1999 per layout) -> "
+                    "iraven_test.npz, for core/baselines/test_eval.py; the meta is iraven.npz's, unchanged")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
+    if args.test:
+        meta = json.loads(str(np.load(os.path.join(args.out, "iraven.npz"))["meta"]))
+        data = B.load("data/I-RAVEN-10000", meta["constellations"], "test", *TEST)
+        assert {o["pos"] for panels, _, _ in data for p in panels for o in p} <= set(meta["slots"]), "a slot unseen in training"
+        np.savez_compressed(os.path.join(args.out, "iraven_test.npz"), meta=json.dumps(meta),
+                            **{f"test_{k}": v for k, v in arrays(data).items()})
+        print("iraven_test", len(data), "puzzles: test", TEST[0], "to", TEST[0] + TEST[1] - 1, "of every layout", flush=True)
+        return
     import neuralogic
     neuralogic.set_max_memory_size(16)
     from neuralogic.logging import clear_handlers

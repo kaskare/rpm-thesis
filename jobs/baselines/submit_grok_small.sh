@@ -14,17 +14,24 @@
 # (WD=1 B2=0.98), does not fit: the training loss rises after about 6000 steps at every N tried (docs/ARITHMETIC.md).
 # amdgpu, not amdgpulong: a higher tier, so it starts sooner. Resubmit with the same settings to continue from last.pt.
 #   N=1000 WD=0 sbatch jobs/baselines/submit_grok_small.sh
+# SCALE sets the width (default 16x, 25.6M weights; 1x is 1.6M, the facet model's size on 3x10), STEPS the updates.
+#   N=1000 WD=0 SCALE=1 STEPS=40000 sbatch jobs/baselines/submit_grok_small.sh
+# DATA picks the dataset (default iravenx_arith, every attribute Arithmetic: a diagnostic, the rule is known), SELECT
+# what picks the epoch (default arithmetic), SEED the seed. The same recipe on the mixed-rule puzzles, the benchmark
+# setting, separates the mixing of rules from the regularisation of the earlier mixed run (dropout 0.3, decay 0.5):
+#   DATA=iravenx_n10_m50 N=6000 WD=0 SCALE=1 STEPS=40000 SELECT=matched SEED=0 sbatch jobs/baselines/submit_grok_small.sh
 
 N=${N:?set N, the number of training puzzles}
-WD=${WD:-0.1}; B2=${B2:-0.999}
+WD=${WD:-0.1}; B2=${B2:-0.999}; SCALE=${SCALE:-16}; STEPS=${STEPS:-300000}
+DATA=${DATA:-iravenx_arith}; SELECT=${SELECT:-arithmetic}; SEED=${SEED:-0}
 PER=$(( (N + 63) / 64 ))
-EPOCHS=$(( 300000 / PER )); EVAL=$(( (2000 + PER - 1) / PER )); WARM=$(( (1000 + PER - 1) / PER ))
+EPOCHS=$(( STEPS / PER )); EVAL=$(( (2000 + PER - 1) / PER )); WARM=$(( (1000 + PER - 1) / PER ))
 
 source /mnt/appl/software/Anaconda3/2024.02-1/etc/profile.d/conda.sh
 conda activate nvsa
 cd /home/kassyask/neuro-vector-symbolic-architectures-raven
 nvidia-smi -L
-echo "N ${N}, decay ${WD}, beta2 ${B2}: ${PER} steps per epoch, ${EPOCHS} epochs, evaluation every ${EVAL}, warm-up ${WARM}"
-python core/baselines/train_baseline.py --data iravenx_arith --arch attr-rel --seed 0 --scale 16 --n-train ${N} --epochs ${EPOCHS} \
+echo "${DATA}, N ${N}, width ${SCALE}x, seed ${SEED}, select ${SELECT}, decay ${WD}, beta2 ${B2}: ${PER} steps per epoch, ${EPOCHS} epochs, evaluation every ${EVAL}, warm-up ${WARM}"
+python core/baselines/train_baseline.py --data ${DATA} --arch attr-rel --seed ${SEED} --scale ${SCALE} --n-train ${N} --epochs ${EPOCHS} \
     --eval-every ${EVAL} --batch 64 --lr 1e-3 --warmup ${WARM} --clip 1 --wd ${WD} --beta2 ${B2} --dropout 0 \
-    --train-eval $(( N < 1000 ? N : 1000 )) --select arithmetic --resume --tag grok_n${N}_wd${WD}$([ "${B2}" = 0.999 ] || echo _b2${B2})
+    --train-eval $(( N < 1000 ? N : 1000 )) --select ${SELECT} --resume --tag grok_n${N}_wd${WD}$([ "${B2}" = 0.999 ] || echo _b2${B2})

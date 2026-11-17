@@ -14,6 +14,8 @@ exact attribute (and Number/Position part) by the rule the puzzle's XML gives it
 
 Transforms (the answer and candidates are transformed too wherever the transformation reaches them):
   rows12     rows 1 <-> 2 of the context
+  cols12     columns 1 <-> 2 of every row (the tie12 control's symmetry; out of support for Progression)
+  reflect    every value v -> maxval - v (I-RAVEN-X; the --fold-values control's symmetry)
   cols23     columns 2 <-> 3 of every row (two middle columns when a row has 4 or more)
   sizecolor  the size and colour values of every object exchanged (I-RAVEN-X: a data symmetry, §22)
   mirror     left-right and up-down layouts mirrored: slots 14 <-> 15 and 16 <-> 17, so the components swap
@@ -31,7 +33,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bench_hub_grounding as B
-from facet_symmetry_check import rows12, cols23
+from facet_symmetry_check import rows12, cols12, cols23
 
 
 def size_color(pz):
@@ -43,7 +45,12 @@ def mirror(pz):
     return [[{**o, "pos": sw.get(o["pos"], o["pos"])} for o in p] for p in pz]
 
 
-TRANSFORMS = {"none": lambda pz: pz, "rows12": rows12, "cols23": cols23, "sizecolor": size_color, "mirror": mirror}
+def reflect(pz):                    # every value v -> maxval - v (I-RAVEN-X): the --fold-values control's symmetry
+    return [[{**o, **{a: B.N_SHP - o[a] for a in ("type", "size", "color")}} for o in p] for p in pz]
+
+
+TRANSFORMS = {"none": lambda pz: pz, "rows12": rows12, "cols12": cols12, "cols23": cols23, "sizecolor": size_color,
+              "mirror": mirror, "reflect": reflect}
 RULES = ("Constant", "Progression", "Distribute_Three", "Arithmetic")
 NUMPOS = ("Number/Position", "Number", "Position")
 
@@ -142,7 +149,8 @@ def main():
             irules = [xml_rules(os.path.join(root, c, f"RAVEN_{i}_val.xml")) for c in cfgs for i in range(300, 300 + args.n)]
             where = f"{args.n} val puzzles (300..) per constellation of {', '.join(c[:12] for c in cfgs)}"
         cols = a.get("columns", "named")
-        copy, roles, fold = bool(a.get("copy_links")), cols != "named", cols == "fold"
+        copy, roles, fold = bool(a.get("copy_links")), ("tie12" if cols == "tie12" else cols != "named"), cols == "fold"
+        B.FOLD = bool(a.get("fold_values"))
         labels = tuple(k for k, f in (("components", "label_components"), ("attributes", "label_attributes")) if a.get(f))
         widths = [int(w) for w in a["widths"].split(",")] if a.get("widths") else None
         model = B.build_facet_template(a["dim"], a["layers"], not a.get("per_attr_weights"), not a.get("no_rows"),
