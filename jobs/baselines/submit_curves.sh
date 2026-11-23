@@ -19,6 +19,8 @@
 #   tasks 35-36  every patch with its own filter, width 64, at 1000 and 6000 puzzles
 #   tasks 37-42  held-out pair: no puzzle with Progression on Size in training or selection
 # Task i: line i of the table. Each line: arch, scale, puzzles per layout, tag, extra flags.
+# SEED=k (default 0) for further seeds. The seed runs of 2026-11-22, the ViT at width 64 with and without rows built
+# in, 3000 puzzles: for S in 1 2; do sbatch --array=16,22 -J bl_vit3000_s$S --export=ALL,SEED=$S jobs/baselines/submit_curves.sh; done
 
 UD=center_single,distribute_four,distribute_nine,left_center_single_right_center_single,in_center_single_out_center_single,in_distribute_four_out_center_single
 GR=distribute_four,distribute_nine,in_distribute_four_out_center_single

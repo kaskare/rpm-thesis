@@ -22,6 +22,11 @@
 # each), then scored on rows of 5, 10 and 20: does a second training length make the fold transfer?
 #   sbatch -J fold_mixed  --mem=160G --export=ALL,RUN=fold_mixed  jobs/pynl/submit_column_roles.sh
 #   sbatch -J roles_mixed --mem=160G --export=ALL,RUN=roles_mixed jobs/pynl/submit_column_roles.sh
+# SEED=k seeds the initial weights and the sample order (unset: a fresh random seed); the run directory gets _s<k>,
+# and the rows of 5 and 20 are not scored. RUN=named: the plain facet model with named columns, the comparison model
+# (facet_iravenx_n10_m50); it needs SEED, so that it never overwrites that run. The seed runs of 2026-11-22
+# (Chapter 6's full-data rows; column roles at 6000 is irx_base_6000 in submit_symmetry_ablation.sh):
+#   for S in 1 2; do for r in named fold; do sbatch -J ${r}_s$S --export=ALL,RUN=$r,SEED=$S jobs/pynl/submit_column_roles.sh; done; done
 
 export JAVA_HOME=/mnt/appl/software/Java/21.0.8
 export PATH="${JAVA_HOME}/bin:${PATH}"
@@ -36,6 +41,8 @@ IRX=${D}_10_maxval_50.json
 COMMON="--template facet --lr 3e-4 --n 6000 --n-sel 300 --n-val 1000 --n-train-eval 300 --train-epochs ${EPOCHS:-60}
         --eval-every 5"
 case "${RUN}" in
+  named)        ARGS="--widths 32,64,128 --jvm-gb 64"; EVAL_GB=64
+                [ -n "${SEED}" ] || { echo "RUN=named needs SEED (facet_iravenx_n10_m50 is the first run)"; exit 1; } ;;
   plain)        ARGS="--columns roles --widths 32,64,128 --jvm-gb 64"; EVAL_GB=64 ;;
   content)      ARGS="--columns roles --widths 32,64,128 --jvm-gb 64 --copy-links --copy-gates content"; EVAL_GB=64 ;;
   wide)         ARGS="--columns roles --widths 64,144,288 --jvm-gb 120"; EVAL_GB=120 ;;
@@ -44,18 +51,22 @@ case "${RUN}" in
   fold_content) ARGS="--columns fold --widths 32,64,128 --jvm-gb 64 --copy-links --copy-gates content"; EVAL_GB=120 ;;
   fold_mixed)   ARGS="--columns fold --widths 32,64,128 --jvm-gb 96"; EVAL_GB=120; IRX=${D}_5_maxval_50.json,${D}_10_maxval_50.json ;;
   roles_mixed)  ARGS="--columns roles --widths 32,64,128 --jvm-gb 96"; EVAL_GB=96; IRX=${D}_5_maxval_50.json,${D}_10_maxval_50.json ;;
-  *) echo "set RUN to plain, content, wide, wide_content, fold, fold_content, fold_mixed or roles_mixed"; exit 1 ;;
+  *) echo "set RUN to named, plain, content, wide, wide_content, fold, fold_content, fold_mixed or roles_mixed"; exit 1 ;;
 esac
 case "${RUN}" in
   *_mixed) SAVE=experiments/facet_iravenx_n5-10_m50_${RUN%_mixed} ;;
+  named) SAVE=experiments/facet_iravenx_n10_m50 ;;
   fold*) SAVE=experiments/facet_iravenx_n10_m50_${RUN} ;;
   *)     SAVE=experiments/facet_iravenx_n10_m50_roles$( [ "${RUN}" = plain ] || echo "_${RUN}" ) ;;
 esac
 
+SAVE=${SAVE}${SEED:+_s${SEED}}
+
 echo "node $(hostname), run ${RUN}, saving to ${SAVE}"
-python3 -u core/pynl/bench_hub_grounding.py ${COMMON} --iravenx ${IRX} ${ARGS} --save-dir ${SAVE}
+python3 -u core/pynl/bench_hub_grounding.py ${COMMON} --iravenx ${IRX} ${ARGS} ${SEED:+--seed ${SEED}} --save-dir ${SAVE}
 python3 -u core/pynl/facet_rule_eval.py ${SAVE} --iravenx ${D}_10_maxval_50.json --transform none cols23 rows12 \
     --jvm-gb ${EVAL_GB} 2>&1 | grep -v "^WARNING\|SLF4J"
+[ -n "${SEED}" ] && exit 0                    # seed runs: rows of 10 only
 for n in 5 20; do
     python3 -u core/pynl/facet_rule_eval.py ${SAVE} --iravenx data/iravenx/center_single_shuffle_n_${n}_maxval_50.json \
         --jvm-gb ${EVAL_GB} 2>&1 | grep -v "^WARNING\|SLF4J"

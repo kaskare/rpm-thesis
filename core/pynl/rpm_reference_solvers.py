@@ -25,9 +25,12 @@ rules+cols+ms  rules+cols, with Constant also holding when every panel of the ro
              exists; these are exactly the Constant attributes I-RAVEN modifies in candidates
              (SRAN sampling.py, sample_attr_avail).
 
-All report expected accuracy (ties share credit) on the validation split.
+All report expected accuracy (ties share credit) on the validation split. --transpose exchanges rows and
+columns of the context first (the answer keeps its place), so the rules run down the columns: how much of
+each solver, all of which read along rows, still works then. Not a ceiling for rows-only models: the generic
+primitives keep more than RAVEN's rules (a Constant row becomes three equal rows, a Distribute_Three can appear).
 
-Usage:  python core/pynl/rpm_reference_solvers.py --split val --n 2000
+Usage:  python core/pynl/rpm_reference_solvers.py --split val --n 2000 [--transpose]
 """
 import argparse, os, sys
 from collections import Counter
@@ -217,11 +220,13 @@ SOLVERS = (("primitives", solve_primitives), ("rules", solve_rules),
 
 
 def _eval(job):
-    cfg, split, n, root = job
+    cfg, split, n, root, transpose = job
     res = Counter()
     for f in files(cfg, split, n, root):
         y = int(np.load(f)["target"])
         panels, _ = read_puzzle(f.replace(".npz", ".xml"), cfg)
+        if transpose:                    # context panel (r, c) <- (c, r); candidates unchanged
+            panels = [panels[(i % 3) * 3 + i // 3] for i in range(8)] + list(panels[8:])
         for name, solver in SOLVERS:
             s = solver(panels)
             top = np.flatnonzero(s == s.max())
@@ -236,10 +241,12 @@ def main():
     ap.add_argument("--split", default="val")
     ap.add_argument("--n", type=int, default=2000)
     ap.add_argument("--root", default="data/I-RAVEN-10000", help="dataset folder, relative to the repo root")
+    ap.add_argument("--transpose", action="store_true", help="rows <-> columns of the context first")
     args = ap.parse_args()
     with Pool(len(CONSTELLATIONS)) as pool:
-        out = dict(pool.map(_eval, [(c, args.split, args.n, args.root) for c in CONSTELLATIONS]))
-    print(f"Reference symbolic solvers on GROUND-TRUTH attributes, {args.split} split, up to {args.n}/constellation")
+        out = dict(pool.map(_eval, [(c, args.split, args.n, args.root, args.transpose) for c in CONSTELLATIONS]))
+    print(f"Reference symbolic solvers on GROUND-TRUTH attributes, {args.split} split, up to {args.n}/constellation"
+          + (", context TRANSPOSED" if args.transpose else ""))
     print("(expected accuracy, ties share credit; strict = unique correct argmax)\n")
     names = [name for name, _ in SOLVERS]
     line = lambda r, n: "".join(f" {100*r[k]/n:>10.2f}% {100*r[k + '_strict']/n:>6.1f}%" for k in names)

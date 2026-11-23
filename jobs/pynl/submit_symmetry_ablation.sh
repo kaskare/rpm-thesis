@@ -23,6 +23,13 @@
 #            irx_base_600 irx_lab_600 irx_lab_6000; do sbatch -J $r --export=ALL,RUN=$r jobs/pynl/submit_symmetry_ablation.sh; done
 #   for a in sep sepm; do for r in lrud_${a}_100 lrud_${a}_1000 lrud_${a}_6000 irx_${a}_600 irx_${a}_6000; do
 #       sbatch -J $r --export=ALL,RUN=$r jobs/pynl/submit_symmetry_ablation.sh; done; done
+# SEED=k seeds the initial weights and the sample order (unset: a fresh random seed); the run directory gets _s<k>.
+# The seed runs of 2026-11-22 (Chapter 6's less-data rows; the first runs had unrecorded random seeds):
+#   for S in 1 2; do for r in lrud_base_100 lrud_lab_100 lrud_sepm_100 irx_base_600 irx_lab_600 irx_sepm_600 \
+#            irx_base_6000 irx_sepm_6000; do sbatch -J ${r}_s$S --export=ALL,RUN=$r,SEED=$S jobs/pynl/submit_symmetry_ablation.sh; done; done
+# The data factor, counted before the runs (2026-11-22, RESULTS §7): separate weights at 2x and 3x the shared model's data.
+#   for S in 1 2 3; do for r in lrud_sep_200 irx_sep_1200 irx_sep_1800; do
+#       sbatch -J ${r}_s$S --export=ALL,RUN=$r,SEED=$S jobs/pynl/submit_symmetry_ablation.sh; done; done
 
 export JAVA_HOME=/mnt/appl/software/Java/21.0.8
 export PATH="${JAVA_HOME}/bin:${PATH}"
@@ -33,8 +40,8 @@ cd /home/kassyask/neuro-vector-symbolic-architectures-raven
 
 IFS=_ read -r SET ARM N <<< "${RUN}"
 case "${N}" in
-  100) EP=300; EV=10 ;;
-  600) EP=200; EV=10 ;;
+  100|200) EP=300; EV=10 ;;                 # 200: the data-factor runs, epochs as at 100 (RESULTS §7)
+  600|1200|1800) EP=200; EV=10 ;;           # 1200, 1800: the same, as at 600
   1000) EP=120; EV=5 ;;
   *) EP=60; EV=5 ;;
 esac
@@ -54,8 +61,8 @@ case "${ARM}" in
   sepm) ARGS="--widths ${NARROW} ${SEP}" ;;
   *) echo "arm must be base, lab, sep or sepm"; exit 1 ;;
 esac
-SAVE=experiments/facet_symabl_${RUN}
+SAVE=experiments/facet_symabl_${RUN}${SEED:+_s${SEED}}
 
 echo "node $(hostname), run ${RUN}, saving to ${SAVE}"
-python3 -u core/pynl/bench_hub_grounding.py ${COMMON} ${DATA} ${ARGS} --save-dir ${SAVE}
+python3 -u core/pynl/bench_hub_grounding.py ${COMMON} ${DATA} ${ARGS} ${SEED:+--seed ${SEED}} --save-dir ${SAVE}
 python3 -u core/pynl/facet_rule_eval.py ${SAVE} --transform ${TRANSFORMS} --jvm-gb 64 2>&1 | grep -v "^WARNING\|SLF4J"

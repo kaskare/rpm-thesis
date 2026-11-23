@@ -15,6 +15,10 @@ occupancy and every object the right type, size and colour (RESULTS §8's measur
     python core/frontend/train_vit_recognizer.py train --width 64 --out experiments/recognizer/vit64
     python core/frontend/train_vit_recognizer.py predict --out experiments/recognizer/vit64 --splits unseen,test
 
+The learning curve end to end (RESULTS §8): --per-layout N trains on the panels of the first N puzzles of every layout,
+with the epochs raised so the number of updates matches the run on 2000 (30 * 2000 / N), as the facet curve does.
+N = 3000 needs training data prepared with --n-train 3000 (experiments/recognizer/data3000).
+
 predict writes <out>/preds_<split>.npy, float16 [puzzles, 16, 22, 22]: per slot P(occupied) (0 outside the layout),
 then the type, size and colour probabilities. Data: data_prep/prepare_recognizer_data.py. Environment nvsa, one GPU.
 """
@@ -98,11 +102,13 @@ class Panels:
     """One split's panels as (image, labels, layout) per panel. The images are read once and kept on the device as
     uint8 (224,000 panels take 5.7 GB): random reads from the network drive would starve the GPU."""
 
-    def __init__(self, d, split, dev):
-        self.img = torch.as_tensor(np.load(os.path.join(d, f"{split}_img.npy"))).to(dev)
+    def __init__(self, d, split, dev, per_layout=0):
         z = np.load(os.path.join(d, f"{split}.npz"))
-        self.lab = torch.as_tensor(z["lab"]).to(dev)
-        self.layout = torch.as_tensor(z["layout"].astype(np.int64)).to(dev)
+        img = np.load(os.path.join(d, f"{split}_img.npy"), mmap_mode="r")
+        keep = np.flatnonzero(z["idx"] < per_layout) if per_layout else slice(None)   # the first N puzzles per layout
+        self.img = torch.as_tensor(np.ascontiguousarray(img[keep])).to(dev)
+        self.lab = torch.as_tensor(z["lab"][keep]).to(dev)
+        self.layout = torch.as_tensor(z["layout"][keep].astype(np.int64)).to(dev)
         self.layouts = json.loads(str(z["meta"]))["layouts"]
         self.n = self.img.shape[0] * 16
 
@@ -147,6 +153,8 @@ def main():
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--wd", type=float, default=0.05)
     ap.add_argument("--max-train", type=int, default=0, help="use only the first N training panels (smoke tests)")
+    ap.add_argument("--per-layout", type=int, default=0,
+                    help="train on the first N puzzles of every layout only, as the facet model's learning curve does")
     ap.add_argument("--splits", default="unseen,test", help="predict: the splits to write")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
@@ -168,7 +176,7 @@ def main():
                   + ", ".join(f"{c} {100 * v:.2f}" for c, v in res["by_layout"].items()), flush=True)
         return
 
-    train, sel = Panels(args.data, "train", dev), Panels(args.data, "sel", dev)
+    train, sel = Panels(args.data, "train", dev, args.per_layout), Panels(args.data, "sel", dev)
     masks = layout_masks(train.layouts, dev)
     model = SlotViT(args.width, args.depth, patch=args.patch).to(dev)
     n_w = sum(p.numel() for p in model.parameters())

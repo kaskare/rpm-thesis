@@ -1,0 +1,23 @@
+% CHECK: Claude's translation of the English abstract; please read it as a native speaker before submitting.
+Neuronové sítě, které čtou přímo obrázky, dokážou řešit generované Ravenovy progresivní matice, ale jen s~velkým
+množstvím dat: vision transformer trénovaný na I-RAVEN vyřeší 19\,\% úloh při 1\,000 trénovacích úlohách na každé
+rozvržení a 93\,\% při 6\,000. Tato práce studuje alternativu, tedy strukturu vestavěnou do modelu před trénováním, a
+ptá se, jakou cenu má pro relační model vestavěná symetrie a zda ji lze poznat ještě před trénováním.
+
+Modely jsou liftované relační neuronové sítě v~PyNeuraLogic, v~nichž se šablona vážených pravidel pro každou úlohu
+zakotví (grounding) do jiné sítě. Dokazujeme, že šablona nedokáže rozlišit konstanty, které nepojmenovává. Symetrii
+lze tedy vestavět tím, že transformované věci zůstanou nepojmenované, a pak platí přesně pro všechna nastavení vah.
+Touto metodou stavíme model, který generuje chybějící panel z~grafu objektů úlohy, aniž by dostal pravidla nebo
+viděl kandidátní odpovědi. Na testovací sadě I-RAVEN dosahuje 97,2\,\% z~popisů objektů a 97,0\,\% end-to-end
+s~rozpoznávačem objektů, který se učí z~označených objektů každého panelu. Vision transformer, který dostává pouze
+označení odpovědi, dosahuje 93,1\,\% se šestinásobkem vah.
+
+Poté symetriím přiřazujeme cenu. Spočítání orbit tabulky pravidla pod symetrií modelu předpovídá, kolik dat
+symetrie ušetří a jaký strop nastaví, když ji pravidlo nesdílí. Ověřují to dvě pravidla shodná formou i velikostí,
+součet a střed. Z~600 úloh dosahuje model ekvivariantní vůči posunu, který čte odpověď z~řádku s~otázkou,
+91\,\% na středu a 6\,\% na součtu, jehož předpovězený strop je 7,9\,\%; když dostane sčítání jako znalost na pozadí, naučí se součet ze 100 úloh. Na
+benchmarku stojí odebrání symetrie posunu 61 procentních bodů přesnosti při 100 trénovacích úlohách a 2 body při
+6\,000. Symetrie mezi atributy objektu má, jak bylo spočteno před během experimentů, cenu dvoj- až trojnásobku
+trénovacích dat, a model bez ní jich tolik potřebuje navíc. Symetrie, která je v~rozporu s~daty, drží model u~stropu
+spočteného předem. Počty omezují, čeho může síť dosáhnout; zda toho dosáhne, závisí i~na tom, jak úlohu čte, a práce
+uvádí, kde za nimi zaostává.

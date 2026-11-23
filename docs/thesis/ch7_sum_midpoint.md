@@ -1,15 +1,8 @@
 # Chapter 7. One model, two rules: sum and midpoint (draft, 2026-11-17)
 
-Numbers are from `docs/ARITHMETIC.md` ("Is the missing symmetry what makes it hard?", "Sum and midpoint compared") and
-`docs/RESULTS.md` §11. Cells are exact % on the tested rule, on unseen puzzles, about 500 rows per cell. Sum and
-midpoint at 100 and 600 puzzles have three seeds for the shared, per-value and `plus` models (`docs/ARITHMETIC.md`,
-"Three seeds"), and so do the two scaling models of Section 7.7 ("The scaling kernel") and the gated models there
-("The rule gate") and the models of "The repair" ("The row descriptor reads the steps"); every other cell is one run,
-so roughly ±4 points. The untrained fit of Section 7.8 and the rows per orbit in Section 7.5 are from "Two checks
-without training". Figure: `docs/figures/twins_sum_midpoint.png`.
-Notes for you are at the end.
-
----
+Cells are exact % on the tested rule, on unseen puzzles, about 500 rows per cell. Sum and midpoint at 100 and 600
+puzzles have three seeds for the shared, per-value and `plus` models, and so do the models of Section 7.7; every other
+cell is one run, so roughly ±4 points.
 
 Chapter 6 found that a symmetry saves data when the data has it and caps the model when it conflicts. Those were
 different symmetries in different models. This chapter holds the model fixed and changes only the rule, with two rules
@@ -57,6 +50,35 @@ shift: with random weights, shifting the input moves the output by the same amou
 **Per value.** The same template with a separate copy of every rule for each value: 459,635 weights and no symmetry
 on the values.
 
+**The shared model's forward pass.** For one attribute, $x_p$ is panel $p$'s value and $v$ runs over the ring of 101
+values. The kernel has one learned vector $w_k$ for each offset $k$ from −50 to 50. A row $\rho$ is read through its
+pairs of neighbouring panels $(p, q)$; $(p_a, p_b)$ is the pair of the question row, and rows 1 and 2 are the complete
+ones. For a row, $\pi_\rho(v)$ counts its panels at value $v$, $\delta_\rho$ is its number of distinct values, and
+$\kappa_\rho$ the number of values a complete row shares with the question row. Capital letters are learned matrices,
+$a_i$ and $b_i$ learned vectors, $n$ a learned vector that gives each value its score:
+
+```math
+h_p(v) &= w_{v - x_p} && \text{the kernel: value } v \text{ seen from panel } p\\
+e_{p,q}(v) &= \tanh\big( M_1 h_p(v) + M_2 h_q(v) \big) && \text{a pair of neighbours, at } v\\
+d_\rho &= M_4 \operatorname*{mean}_{(p,q) \in \rho} M_3 \sum_{v} e_{p,q}(v) && \text{the row descriptor}\\
+c &= \tanh\Big( N_1 \operatorname*{mean}_{\rho = 1,2} d_\rho + N_2 d_3 + a_1 \operatorname*{mean}_{\rho = 1,2} \delta_\rho + a_2 \delta_3 && \text{the rule descriptor}\\
+&\qquad\qquad + a_3 \operatorname*{mean}_{\rho = 1,2} \kappa_\rho + b_1 \Big)\\
+c' &= \tanh(N_3 c + b_2)\\
+o(v) &= \tanh\Big( N_4 c' + K_1 h_{p_b}(v) + K_2\, e_{p_a,p_b}(v) && \text{the answer at } v\\
+&\qquad\qquad + a_4 \sum_{\rho = 1,2} \pi_\rho(v) + a_5\, \pi_3(v) \Big)\\
+P(v) &= \operatorname{softmax}_v \; n^{\top} \tanh\big( N_5\, o(v) + b_3 \big)
+```
+
+The answer for each attribute is the distribution $P$ over the values, trained by the squared error against the one-hot
+code of the true value. Nothing on the right of these equations depends on $v$ except through $v - x_p$ and the counts
+at $v$, so shifting every value moves $P$ with it: that is the symmetry. It also shows Statement 5's point. The score of
+$v$ reads $v$'s offsets to the two panels of the question row and a descriptor $c'$ that is the same for every $v$; no
+term measures from a panel of the question row to a panel of another row. The variants change one line each. Per
+value, $w$ and every matrix that meets a value are indexed by $v$ as well. With `plus` in learned rules, a state
+carried along a row through the `plus` facts adds a term to $o(v)$ and to $c$. In the scaled and doubled models of
+Section 7.7, the offset $v - x_p$ is counted in the row's unit. The row descriptor that reads the steps adds
+$M_6 \operatorname{mean}_{(p,q)} M_5 w_{x_q - x_p}$ to $d_\rho$, under a tanh.
+
 Two further models have no value symmetry: the facet model, and a learner that only memorises the rows it has been
 asked about and is otherwise untrained.
 
@@ -90,7 +112,8 @@ even first step from −50 to 50 except 0. A model with the shift has 50 things 
 
 **Sum.** The answer is c = b + a, and a is not a function of b − a. Within an orbit every row needs a different g,
 and the model has one. It can be right on one row of each orbit. Sum's 1,225 rows fall into 97 orbits, so at most
-97 of 1,225 rows can be right: **7.9%**, whatever the amount of data.
+97 of 1,225 rows can be right: **7.9%**, whatever the amount of data. This is the bound of Wang et al. (2023a,
+Theorem 4.3) for incorrect equivariance, evaluated on sum's table (Section 3.6.3).
 
 **Without the symmetry** the two rules should cost the same, since they differ in nothing else. The memorising learner
 confirms that the tables are equally hard to cover: it gets 4.7 / 24.1 / 90.7 on sum and 5.0 / 21.6 / 90.5 on midpoint
@@ -119,6 +142,10 @@ puzzles. Mean ± standard deviation:
 |---|---|---|---|---|
 | shared, shift built in | 4.5 ± 2.3 | 6.2 ± 0.8 | **60.3 ± 2.7** | **91.0 ± 3.4** |
 | per value | 4.8 ± 0.6 | 19.4 ± 1.1 | 5.0 ± 0.5 | 18.0 ± 0.9 |
+
+Figure 7.1 shows the same numbers.
+
+![**Figure 7.1.** Exact % on sum and on midpoint against training puzzles, for the convolution along the values (the shift built in), the same model with learned use of `plus`, and weights per value. Means of three seeds at 100 and 600 puzzles, one run at 6,000. The dashed line is sum's ceiling under the shift, 7.9%, counted before training; the dotted line is the counting learner with the shift.](../figures/twins_sum_midpoint.png)
 
 The single runs of the first table agree with these means to within 3 points. The same comparison as a two-by-two
 table, with the means at 100 / 600 puzzles:
@@ -153,7 +180,7 @@ value at 6,000 puzzles, on a rule the model could otherwise learn.
 *and* nothing collapses it. A large table with the right symmetry is cheap (midpoint, shared), and a small table needs
 none (lookup).
 
-## 7.5 The network learns the orbits and nothing more
+## 7.5 What the network generalises is what its orbits allow
 
 The shared network reaches 60.3 / 91.0 / 92.7 on midpoint where the counting learner reaches 80.0 / 99.8 / 100. Part
 of the distance has a plain cause: the counting learner is told which rule a row follows, and the network is not. A
@@ -168,12 +195,15 @@ those of the seeded table in Section 7.4, seeds 1 / 2 / 3.
 | 100 training puzzles | 71.5 / 77.5 / 77.2% of 404 rows | **0 / 0 / 0** of 101 rows |
 | 600 | 87.3 / 93.3 / 93.1% of 504 | 0 / 0 / 0 of 1 |
 
-Not one row with an unseen first step is answered correctly, at either size or any seed. The answer is linear in the first step,
-c = b − (b − a)/2, and a network could in principle carry "half the step back" from the steps it has seen to one it
-has not. It does not. It fills the orbits the convolution gives it, one at a time, as the counting learner does, only
-less efficiently. Weights per value do the same one level down: at 100 puzzles they get 20 to 24 of the 25 rows whose
-pair (a, b) they have seen and 3 or 4 of the other 480. In both models, what generalises is exactly what the built-in symmetry merges. The network does not
-learn "halfway" as a law.
+Not one row with an unseen first step is answered correctly, at either size or any seed. This is what the model's
+parameterisation implies. The answer is linear in the first step, c = b − (b − a)/2, but the kernel has one free weight
+vector per offset and nothing ties the vectors of two offsets together, so the template has no way to carry "half the
+step back" from the steps it has seen to one it has not (Statement 11 holds for it nearly as it stands). The model fills
+the orbits the convolution gives it, one at a time, as the counting learner does, only less efficiently. Weights per
+value do the same one level down: at 100 puzzles they get 20 to 24 of the 25 rows whose pair (a, b) they have seen and
+3 or 4 of the other 480. In both models, what generalises is exactly what the built-in symmetry merges. The result is
+not a finding about neural networks in general, which with a smooth kernel or numbers as inputs could do otherwise. Its
+use is that the count says, before training, which rows a model of this family will get.
 
 How many training rows an orbit needs can be read from the same checkpoints. Pooled over the three seeds, an unseen
 row with exactly one training question in its orbit is answered correctly in 422 of 573 cases at 100 puzzles (74%)
@@ -203,8 +233,12 @@ single number k. Sum's full group of moves is thus the rule itself up to one con
 these moves has a single orbit and is right after ten puzzles. The convolution gave midpoint one of the two directions
 of its group, which left 50 orbits to learn; `plus` gives sum everything, which leaves one. That is why 98.2 is above
 60.3, and it does not mean sum is the easier rule. `plus` is the relation handed over as background knowledge. What the
-network learns is when to use it and how to read the result. The general statement is this: the more of a rule's
-group is built in, the fewer orbits are left to learn, and at one orbit the rule has been given.
+network learns is when to use it and how to read the result. Learning sum then becomes choosing and reading a given
+relation, much as in models with programmed rules, PrAE (Zhang et al., 2021) and ARLC (Camposampiero et al., 2024).
+The section measures the price of that knowledge, not a way of learning arithmetic. It also has a cost in size: there is
+one `plus` fact per pair of values, so their number grows with the square of the value range, and the value axis was
+not run on I-RAVEN-X's range of 1,000. The general statement is this: the more of a rule's group is built in, the fewer
+orbits are left to learn, and at one orbit the rule has been given.
 
 The same switch on the benchmark's own Arithmetic, in puzzles where the four rules are mixed:
 
@@ -224,7 +258,8 @@ Section 7.5 ended on a claim that can be tested: what generalises is what the bu
 right, a model with a second symmetry of midpoint must answer rows with unseen first steps, in the orbits the new
 symmetry merges and in no others. Midpoint has such a symmetry. Multiply every value by the same number k and the row
 stays valid: ka + kb = 2kc. In the terms of Section 2.4, the shift makes the zero of the value scale a convention, and
-scaling makes its unit one.
+scaling makes its unit a convention too: together they are Stevens's interval scale, except that on the ring a scaling
+may also be negative, which his interval scale, being ordered, excludes.
 
 **The model.** The shared model's kernel has one weight per offset between two values. The new kernel counts offsets
 in each row's own unit: a value V lies k units from a value U, V = U + k·S, with one weight per k. The unit S is a
@@ -240,7 +275,8 @@ step included. A rule derives a row's unit from its first two panels, in one of 
 
 Both have the shared model's 14,785 weights. With random weights, the output of a transformed puzzle equals the
 transformed output to 2·10⁻¹⁷ on 100 puzzles, for every k and s in the scaled model and for doubling in the doubled
-one wherever the doubled steps stay in range. The shared model has neither symmetry (a difference of 2·10⁻²).
+one wherever the doubled steps stay in range. These are exact on the ring; on the values 0 to 50 a scaling sends most
+rows out of range, and Section 3.7.1 says what that leaves. The shared model has neither symmetry (a difference of 2·10⁻²).
 
 **Predictions, made before training.** At 100 training puzzles, 101 of the 505 unseen midpoint rows have a first step
 that no training question had. For 72 of them a training question had the same odd part of the step, for 29 none had.
@@ -354,8 +390,10 @@ doubling and scaling.
 
 **Limits.** Three seeds, 200 epochs and no tuning. The ladder as printed is the second attempt: the first descriptor
 failed, the cause was measured, and the repair was predicted before it was run. Why the pooled descriptor loses the
-steps in training was not studied; with random weights it still separates the two rules a little. The models with the
-repaired descriptor were not run on sum. The doubled model's runs without the repair were not probed. Scaling is exact
+steps in training was not studied; with random weights it still separates the two rules a little. On sum the models
+with the repaired descriptor stay at their ceilings, as predicted before the runs: 4.0 and 7.6, 3.4 and 5.2, 1.2 and
+1.6 at 100 and 600 puzzles against 7.9, 7.2 and 1.4. The repair was to the descriptor, and on sum the limit is where
+the answer is read: from the question row only. The doubled model's runs without the repair were not probed. Scaling is exact
 on the ring of 101 values, not on the range 0 to 50.
 
 ## 7.8 A ladder of priors, and values read as numbers
@@ -402,7 +440,7 @@ The same for sum:
 | built in | left to learn | counting learner | trained model |
 |---|---|---|---|
 | nothing about the values (weights per value) | 1,225 rows | 4.7 | 4.8 ± 0.6 |
-| the shift, which sum does not have | a ceiling of 7.9% | 3.6 | 4.5 ± 2.3 |
+| the shift, with the answer read from the question row | a ceiling of 7.9% | 3.6 | 4.5 ± 2.3 |
 | addition's own moves (`plus`) | 1 orbit, one number | 100 | 98.2 ± 0.8 |
 | the linear form, values as numbers | nothing from other puzzles | – | 99.6 with no training |
 
@@ -411,14 +449,15 @@ The same for sum:
 - **Each rung is a piece of knowledge about numbers.** That values lie on a line (the shift), that the line has no
   fixed unit (scaling), that values can be added (`plus`), that the rule is linear. Each has a price in training
   puzzles, and the count gives that price before training.
-- **The trained models follow the count up the whole ladder.** The count says every rung needs less data than the one
-  below it, and from 100 puzzles the networks reach 5.0, 59.9, 89.2 and 100.0%. They stay under the count where many
-  orbits are left: by 20 points with the shift, by 5 with doubling, by nothing with scaling. This needed a model that
-  can read the rule from the complete rows. With the first row descriptor the two scaling rungs fell below the rung
-  beneath them (Section 7.7).
+- **The trained models end in the count's order, at the second attempt.** The count says every rung needs less data
+  than the one below it, and from 100 puzzles the networks reach 5.0, 59.9, 89.2 and 100.0%. They stay under the count
+  where many orbits are left: by 20 points with the shift, by 5 with doubling, by nothing with scaling. The order held
+  only once the model could read the rule from the complete rows. With the first row descriptor the two scaling rungs
+  fell below the rung beneath them (Section 7.7), with the same groups and the same counts. The count bounds what a
+  model of this family can reach and orders the rungs; how close a network comes depends also on how it describes a
+  row, and the 20 points with the shift alone are not explained.
 - **A prior and the answer are two ends of one scale.** At the top nothing is left to learn across puzzles, and at one
-  orbit a single number is. What is left to learn, counted in orbits, is a unit on that scale. Chollet (2019) asks that
-  skill be reported together with the priors and the experience behind it (Section 2.4). For one rule and one family
+  orbit a single number is. What is left to learn, counted in orbits, is a unit on that scale. Chollet (2019, pp. 1 and 43) asks that skill be reported together with the priors and the experience behind it (Section 2.4). For one rule and one family
   of models, the amount of prior can here be counted.
 - **The top rung has its price too.** The linear form gives nothing on Distribute Three and on lookup, as the shift
   gives nothing on sum. The worth of a prior belongs to the pair of model and rule at every rung.
@@ -432,7 +471,9 @@ bottom, and this chapter measured what each step up costs it.
 **What it shows.** A symmetry prior is not good or bad in itself. The same convolution is worth an order of magnitude
 of data on midpoint and costs nearly everything on sum. Its worth belongs to the pair of model and rule, and for this
 pair it was computed before training: 50 orbits in place of 1,250 rows on one side, a ceiling of 7.9% on the other.
-The trained networks landed on both, and learned nothing the count did not allow. Section 7.8 puts the same statement
+The trained networks sat at the ceiling, came close to the saving (59.9% against the count's 74.8% at 100
+puzzles, 91.0% against 98.7% at 600, and 98.3% once the row descriptor read the steps), and, as their weights per
+offset imply, got no row the count did not allow. Section 7.8 puts the same statement
 on one scale: from weights per value to the linear form, each piece of built-in knowledge leaves less to learn, down
 to nothing.
 
@@ -443,8 +484,7 @@ to nothing.
   is not linear, where the numbers do not help.
 - *"A shift-equivariant model cannot fit a rule that is not shift-equivariant. That is obvious."* For a model that
   answers from the question row it is, and Section 7.4 says so. What is not obvious is that the two rules are otherwise
-  equally hard, that the size of the gain on midpoint is given by a count, and that the network adds nothing to that
-  count.
+  equally hard, and that the size of the gain on midpoint, and which rows it covers, are given by a count.
 - *"Your model sees the complete rows, and from them a shift-equivariant function can compute a sum."* It can
   (Section 7.3). The ceiling holds for this template because it never measures from one row to another, and Section
   7.3 says that this is a property of the template and not of the shift.
@@ -455,6 +495,13 @@ to nothing.
   numbers stand; the group language is exact only away from the ends of the range.
 
 **Limits.**
+- *The test range came last.* Every checkpoint of this chapter was scored once on puzzles 8000 to 9999 at the end of
+  the work, with 963 midpoint and 1,014 sum rows (Appendix D.6). The seeded cells move by at most 3.2 points, each
+  within the sampling error of the 500 rows reported here. Every sum mean stays at or under its ceiling within sampling
+  error, and the ladder keeps its order: with the steps at 100 puzzles, 59.4, 88.2 and 100 against the counts 80.0,
+  94.3 and 100. The facet model on sum at 600 puzzles moves the most, from 31.2 to 24.7, so its lead over midpoint
+  there shrinks from 7 points to 3. The cells at 6,000 puzzles of the shared and per-value models cannot be tested as
+  reported, because their runs saved another epoch than the one the table reads.
 - Sum and midpoint at 100 and 600 puzzles have three seeds, with standard deviations up to 3.9 points. Three runs fix
   a standard deviation only to about half its size. The cells at 6,000 puzzles, mirror, lookup and the facet model are
   one run of about 500 rows, so ±4 points. The effects reported are 50 points and more; differences of a few points
@@ -470,68 +517,6 @@ to nothing.
 - Every trained model here treats values as symbols (Section 7.2). The comparison between sum and midpoint is a
   statement about such models; with values as numbers and the linear form given, neither rule needs training.
 - The ladder of Section 7.8 has three seeds per rung, and its three rungs with a symmetry use the row descriptor that
-  was repaired after the first one failed. It is a second attempt, with the repair predicted before it was run.
-
----
-
-## Notes for you (not thesis text)
-
-- **Order follows outline §3**, steps 1 to 8, with the two-by-two table and the three objections.
-- **Credit the ceiling.** The 7.9% is Wang et al.'s (2023) kind of bound, in its equivariant form, evaluated on sum's
-  table (see the note in Chapter 2). I did not cite it inside this chapter because I have not read their equivariant
-  theorem; add the citation in 7.3 once you have.
-- **Mohamadi et al. (2024)** belongs in 7.4 next to "both track the memorising learner": a learner that treats values
-  as unnamed labels must see a constant fraction of the table. Section 2.5 already says it; one back-reference is
-  enough.
-- **All three cheap runs of outline §3 are done.** Three seeds at 100 and 600 puzzles and the 0 of 101 from the
-  checkpoints in the table (2026-11-14; `docs/ARITHMETIC.md`, "Three seeds"), and the scaling kernel (2026-11-15; "The
-  scaling kernel"), now Section 7.7.
-- **How 7.7 came out, plainly.** The prediction about which unseen rows become answerable held exactly. With the first
-  row descriptor the totals went down; the cause was measured, the repair predicted, and with it every rung needs less
-  data than the one below ("The repair"). It is now a strong section, but a second attempt: keep the failure in the
-  text. The 33 rows of the shared model were already in 7.5; the repair also answers them at 600 puzzles.
-- **The gate (2026-11-16) was my guess and it was wrong.** Both of its predictions failed (`docs/ARITHMETIC.md`, "The
-  rule gate"). The probe of the saved checkpoints then located the cause one layer earlier: the row descriptor is a
-  constant in 22 runs of 24 (`analysis/twins_probe.py`). "Why two seeds fail" in 7.7 reports both. The gated runs can
-  shrink to one sentence if the section is too long; the probe table is the part to keep.
-- **The next run for 7.7 was made on 2026-11-17 and came out as predicted** (`docs/ARITHMETIC.md`, "The row descriptor
-  reads the steps"; 18 runs). It is "The repair" in 7.7, and it changed the fourth point of "What this adds", the
-  limits, and the ladder of 7.8. The section's ending is now "scaling gives the rule from 100 puzzles once the model
-  can read the rows". Keep the first, failed version in the text: the failure, its measured cause and the predicted
-  repair are the argument, and a reader should see that the ladder is a second attempt. One prediction was missed by
-  one row (the shared model right on 1 of 303 rows with an unseen first step); the text says so.
-- **"Section 2.4" in 7.7** is the paragraph on Stevens (1946). Stevens's interval scale allows v → kv + s with k > 0;
-  the ring also allows negative k. Check the wording against the paper before keeping "its unit one".
-- **What the seeds changed in this chapter.** No conclusion. One sentence: `plus` does not improve midpoint (the
-  single run's 70.5 at 100 puzzles was a high draw; three seeds give 63.9 ± 3.9 against 60.3 ± 2.7). The `plus`
-  cells on sum were 97.6 / 99.8 in the single run, picked by exact on the test rule; the seeded cells use the
-  whole-puzzle rule like every other cell. The first table of 7.4 still shows the single runs, so that all four
-  rules and 6,000 puzzles sit in one table; you may prefer to put the means into its 100 and 600 cells.
-- **The row for 300 puzzles is gone from 7.5** (0 of 6 unseen first steps, 77.0% of the others): it came from an
-  unseeded checkpoint picked by matched. It is in `docs/ARITHMETIC.md` if you want it back.
-- **The figure is redrawn** with the seed means and one-sd whiskers at 100 and 600 puzzles.
-- **"A tenth of the data"** in 7.4: 600 against 6,000 puzzles.
-- **The lookup column of the shared model** (35.9 / 74.3 / 77.7) is not discussed. A shift-equivariant model should be
-  capped on lookup too; it reaches 77.7 because with 51 rows the first step b − a almost identifies the row (the docs
-  give 82.0 as the best possible from differences). One sentence in 7.4 could say so; I left it out to keep the
-  section on the twins.
-- **Mirror without the symmetry is harder than sum** (63.2 against 69.8 per value, 41.9 against 65.5 facet). Not
-  predicted and not explained; `docs/ARITHMETIC.md` lists it under "what did not go as predicted". An examiner who
-  reads the table will see it, so a footnote is safer than silence.
-- **The `plus` facts do not wrap** while the kernel is a ring; `docs/ARITHMETIC.md` notes it.
-- **Values as numbers and the ladder of priors are in (2026-11-17).** The scope paragraph closes 7.2, the ladder is
-  the new 7.8 (the old 7.8 is now 7.9; no other chapter referred to it by number), 7.5 gained the rows-per-orbit
-  numbers, and 7.9 gained one sentence, one objection and two limits. Sources: `docs/ARITHMETIC.md`, "Two checks
-  without training"; `analysis/twins_linear_fit.py`; `analysis/twins_seeds.py --dumps`. To check before you keep it:
-  - The linear fit is a reference with no training, not one of the thesis's models. Keep it out of any ranking.
-  - The middle of the ladder contradicted its own count with the first row descriptor (60.3, then 49.9, then 19 to
-    100). The table now shows the models with the repaired descriptor (59.9, 89.2, 100.0) and says so underneath.
-  - The ladder is not new mathematics: a symmetry with one orbit fixes the rule. Its use here is as an accounting of
-    priors. Do not let the section claim more than that.
-  - The Chollet sentence rests on Section 2.4's summary of his paper. Check it against the paper.
-  - "Only ratios of differences count" for the scaled model is the invariant of v → kv + s; on the ring k may be
-    negative (see the Stevens note above).
-  - Chapter 8's section on priors can now point to 7.8. I did not change Chapter 8.
-- **Not included:** Peano addition from zero and `next`, the grokking runs, plus and minus apart, the MLP row (it
-  barely learns any rule on these puzzles). Outline §5 puts the first in two paragraphs of this chapter or Chapter 8;
-  I gave it one paragraph in Chapter 8.
+  was repaired after the first one failed. It is a second attempt, with the repair predicted before it was run. The
+  first attempt shows that, for one group and one orbit count, the way a model describes a row can decide between 20%
+  and 100%. The count predicts the order and the reach of the rungs, not the accuracy of a given network.

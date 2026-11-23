@@ -1,32 +1,30 @@
 # Chapter 8. Discussion and conclusion (draft, 2026-11-14)
 
-Draws on Chapters 5 to 7. The quotations from Chollet (2019) were checked against the arXiv PDF on 9 November (long
-outline, Chapter 7). Notes for you are at the end.
-
----
-
 ## 8.1 What a symmetry is worth
 
 The thesis asked what a built-in symmetry is worth to a relational model, and whether that can be known before
-training. The experiments give one answer in several places.
+training. The answer the experiments give is a count with two sides and a condition.
 
-A symmetry merges the inputs it maps onto each other. If the rule to be learned gives those inputs corresponding
-answers, the model has one thing to learn where it had many, and the saving is largest when training data is scarce.
-We measured 12 points of accuracy for a group of two elements and 61 for a group of about fifty, at 100 training
-puzzles, and little or nothing at 6,000 (Section 6.2). On the matched rule of Chapter 7 the symmetry replaced 1,250
-table rows by 50 orbits, and the model with it was ahead from 600 puzzles of where the model without it stood at 6,000.
+Where the rule gives corresponding answers on the inputs a symmetry merges, the symmetry is worth the
+data it lets the model reuse. Where it does not, it is worth a ceiling. Both are numbers of orbits on the rule's table,
+and both were written down before the runs. The saving matters most in practice, because it is largest exactly where
+data is scarce and fades as data grows: tens of points at 100 to 600 training puzzles, a few at 6,000 (Section 6.2).
+Counted in puzzles rather than points, it is the size of the group the data really has. For the attributes that is
+two to three, not the three of the group the model was given, because type never carries Arithmetic; the runs needed
+that much data. The ceiling showed up twice: a reflection held a model near half of all values (Section 6.7), and the
+shift held one at 7% on sums against the 7.9% counted (Section 7.4).
 
-If the rule gives those inputs answers that do not correspond, the model can be right on only one of them, and no
-amount of data changes that. We measured a model held at half of all values by a reflection it could not see through
-(Section 6.6), and a model held at 7% on sums by a shift it could not undo, against a counted ceiling of 7.9% (Section
-7.4).
+The condition is on the learner. The count describes a learner that shares nothing across orbits and can tell every orbit apart. Our
+value models share nothing across orbits by construction, so they got the rows the count allows and none of the others
+(Section 7.5); that part follows from their weights. Whether a network also tells the orbits apart depends on how it
+reads the puzzle. With the first row descriptor the same group and the same count gave 20% or 100% (Section 7.7), and
+with the shift alone the network stays 20 points under the count at 100 puzzles, for a reason we did not find. The
+ceiling has a condition of the same kind: it belongs to the shift together with reading the answer from the question
+row, not to the shift alone (Section 3.6.3). The count bounds what a model of a given family can reach and orders the
+models by the data they need. It does not by itself give a network's accuracy.
 
-Both amounts come from counting orbits on the rule's table. They were computed before the runs, and the trained
-networks landed on them. In the one place where we could look inside the gain, the network had learned exactly the
-orbits and nothing more (Section 7.5).
-
-So the answer to the second half of the question is yes, to the extent that the rule's table is known. For a
-generated benchmark it is known. For a task where it is not, the count still says what to look for: the worth of a
+So the answer to the second half of the question is yes, to the extent that the rule's table is known and the way the
+model reads the puzzle is part of what is counted. For a generated benchmark both are known. For a task where they are not, the count still says what to look for: the worth of a
 symmetry prior is a property of the pair of model and task, and a prior that helps on one rule can cap the model on
 its neighbour.
 
@@ -41,7 +39,12 @@ The practical reading is that "more equivariance" is not a direction in which mo
 natural symmetry to put on a line of values, three of the benchmark's four rules have it, and on the fourth it turns a
 model that would have learned slowly into one that cannot learn at all. A designer who adds a symmetry is betting that
 every rule in the task shares it. The bet can be checked beforehand, by transforming valid examples and asking
-whether they stay valid and whether the answer moves with them (Section 4.2), and the stakes can be counted.
+whether they stay valid and whether the answer moves with them (Section 3.5), and the stakes can be counted.
+
+The same holds in the other direction. Midpoint keeps the shift and also scaling, and a model given both needs less
+data at every step: from 59.9% with the shift alone to 100% with scaling at 100 puzzles, once its row descriptor could
+read the steps of the complete rows (Sections 7.7 and 7.8). More of a rule's own symmetry helps; a symmetry the rule
+lacks caps.
 
 ## 8.3 Sharing and invariance are two things
 
@@ -50,7 +53,8 @@ exchanges, and its output is exactly invariant. The label experiments separate t
 and is not invariant learns as fast as the invariant model on puzzles like the training ones (Section 6.3). It fails
 where the training data stops: on a rule never seen on an attribute it loses 44 points where the invariant model loses
 5 (Section 6.4), and where the generator leaves room, it learns the generator's regularity in place of the rule
-(Section 6.5).
+(Section 6.5). A symmetry in that room can also pay on the benchmark itself: the order of Arithmetic's operands,
+which the generator never varies, adds 7 points at 6,000 puzzles and doubles the exact sums (Section 6.6).
 
 Sharing, then, is what saves data, and invariance is what carries the model beyond its data. For a benchmark score
 only the first is needed, which is one reason a benchmark score says little about the second.
@@ -60,7 +64,7 @@ only the first is needed, which is one reason a benchmark score says little abou
 Every prior in this thesis was chosen by someone who had read the generator. The first objection to all of the above
 is therefore that the answer key was copied into the model. Chollet (2019) gives the terms for an honest reply. Skill
 can be bought with priors, and "unlimited priors allow system developers to 'buy' unbounded performance on any given
-task" (p. 25). A fair test may assume a short list of them: objects, elementary geometry, and numbers, which "may be
+task" (p. 25). A fair test may assume a short list of them, including objects, elementary geometry, and numbers, which "may be
 added or subtracted" (p. 26), with quantities "smaller than approximately 10" in his own benchmark (p. 49). And
 generating every task from one program is "a weakness", since reverse-engineering the program would solve them all
 (p. 51). RAVEN is generated from one program.
@@ -82,15 +86,18 @@ generator.
 
 Read by kind, the prices are suggestive. The largest gains belong to general priors: the shift of values (61 points at
 100 puzzles), addition (sum from 5% to 98%), and a graph with a node per attribute (86% against 30% at 300 puzzles,
-Section 5.4). The generator's priors bought less, and what they bought was gone at full data: 12 points for the
+Section 5.4). The generator's priors bought less, and what they bought was gone at full data: 14 points for the
 components at 100 puzzles, none at 6,000. This is a comparison across different models and datasets, and we do not
 lean on it.
 
-One generator prior is in every model here, ours and the baselines alike, and was never priced: that rules run along
-rows. Transposing an I-RAVEN matrix leaves 3% of Progression instances valid (Section 2.1), so a model with rows as
-facts would fail on a transposed puzzle that a person would not notice had changed. The test is cheap and we did not
-run it. It limits what every score in this thesis means: accuracy on the generator's own distribution, bought partly
+One generator prior is in every model here, ours and the baselines alike: that rules run along rows. Transposing an
+I-RAVEN matrix leaves 3% of Progression instances valid (Section 3.5), so a model with rows as facts should fail on a
+transposed puzzle that a person would not notice had changed. It does. On transposed puzzles the facet model, the
+model with copy links and the row fold all fall from 95.8–97.4% to 45.0–45.1% matched, and to about 4% exact. RAVEN's
+rules applied along rows keep 47.7% of the same kind of puzzles, so the models fail as a perfect row-rule solver fails (Figure 8.1 shows a transposed puzzle). This is the prior's cost away from the generator; its worth in training data was not measured. It limits what every score in this thesis means: accuracy on the generator's own distribution, bought partly
 with the generator's own structure. Nothing here is a claim about the tests people take.
+
+![**Figure 8.1.** The I-RAVEN puzzle of Figure 2.1 as given and transposed: panel (r, c) takes the place of panel (c, r). The answer keeps its place (3, 3), so the candidates are unchanged, and the rules now run down the columns.](../figures/iraven_transposed.png)
 
 ## 8.5 What the lifted template contributes
 
@@ -100,11 +107,14 @@ I-RAVEN (Section 5.5). The gains reported in this thesis belong to the symmetrie
 **A uniform way to state and prove a symmetry.** In the template, a symmetry is the absence of a name. One theorem
 covers every case, and each was confirmed on random weights to machine precision. The baseline's symmetries were
 engineered into its node features one at a time, and each needed its own check. The ablations of Chapter 6 are changes
-of a line in the template: add a fact that labels a component, or write a rule once per attribute.
+of a line in the template: add a fact that labels a component, or write a rule once per attribute. This is a difference
+in uniformity and convenience, not in what can be built: in a tensor framework, sharing weights over a set or a typed
+axis is also one line, and equivariant layers come with their own proofs.
 
 **Relations of more than two things, used by learned rules.** `plus(U, W, V)` joins three values. In the template it
-is a fact like any other, and rules with weights walk through it (Section 7.6). A network that passes messages along
-pairs has no place for it without being redesigned.
+is a fact like any other, and rules with weights walk through it (Section 7.6). A graph network that passes messages
+along pairs needs extra nodes for the triples to do the same, as networks on hypergraphs or factor graphs have; in the
+template no change of architecture is needed.
 
 **Recursion.** The `plus` facts need not be given as a table. Two rules without weights derive them from the zero and
 the successor of each value, u + 0 = u and u + (w + 1) = (u + w) + 1, and the model's outputs are then identical to
@@ -115,27 +125,39 @@ time on rows of 10.
 
 **A cost.** Every puzzle becomes its own network, kept in memory, and trained one at a time on CPU: over 300 GB and
 about 15 hours for a run on all of I-RAVEN, where the PyTorch baselines need one GPU and a few gigabytes (Section 5.8).
+Background facts cost too: the `plus` facts grow with the square of the value range.
 
 ## 8.6 Limits
 
-- **One seed.** Almost every number is a single training run. Where two seeds exist they differ by 1 to 2 points.
-  Only sum and midpoint at 100 and 600 puzzles have three, with standard deviations of 0.4 to 3.9 points for the
-  models of Sections 7.4 to 7.6. The first scaled model of Section 7.7 had two outcomes, 100% at one seed and about 20%
+- **One seed.** Most numbers are a single training run. Where two seeds exist they differ by 1 to 2 points.
+  Sum and midpoint at 100 and 600 puzzles have three, with standard deviations of 0.4 to 3.9 points for the
+  models of Sections 7.4 to 7.6. So do Chapter 6's comparisons with little data and the attributes at 6,000: standard
+  deviations of 0.2 to 2.7 points, and each seed's gain within 2 points of the mean gain (+14.2, +13.5, +6.3). The
+  vision transformer varies more: its gain from the exchange of rows is 7.6 to 28.0 points across three seeds. The first scaled model of Section 7.7 had two outcomes, 100% at one seed and about 20%
   at two, which went with whether its row descriptor carried the rule; with a descriptor that reads the steps it is at
   100% in six runs of six.
   The conclusions rest on effects of 10 to 60 points and on their direction, not on differences of a point or two;
   the 0.4 points between the facet model and its PyTorch counterpart is not a result.
 - **The value axis is given the rules' primitives.** Its results are comparisons with itself. The symmetry on values,
-  the centre of Chapters 6 and 7, has not been built into a model that learns the rules from codes.
+  the centre of Chapters 6 and 7, has not been built into a model that learns the rules from codes. With `plus` given,
+  learning sum is choosing a given relation, as in models with programmed rules, and the facts grow with the square of
+  the range: the value axis was not run on values up to 1,000.
 - **One object per panel on I-RAVEN-X, and rows of 3 for the twins.** The orbit count was tested on tables of about
   1,250 rows. That it explains the difficulty of Arithmetic on rows of 10 is an inference.
-- **The count needs the rule's table.** It was made on finite tables, where the groups hold only away from the ends of
-  the range.
+- **The count needs the rule's table, and describes one kind of learner.** It was made on finite tables, where the
+  groups hold only away from the ends of the range, and on a ring of 101 values where they hold exactly. It bounds a
+  learner that shares nothing across orbits; how close a network comes depends on how it reads the puzzle (Section 8.1).
 - **Rows of 10 are not compared across model families.** The runs differ in training length and recipe (Section 5.7).
 - **Perception is trained apart**, with labelled objects, and the reasoning model cannot take graded inputs as it
-  stands (Section 5.3). The pipeline is end to end at test time only.
+  stands (Section 5.3). The pipeline is end to end at test time only, and its labels give it more supervision than the
+  black-box transformer gets (Section 5.4).
 - **The fixed encoding.** Thermometer codes tie the facet model to the value range it was trained on, and the list of
   attributes is given.
+- **The I-RAVEN-X test pass came last.** The text reports puzzles 6300 to 7299, which were looked at throughout the
+  work. Every final checkpoint of Chapters 5 to 7 was scored once on puzzles 8000 to 9999 only at the end, after an
+  external review asked for it (Appendix D.6). The test numbers agree with the reported ones within sampling error,
+  except the facet model on sum at 600 puzzles, a single run, 24.7 against 31.2. Column roles' Arithmetic, the model
+  chosen with the unseen puzzles in view, drops from 39.6 to 36.0, within sampling error but at every seed.
 - **One generator.** Section 8.4.
 
 ## 8.7 Future work
@@ -147,9 +169,12 @@ about 15 hours for a run on all of I-RAVEN, where the PyTorch baselines need one
    The question is whether it then learns sum with the shift built in and without the `plus` facts. (The item that
    stood here, a row descriptor that reads each pair's step, was built and is Section 7.7's repair: the scaled model
    then learns midpoint at every seed, so the cost measured there belonged to the descriptor and not to the
-   symmetry.)
-2. **Pricing "rows only".** Score the existing checkpoints on transposed puzzles; then replace rows by lines, with
-   rows and columns both given as facts, so that the direction of a rule is inferred per attribute.
+   symmetry. On sum it changes nothing, as predicted.) One caution: the function above chains two offsets, and a
+   template that chains offsets for every answer contains it by construction. The test means something only if the
+   chain is the same for every rule and the model still has to find which offsets to chain.
+2. **Pricing "rows only".** The cost on transposed puzzles is measured (Section 8.4). What remains is its worth in
+   data: replace rows by lines, with rows and columns both given as facts, so that the direction of a rule is
+   inferred per attribute, and compare the two models at a few training sizes.
 3. **Training perception and reasoning together.** The recognizer's output, the probability that a value exceeds each
    threshold, is already a soft thermometer code. The template has to lose its jump at zero first.
 4. **The value axis on grids.** Position slots as constants with the geometry of the grid as background facts, and
@@ -161,45 +186,19 @@ about 15 hours for a run on all of I-RAVEN, where the PyTorch baselines need one
 
 A built-in symmetry is worth the orbits it merges. Where the rule respects the symmetry, the model learns one answer
 per orbit and needs correspondingly less data; where it does not, the model is right on one input per orbit and no
-data helps. Both can be counted before training, and in our experiments trained networks did what the count said and
-no more.
+data helps. Both can be counted before training. In our experiments the trained networks sat at the counted ceiling,
+needed the counted amount of extra data where the models were otherwise equal, and came close to the counted saving
+once they could tell the orbits apart.
 
 In a lifted relational template these symmetries are declared by leaving things unnamed, and hold exactly. A model
 built this way generates the answers of I-RAVEN without the rules and without the candidates: 97.2% on the test
 split from object labels and 97.0% end to end behind an object recognizer, against 93.1% for a vision transformer
-with six times the weights, and 90% against 16% when each layout has 300 training puzzles. A graph network with the
+with six times the weights, and 90% against 16% when each layout has 300 training puzzles, end to end as from
+labels. The recognizer learns from labelled objects and the transformer from the answer alone, so that gap is what
+the object representation and its labels are worth together. A graph network with the
 same symmetries does as well, so the credit goes to the structure and not to the framework.
 
 The assignment asked for symmetry-aware architectures that combine object recognition with priors on how objects
 compose, built on relational neural networks, and for an improvement over black-box vision. Chapters 3 and 4 give the
 architectures and Section 4.3 the recognition; Chapter 5 gives the improvement, largest where data is scarce; and
 Chapters 6 and 7 measure, prior by prior, what was bought and what a wrong choice would have cost.
-
----
-
-## Notes for you (not thesis text)
-
-- **8.4's table is the long outline's, shortened.** Two rows are judgement calls you may want to move: "the same rule
-  in every row" (general, but "rows" is the generator's) and "any attribute can carry a rule" (general, though the
-  attribute list is not). The long outline marks the row fold and copy links as mixed; both are cut here with their
-  models.
-- **Chollet's page numbers** are from the long outline's check of 9 Nov (arXiv:1911.01547). Only short phrases are
-  quoted; recheck them against the PDF when the chapter is final.
-- **"Sum from 5% to 98%"** is 4.5 → 98.2 at 100 puzzles on the twins, means of three seeds (Section 7.6).
-- **8.1's "little or nothing at 6,000"**: −0.1 for components, +1.6 for the value shift, +6.0 for attributes. The
-  introduction says "between 0 and 6 points"; use one wording in both.
-- **8.5 claims the baseline's symmetries "each needed its own check".** That is `--check-symmetry` in
-  `core/baselines/train_baseline.py`; true as far as I can see, but you wrote that code path with me over several
-  sessions and know best whether "engineered one at a time" is fair.
-- **8.5's sentence that a pairwise message-passing network "has no place" for `plus`** follows `docs/ARITHMETIC.md`
-  ("Numbers as objects": a hyperedge). Hypergraph networks exist; "without being redesigned" is there for that reason.
-- **Future work item 1 was the scaling kernel.** It was run on 2026-11-15 and is now Section 7.7; the item is replaced
-  by what that run left open. The gate it first proposed was run on 2026-11-16 and failed; the item now names the row
-  descriptor, the cause the probe found (`docs/ARITHMETIC.md`, "The rule gate"). The descriptor was repaired on 2026-11-17
-  and the item now names the next open path, sum from differences across rows. Sections 8.1 and 8.2 do not mention
-  scaling yet. One sentence would fit in 8.2: more of a rule's symmetry means less data at every step, once the model
-  can read the rule from the complete rows (Sections 7.7 and 7.8).
-- **The conclusion uses test-split numbers** for 97.2, 97.0 and 93.1, and validation numbers for 90 against 16 (the
-  learning curve has no test pass).
-- **Not discussed:** grokking, row-length transfer, the row fold, LLMs. Outline §5 sends the first three to an
-  appendix of negative results, one page each.

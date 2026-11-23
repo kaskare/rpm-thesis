@@ -641,6 +641,8 @@ def main():
                          "A comma list of files with one value range and several row lengths (4 or more) trains on all of "
                          "them, --n / --n-sel / --n-val per file; needs --columns roles or fold (notes §25)")
     ap.add_argument("--save-dir", default=None, help="train/val: save the best-on-selection weights + history here")
+    ap.add_argument("--seed", type=int, default=None, help="seed of the backend's random generator (initial weights, "
+                    "order of the training samples); default: a fresh random one per run")
     ap.add_argument("--n-train-eval", type=int, default=0,
                     help="train/val: report training accuracy on only this many puzzles per constellation")
     ap.add_argument("--visible-selectors", action="store_true",
@@ -691,6 +693,8 @@ def main():
 
     import neuralogic
     neuralogic.set_max_memory_size(args.jvm_gb)
+    if args.seed is not None:
+        neuralogic.manual_seed(args.seed)                     # before the first Settings, which hands it to the backend
     from neuralogic.logging import clear_handlers
     clear_handlers()
     from neuralogic.core import R, Settings

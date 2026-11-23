@@ -1,14 +1,210 @@
-# Chapter 3, Sections 3.6 and 3.7: what a symmetry is worth, with proofs (draft, 2026-11-17)
+# Chapter 3. Symmetry in a lifted template (draft, 2026-11-23)
 
-Each statement below comes with why it holds, in plain words, and with the measurement that backs it. The checks that
-need no training are printed by `analysis/pricing_checks.py`, `analysis/rule_orbits.py` and
-`analysis/twins_linear_fit.py`; the trained numbers are from `docs/ARITHMETIC.md` and `docs/RESULTS.md` §11. The
-renaming theorem itself (Section 3.2) is in `docs/PYNEURALOGIC_NOTES.md` §21 and is not repeated here. Notes for you
-are at the end.
+This chapter holds the theory of the thesis. Its first half explains how a symmetry gets into a lifted template and
+why it then holds exactly. A template cannot tell apart constants that it does not name (Sections 3.1 and 3.2).
+What the template names and which background facts it is given decide, together, which group the model has
+(Section 3.3). The same theorem shows two different ways of taking a symmetry out again (Section 3.4). Section 3.5
+sorts symmetries by what they do to the puzzles a generator produces. The second half puts a price on a symmetry
+before any training: the data it saves and the ceiling it sets (Sections 3.6 and 3.7).
 
----
+None of the proofs is long. What the chapter adds is that every statement is tied either to a check that needs no
+training or to a count that was made before the runs of Chapters 6 and 7.
 
-## 3.6 The words
+## 3.1 Templates, samples and renamings
+
+We use the setting of Section 2.3. A template T is a set of weighted rules. Most arguments of its atoms are
+variables, but a rule may also write a constant. The rule body `col(P, "c1")`, for example, holds only for panels of
+the first column. We call the constants written in T its *named* constants.
+
+A sample is a set of facts F. Here a sample is one puzzle, or one component of one puzzle (Section 4.4), and its facts
+are of two sorts. The *puzzle facts* describe what the panels show: which objects a panel holds, which component an
+object belongs to, and the value of each attribute. The *background facts* describe the frame the puzzle sits in,
+which is the same for every puzzle of a dataset: which panels form a row, which rows are complete, which column a
+panel stands in, and, for the value-axis model of Section 4.5, how the values relate to each other. Grounding T on F
+gives a network in which every atom a has a value. We write it val_F(a).
+
+A *renaming* σ is a one-to-one map from constants to constants. It acts on a fact or an atom by renaming every
+constant in it, and on a set of facts one fact at a time. A transformation g of a puzzle *is a renaming* if some σ
+turns the facts of the puzzle into exactly the facts of the transformed puzzle. Exchanging rows 1 and 2 is a
+renaming: it swaps the panels of the two rows and the row names r1 and r2. Mirroring a left-right puzzle renames the
+components k0 and k1 into each other. Exchanging size and colour renames the two attributes. Not every
+transformation is a renaming. Moving an object to another slot of a grid changes a vector of numbers inside a fact,
+not a constant, and no σ does that.
+
+As in Section 2.4, a model has a symmetry *built in* if f(g·x) = g·f(x) for every setting of its weights. For a
+renaming this has a plain meaning: the output on the transformed puzzle is the output on the original, with its atoms
+renamed. If no output atom contains a renamed constant, as when rows are exchanged, the symmetry is an invariance. If
+some do, as the output blocks for size and colour do, it is an equivariance.
+
+## 3.2 The renaming theorem
+
+**Theorem.** Let σ be a renaming that leaves every named constant of T in place. Then for every atom a and for every
+setting of the weights,
+
+  val_σ(F)(σ(a)) = val_F(a).
+
+*Proof.* A ground rule is a rule r of T whose variables have been replaced by constants through a substitution θ.
+Since σ leaves the constants of r in place, renaming the ground rule rθ gives r(σ∘θ). That is a ground rule of the
+same rule r, and its body holds in σ(F) exactly when the body of rθ holds in F. The inverse of σ also leaves the
+named constants in place, so this pairs the ground rules of the two networks one to one. Weights belong to the rules
+of T and not to their groundings, so paired ground rules carry the same weights. An aggregation, such as an average or
+a sum, sees the multiset of values of the bodies that share a head, and σ maps this multiset one to one onto its
+counterpart. A product or a concatenation combines the atoms of a single body, and σ maps those one by one. For the
+facts, the equation holds by the definition of σ(F). The ground network has no cycles, so induction over the depth of
+an atom carries the equation from the facts to every atom. ∎
+
+A transformation of the puzzle is therefore built in whenever two conditions hold:
+
+1. it is a renaming: some σ turns the facts of the puzzle, background facts included, into exactly the facts of the
+   transformed puzzle;
+2. the template names none of the constants that σ moves.
+
+Three remarks.
+
+- The conditions are sufficient, not necessary. A template can also be symmetric by coincidence, for instance when two
+  rules that name different constants happen to have equal weights.
+- A named constant allows the symmetry to break, but does not force it. The checks below show that with random
+  weights it does break.
+- The theorem is the form that the permutation equivariance of graph networks takes in a logic program. In a graph
+  network the renamed constants are the nodes, and the only facts are edges and node features, which a permutation of
+  the nodes maps onto themselves. In a template any constant can take that role: a row, a component, an attribute, a
+  value. The background facts decide which renamings keep the frame of the puzzle.
+
+**The checks.** Every built-in symmetry claimed in this thesis was also checked numerically, without training. With
+random weights, several draws and unseen puzzles, the output on the transformed puzzle is compared with the renamed
+output on the original (`core/pynl/facet_symmetry_check.py`, and the `--check-shift` and `--check-scale` options of
+`core/pynl/value_axis.py`). Where the theorem applies, the largest difference lies between 0 and 10⁻¹⁵, the size of a
+change in the order of a floating-point sum. Where the template names a constant that the transformation moves, the
+output changes by 0.4 to 1.0. Sections 3.3 and 3.4 give the individual numbers.
+
+## 3.3 What is named, and what the background facts keep
+
+The two conditions of the theorem are two places to put a symmetry. The rules decide which constants are named, and
+the background facts decide which renamings map a sample onto itself. Together they fix the group of the model: the
+renamings that leave every named constant in place and keep every background fact true. Adding a background relation
+can only make this group smaller, because each new fact is one more thing a renaming must keep. The background facts
+are therefore where a lifted template chooses its group, in the way that the choice of domain fixes the group of a
+convolutional or a graph network (Section 2.4).
+
+The relations used in this thesis show how this works.
+
+- **Complete rows**, `full(r1)` and `full(r2)`. Both complete rows carry the same fact, and the rules reach them only
+  through it, so exchanging rows 1 and 2 keeps the frame. The question row is set apart, because the rules name it,
+  as in `inrow(P, "r3")`, and no renaming may move it.
+- **Columns**, `col(P, "c1")`, `col(P, "c2")` and `col(P, "c3")`. The rules name each column, so no exchange of columns
+  is built in. That is intended: a Progression row read backwards is a different row. For I-RAVEN-X with rows of ten,
+  *column roles* give each panel one of the facts `col(P, "first")`, `col(P, "mid")` and `col(P, "last")` instead. All
+  eight middle columns now carry the same fact, so any exchange of middle columns is built in, while the first and last
+  columns stay apart.
+- **Neighbours**, `next(P, Q)`. The row fold of Appendix E reads a row as a chain of neighbouring panels. Reversing a
+  row would map `next` onto its inverse, which is not among the facts, so the fold keeps the direction of a row.
+- **Offsets on the value axis**, `off(U, V, k)` for V = U + k. In the value-axis model every value is a constant, and
+  no rule names one. Moving all values by the same amount s maps `off` onto itself, exactly on a ring of values and
+  away from the ends on a line, so the model is equivariant to this common shift.
+- **Addition**, `plus(U, W, V)` for U + W = V. The common shift does not keep these facts, since (u + s) + (w + s) is not
+  (u + w) + s. Giving a model `plus` therefore takes the common shift out of its group. What remains are the moves that
+  addition keeps, such as adding s to one operand and to the result.
+
+| background facts | the renaming they keep | built in | random weights, largest change |
+|---|---|---|---|
+| `full(Rw)` | rows 1 and 2 exchanged | yes | 3·10⁻¹⁶ |
+| `col(P, c)`, one fact per column | no exchange of columns | no | columns 1 and 2: 0.46 to 0.96 |
+| `col(P, "mid")`, column roles | any two middle columns exchanged | yes | 4.4·10⁻¹⁶ (named columns: 0.38) |
+| `off(U, V, k)` | all values moved by the same amount | yes | 3·10⁻¹⁷ |
+| `off` and `plus` | one operand and the result moved together | the common shift no longer | 0 in 94–97% of puzzles; up to 2.8·10⁻³ where the shift changes a sum |
+
+The same mechanism lets a symmetry be stated as a relation, not only left unnamed. The two components of the
+left-right and up-down layouts are exchangeable because no rule names k0 or k1. One could also give the model a
+relation that says how the components of a layout correspond, for example a reflection with one fact per layout, and
+let every rule take the layout as a variable. The left-right and up-down layouts would then share every weight because
+no rule names either of them, and the relation would tell the model which component of one layout corresponds to
+which of the other. The experiments did not need this. It is the form in which the method reaches from the
+symmetries inside one puzzle to symmetries between layouts.
+
+## 3.4 Two ways to break a symmetry
+
+To measure what a symmetry is worth, Chapter 6 takes it out of a model and compares. The theorem has two conditions,
+and there is one way to break each.
+
+**Labels** break the first condition. The template stays as it is, but facts tie each of the exchangeable constants
+to a fixed vector: `cid(k0) = [1, 0]` and `cid(k1) = [0, 1]` for the components, or a one-hot `aid(A)` for the
+attributes, read by the summary of every panel. When a puzzle is mirrored, its objects move from k0 to k1, but
+`cid(k0)` stays [1, 0]. The facts of the mirrored puzzle are then no longer a renaming of the original facts. With
+random weights the mirror changes the output by 0.37, and with attribute labels the exchange of type and colour changes
+it by 0.41. Every weight is still shared between the components or the attributes. The labels add 320 weights to the
+266,528 of the components model, or 512 to the 288,328 of the attributes model.
+
+**Separate weights** break the second condition. Every rule with weights is written once per component, or once per
+attribute, with that constant in it. The template now names the constants, and the pairing of ground rules in the
+proof is gone: the rules for k0 and those for k1 have weights of their own. With random weights the mirror changes the
+output by 0.78, and the exchange of type and colour by 0.90. At the same widths the model has twice as many weights
+for the components and 3.2 times as many for the attributes, so Chapter 6 also uses narrower versions with as many
+weights as the symmetric model.
+
+The two ways take out different things. Labels remove the exact invariance and keep the sharing: every training puzzle
+still trains every weight. Separate weights remove both. Comparing a symmetric model with its labelled and its separate
+versions therefore tells apart what the invariance is worth and what the sharing is worth (Section 6.3).
+
+A constant can also be named by accident. The first version of the copy links in Section 6.5 gave every panel a gate of
+its own, `gate("p3")`. That names the panels, so the exchange of rows 1 and 2 was no longer built in (0.99 with random
+weights), and the trained model made use of the freedom. Gates computed from what a panel contains name nothing, and
+with them the exchange is exact again (4.4·10⁻¹⁶).
+
+## 3.5 Three kinds of symmetry
+
+Whether a built-in symmetry helps or hurts depends on what it does to the puzzles that the generator produces. Take a
+transformation g of a complete matrix that leaves the missing panel in its place, a valid puzzle x and its answer y.
+There are three cases.
+
+- **A data symmetry.** g·x is again a valid puzzle, its answer is g·y, and the generator produces g·x as often as x.
+  The training data then contains both, and a model with the symmetry has less to learn. This is a case of what Wang et al. (2023a) call
+  correct equivariance; their definition asks only that g·x occur in the data, not that it occur as often. Section 3.6 counts what it is worth.
+- **Out of support.** The generator never produces g·x, so the symmetry puts no constraint on the data. This is Wang et
+  al.'s extrinsic equivariance. For the benchmark two cases of it differ. If g·x is still a valid puzzle with the
+  answer g·y, the symmetry belongs to the task but not to the data. Building it in costs nothing on the right solution,
+  and it rules out solutions that hold only on what the generator produces (Section 6.5). If g·x is not a valid puzzle
+  at all, the model never has to answer it, so no ceiling follows, but the model must find the rule in a form that
+  respects g, and that can cost data (Section 6.7).
+- **Conflicting.** g·x is a valid puzzle that the generator does produce, but its answer is not g·y. A model with the
+  symmetry has to answer x and g·x consistently, so it is wrong on one of them. This is Wang et al.'s incorrect
+  equivariance, for which they prove a lower bound on the error, orbit by orbit. Section 3.6 evaluates that bound on a
+  rule's table, and Sections 6.7 and 7.4 test it.
+
+Wang et al. make their definitions point by point, so one move can be correct on some rules and incorrect on others,
+as the shift is.
+
+Which case a transformation falls into is a property of the generator. It can be read off the generators' code and
+checked on the data. The table gives the share of rule instances (one attribute of one puzzle) that still satisfy a
+rule of the same kind after the transformation, in the order Constant / Progression / Arithmetic / Distribute. Before
+the transformation every instance satisfies its own rule.
+
+| transformation | I-RAVEN | I-RAVEN-X, rows of 3 | I-RAVEN-X, rows of 10 |
+|---|---|---|---|
+| rows 1 and 2 exchanged | 100 / 100 / 100 / 100 | 100 / 100 / 100 / 100 | 100 / 100 / 100 / **0** |
+| columns 1 and 2 exchanged | 100 / **0** / 51 / 100 | 100 / **0** / 55 / 100 | 100 / **0** / 50 / **0** |
+| two middle columns exchanged | – | – | 100 / **0** / 100 / **0** |
+| values reflected, v → max − v | 100 / 100 / **0** / 100 | 100 / 100 / **0** / 100 | 100 / 100 / **0** / 100 |
+| matrix transposed | 58 / 3 / 1 / 100 | – | – |
+
+The symmetries that this thesis builds in, breaks or adds on purpose fall into the three cases as follows.
+
+| symmetry | case | the reason, from the generator | used in |
+|---|---|---|---|
+| order of the objects in a panel; order of the candidates | data | the order carries no meaning | every model |
+| the two components of the left-right and up-down layouts | data | identical constraints, and matching rule counts and means in both components | 6.2, 6.3 |
+| size and colour exchanged (I-RAVEN-X) | data | both are drawn by the same function, with the same rules and range | 6.2, 6.3 |
+| the attributes exchanged, apart from size and colour in I-RAVEN-X | out of support | the attributes differ in their values (in I-RAVEN they have 5, 6 and 10) and type never carries Arithmetic | 6.4 |
+| rows 1 and 2 exchanged, I-RAVEN and rows of 3 | data | each row is drawn afresh by the same rules, with one small exception for Arithmetic on colour | 6.2 (the vision transformer), 6.5 |
+| rows 1 and 2 exchanged, rows of 10 | out of support, valid | a Distribute row is the first row rotated by a step, and after the exchange no step fits; the answer is still the value that the third row lacks | 6.5 |
+| middle columns exchanged, rows of 10 (column roles) | out of support: valid for Arithmetic and for the answer of Distribute, not for Progression | the operands of a sum may be reordered and the value a row lacks does not depend on the order, but the generator places the zeros among the operands in a fixed pattern | 6.6 |
+| columns 1 and 2 tied | out of support, not valid | a Progression row read in another order is not a Progression row | 6.7 |
+| values reflected (a model that cannot tell v from max − v) | conflicting | Constant, Progression and Distribute rows stay valid and equally likely with the reflected answer, which differs | 6.7 |
+| all values moved by the same amount | data for Constant, Progression, Distribute and midpoint, exactly on a ring of values; conflicting for sum and Arithmetic | a shifted sum row is not a sum row, but its question row is a valid question with another answer | 6.2, 7.3–7.6 |
+
+## 3.6 Pricing by orbits
+
+A symmetry merges inputs into orbits. This section counts what that is worth on a rule's table, in the simplest
+setting where the count can be made exactly: a single row of three values. First the words.
 
 A **row** is three values (a, b, c). In the **question row** the third is missing, and a **learner** is anything that
 turns the two values (a, b) into an answer for c. We write f(a, b) for that answer.
@@ -24,7 +220,7 @@ if moving its input moves its answer in the same way: for the shift, f(a + s, b 
 an input is everything the moves turn it into. Values are the whole numbers 0 to 50. Where a statement divides, it
 is made on the ring of 101 values that the models use, where every step has a half and every multiple.
 
-## 3.6.1 Which rule keeps which move
+### 3.6.1 Which rule keeps which move
 
 **Statement 1.** A rule of the form c = pa + qb keeps the shift exactly when p + q = 1. Every such rule keeps
 scaling. Sum keeps the move of one operand with the answer, and midpoint does not.
@@ -46,7 +242,7 @@ for c + s/2.
 
 The 3% that sum loses under its own move are rows pushed onto a = 0, which the table leaves out.
 
-## 3.6.2 A learner with the shift, and what it saves
+### 3.6.2 A learner with the shift, and what it saves
 
 **Statement 2.** A learner that has the shift can only compute c = b + g(b − a), for some list of numbers g with one
 entry per first step b − a.
@@ -87,7 +283,7 @@ points with the shift and by 5 with doubling at 100 puzzles, by 2 or less at 600
 three networks with a symmetry are those whose row descriptor reads the steps (Section 7.7); Section 3.7 says why
 that matters.
 
-## 3.6.3 The ceiling, and whose ceiling it is
+### 3.6.3 The ceiling, and whose ceiling it is
 
 **Statement 4 (the ceiling).** On a rule in which the rows of an orbit all need different answers, a learner of the
 form of Statement 2 is right on at most one row of each orbit. For sum under the shift that is 97 rows of 1,225: 7.9%.
@@ -95,8 +291,9 @@ form of Statement 2 is right on at most one row of each orbit. For sum under the
 *Why.* On a sum row the answer is b + a, so the learner is right exactly when g(b − a) = a. Rows with the same first
 step have different a, and g holds one number for that step. It can match one of them. Sum's table has 97 different
 first steps. With rows drawn evenly, the best a learner can expect is one right row per orbit, 97 in 1,225. In
-general the count per orbit is the largest group of its rows that agree on the answer; that is the bound of Wang et
-al. (2023), evaluated here on a table.
+general the count per orbit is the largest group of its rows whose answers agree once the move is undone; for the
+shift, the rows with the same c − b. Written this way a learner with the shift is a learner of c − b that ignores the
+shift, and the count is the bound of Wang et al. (2023a, Theorem 4.3) for such learners, evaluated here on a table.
 
 *Checked.* Fitted on the whole table, the counting learner with the shift is right on 97 of 1,225 rows. With the
 shift and doubling it is 88 (7.2%), with the shift and scaling 17 (1.4%). The trained shared model reaches 4.5 ± 2.3
@@ -133,12 +330,12 @@ structure, and not a consequence of the puzzle-wide shift alone. The coincidence
 small one: in 48 of the 507 unseen sum rows the answer is a value that already stands in the puzzle, and the template
 sees which values those are. The runs sit at the ceiling and not clearly above it.
 
-In the terms of Wang et al. (2023): shifting one row turns a sum row into a row that needs another answer, which is
+In the terms of Wang et al. (2023a): shifting one row turns a sum row into a row that needs another answer, which is
 their incorrect equivariance, the case their lower bound covers. Shifting a whole sum puzzle turns it into something
-that is not a sum puzzle at all, which is their extrinsic equivariance; the bound does not apply to it, and they show
-that it can help or hurt.
+that is not a sum puzzle at all, which is their extrinsic equivariance. On such orbits only one puzzle occurs in the data and their bound
+is zero. Extrinsic equivariance can still hurt (Wang et al., 2023a, Section 5) or help (Wang et al., 2023b).
 
-## 3.6.4 More of the rule's moves
+### 3.6.4 More of the rule's moves
 
 **Statement 6 (doubling).** A learner that has the shift and doubling has one free number for each odd part of the
 first step. On the ring, a row with a first step it never saw is answerable exactly when a training row had a first
@@ -188,7 +385,7 @@ to its answer to x. Nothing else is free.
 This is why the number of orbits is the right unit: it counts the answers that are left to learn. Statements 7 and 8
 are the two cases with one orbit, and in both the model has been handed its rule up to one number.
 
-## 3.6.5 Values read as numbers
+### 3.6.5 Values read as numbers
 
 **Statement 10.** Let the rule be c = pa + qb, and let the two complete rows of a puzzle be (a₁, b₁, c₁) and
 (a₂, b₂, c₂). If a₁b₂ ≠ a₂b₁, the two rows fix p and q, a least-squares fit finds them, and its answer for the
@@ -211,7 +408,7 @@ rule's.
 All 44 misses on the linear rules (13, 7, 12 and 12) are puzzles with a₁b₂ = a₂b₁. There is no miss among the others.
 Lookup and Distribute Three are not of the form, and the fit gets 1.7% and nothing.
 
-## 3.6.6 Reach: what is proved and what is measured
+### 3.6.6 Reach: what is proved and what is measured
 
 **Statement 11.** For a learner with one free number per orbit, training rows from other orbits put no condition on
 the number of an orbit that training never reached.
@@ -221,8 +418,10 @@ another first step involves another entry of g. So every setting of the unreache
 equally well, and the training data cannot make it right.
 
 *Proved for:* the counting learner. *Measured for the networks:* the kernel has one free weight vector per offset,
-and nothing ties the vectors of different offsets together, but a network could still carry "half the step back"
-from the steps it has seen. It does not. Pooled over three seeds:
+and nothing ties the vectors of different offsets together. The template therefore has no way to carry "half the step
+back" from the steps it has seen to one it has not, beyond coincidences of weights trained in other roles; Statement 11
+applies to it nearly as it stands. The measurement is a check of that, not a discovery about networks. What the count
+adds is that it says before training which rows those are. Pooled over three seeds:
 
 | training rows in the row's orbit | 0 | 1 | 3–4 |
 |---|---|---|---|
@@ -247,44 +446,56 @@ answers are left to learn. Midpoint at 100 training puzzles:
 | the shift and scaling | 1 orbit, one number | 100 | 100 | 100.0 / 100.0 / 100.0 |
 | the linear form, values as numbers | nothing from other puzzles | – | – | 99.8, no training |
 
-For sum the ladder has other rungs, because its moves are others: nothing (4.8 ± 0.6); the shift, which sum does not
-keep (4.5 ± 2.3 at a ceiling of 7.9); its own moves (98.2 ± 0.8); the linear form (99.6, no training).
+For sum the ladder has other rungs, because its moves are others: nothing (4.8 ± 0.6); the shift, with the answer read
+from the question row, which sum does not keep (4.5 ± 2.3 at a ceiling of 7.9); its own moves (98.2 ± 0.8); the linear
+form (99.6, no training).
 
-The count says each rung needs less data than the one below, and the trained models follow it up the whole ladder.
-That took two attempts. With the first row descriptor the two scaling rungs fell below the rung beneath them: 49.9 ±
-5.3 with doubling and 19.0 / 100.0 / 21.0 with scaling. Statement 7's consequence names the reason: with rows read in
-a unit the rule has to come from the complete rows, and that descriptor did not carry it. A descriptor that reads each
-pair's step was then built, with its outcome predicted before the runs, and gives the table above
-(`docs/ARITHMETIC.md`, "The row descriptor reads the steps").
+The count says each rung needs less data than the one below, and the trained models end in the same order. They do so
+only at the second attempt, and they do not reach the count's numbers on every rung. With the first row descriptor the
+two scaling rungs fell below the rung beneath them: 49.9 ± 5.3 with doubling and 19.0 / 100.0 / 21.0 with scaling.
+Statement 7's consequence names the reason: with rows read in a unit the rule has to come from the complete rows, and
+that descriptor did not carry it. A descriptor that reads each pair's step was then built, with its outcome predicted
+before the runs, and gives the table above (Section 7.7). The first attempt is a result in its own right: the same
+group and the same orbit count gave 20% or 100% depending on how a row was described. The count is a bound for a
+learner that shares nothing across orbits and can tell every orbit apart. It predicts the order of the rungs and which
+rows a model can get, not the accuracy a particular network reaches; with the shift alone the network stays 20 points
+under the counting learner at 100 puzzles (59.9 against 80.0), and we did not find the cause.
 
-## 3.7.1 What is not proved
+### 3.7.1 What is not proved
 
 - **That the trained network reaches the count.** The count is what a learner with one answer per orbit gets. The
   networks come within 4 points of it without a symmetry, and with the shift they stay 20 points under it at 100
-  puzzles and 2 at 600.
+  puzzles and 2 at 600. A network reaches the count only if it can tell the orbits apart, which a row descriptor that
+  pools away the steps prevents (Section 7.7). The 20 points with the shift alone may be a limit of the same kind; it
+  is not explained here.
 - **That a network cannot generalise past its orbits.** Statement 11 is proved for the counting learner. For the
   networks it is a measurement on one family of templates, in which nothing but the built-in moves ties weights
   together. A model with other ties, such as a smooth kernel, could do otherwise.
 - **The ceiling for the template.** Statement 5: it follows from how the template reads the puzzle, with coincidences
   of values between rows left over. It is not a theorem about the puzzle-wide shift. The runs sit at it: 7.1 or less
   at every picked epoch, and above 7.9 at 8 of 172 evaluated epochs, 9.7 at the most.
-- **Anything about groups on 0 to 50.** A shift can leave the range and midpoint needs a + b even. The counts are made
-  on the actual tables. Statements 6 and 7 are exact on the ring of 101 values.
+- **Anything about groups on 0 to 50.** The models compute on a ring of 101 values, chosen because 101 is prime: every
+  step then has a half and every multiple, so the scaling moves are defined. On the values 0 to 50 the moves are not a
+  group at all, since a shift or a scaling can leave the range. The data never leaves the part where the ring and the
+  whole numbers agree: a midpoint row has a + b even and at most 100, so half of a + b on the ring is the ordinary
+  midpoint. The counts are made on the actual tables. Statements 6 and 7, and the exactness checks of the scaled models
+  (Section 7.7), hold on the ring only; on the data, scaling maps most rows out of range and is an out-of-support
+  symmetry in the sense of Section 3.5.
 
 ---
 
-## What is known already, and what is added here
+## 3.8 What is known already, and what is added here
 
-All of these were found by search on 2026-11-17 and read as abstracts only, except where Chapter 2 says otherwise.
+The sources were found by search on 2026-11-17; the papers cited for a result were read on 2026-11-23.
 
 | statement | standing | source |
 |---|---|---|
 | 1 | textbook: a weighted sum of points needs no origin when the weights sum to 1 | Section 2.4 (Stevens 1946; Baez 2009) |
 | 2, 6 to 9 | elementary; no novelty claimed. The form in 8 is a known functional equation | reading list: Reem 2017 |
-| 3 | the gain from an invariance as more effective samples is known in general: for a finite group the effective number of samples is multiplied by the group's size | Tahmasebi and Jegelka 2023; Sannai et al. 2021; Elesedy and Zaidi 2021; Bietti et al. 2021 |
+| 3 | the gain from an invariance as more effective samples is known for kernel methods: for a finite group the effective number of samples is multiplied by the group's size; strict gains and improved bounds of other forms are known in general | Tahmasebi and Jegelka 2023; Bietti et al. 2021; other forms: Elesedy and Zaidi 2021; Sannai et al. 2021 |
 | 3, added here | the exact count on a finite table with orbits of unequal size, and its test against a counting learner and trained networks | – |
-| 4 | the bound | Wang et al. 2023 |
-| 5 | the two cases are Wang et al.'s incorrect and extrinsic equivariance; the example and the reading of the template are added here | Wang et al. 2023 |
+| 4 | the bound: Theorem 4.3, applied to the answer relative to the moved input | Wang et al. 2023a |
+| 5 | the two cases are Wang et al.'s incorrect and extrinsic equivariance; the example and the reading of the template are added here | Wang et al. 2023a |
 | 10 | models that make addition an operation of the representation | Section 2.5 (NVSA, ARLC) |
 | 11 | what trained networks do on inputs outside the training support is studied for Boolean functions (they find the interpolator of lowest degree); reasoning over symbols never seen in training is proved to fail for fully connected networks | Abbe et al. 2023; Boix-Adserà et al. 2024 |
 
@@ -296,24 +507,3 @@ All of these were found by search on 2026-11-17 and read as abstracts only, exce
   networks via quotient feature spaces. *UAI*. arXiv:1910.06552.
 - Tahmasebi, B., Jegelka, S. (2023). The exact sample complexity gain from invariances for kernel regression.
   *NeurIPS*. arXiv:2303.14269.
-
----
-
-## Notes for you (not thesis text)
-
-- **Statement 5 changes a sentence of Chapter 7.** Sections 7.3 and 7.4 said that a model equivariant to the common
-  shift can only compute b + g(b − a) and so cannot fit sum. That is true of a learner that answers from the question
-  row. The template has the shift of the whole puzzle, and that alone would not cap sum (the function in Statement 5).
-  I changed the two sentences and added a paragraph to 7.3. An examiner who knows Wang et al. could have raised it.
-- **The same point opens a run you have not made.** A kernel between a panel and the panel above it would give the
-  template the cross-row offsets that the function in Statement 5 uses. The model would keep the shift and could in
-  principle learn sum from differences. That is "the zero found from the complete rows", which `--find-zero` did with
-  the `plus` facts. Not run, and not needed for the argument.
-- **Statement 3 is the cleanest new piece.** The coverage formula predicts the counting learner from the table alone
-  (74.8 against 80.0, 98.7 against 99.8, 4.5 against 5.0, 22.0 against 21.6, 91.2 against 90.5). It makes "the data a
-  symmetry saves" a number: 2,878 rows against 107 for 90%.
-- **Nothing here is deep mathematics.** Each proof is two or three lines. The contribution is that every statement is
-  tied to a count made before training and to a measurement. Do not let the chapter claim more.
-- **The sources are abstracts.** Tahmasebi and Jegelka's "multiplied by the group's size" is from the search summary
-  of their abstract. Read the papers before citing them for more than their existence.
-- **Voice.** "We", as in the other chapters.

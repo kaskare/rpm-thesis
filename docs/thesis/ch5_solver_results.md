@@ -1,9 +1,6 @@
 # Chapter 5. The solver: accuracy, end to end, and against the baselines (draft, 2026-11-14)
 
-Numbers are from `docs/RESULTS.md` (§1 for the test split, §4 for layouts, rules and learning curves, §8 for
-perception, §9 for cost). Cells are matched % with exact % in brackets. Notes for you are at the end.
-
----
+Cells are matched % with exact % in brackets.
 
 ## 5.1 I-RAVEN, test split
 
@@ -47,6 +44,24 @@ of the weights. At a comparable size, the transformer with 335k weights reaches 
 given the same supervision: the recognizer is trained on the annotated objects of every panel, while the transformer
 gets the annotation of the answer only. What the comparison shows is the value of that intermediate representation
 together with the structure built on it, and the next sections separate the two.
+
+**Against published solvers.** Our transformer is a plain one, not an architecture built for these puzzles.
+Małkiński and Mańdziuk (2025a) retrained thirteen such architectures under one protocol, on the same 6,000 training
+puzzles per layout, each with an auxiliary loss on the puzzle's rules. Three of the strongest, as their authors report
+them and as rerun:
+
+| I-RAVEN test, 6,000 training puzzles per layout | reported | rerun under one protocol |
+|---|---|---|
+| SCL | 95.0 | 83.4 |
+| PredRNet | 96.5 | 88.8 |
+| DRNet | 97.6 | 90.9 |
+| our vision transformer, width 224 | | 93.1 |
+| facet model, end to end | | 97.0 |
+
+These models pick one of the eight candidates. Ours generate the answer, and matched accuracy counts it right when the
+closest candidate is the answer, so the two scores are close but are not the same task. The rerun models also learn
+from the labels of the rules, which ours never see. Within those limits our transformer is a fair stand-in for black-box
+vision at this amount of data, not a weak one.
 
 ## 5.2 By layout
 
@@ -97,30 +112,39 @@ The model cannot take graded inputs as it stands, which is why the recognizer's 
 ## 5.4 By amount of training data
 
 The models were retrained on the first 300, 1,000 and 3,000 puzzles of every layout, with the number of updates kept
-the same. These runs were scored on the unseen validation puzzles only, with one seed; the relational models read the
-annotation.
+the same. These runs were scored on the unseen validation puzzles only, with one seed. The relational models read the
+annotation. The facet model was also run end to end: the recognizer of Section 4.3 was trained from scratch on the same
+first puzzles of every layout, and the facet checkpoint of that size read its panels (at 6,000 puzzles it is the
+recognizer of Section 5.3, trained on 2,000).
 
-| training puzzles per layout | facet | GNN B | GNN A | object GNN | MLP | ViT 224 | ViT 224, rows built in |
-|---|---|---|---|---|---|---|---|
-| 300 | 90.0 (53.3) | 87.0 (53.0) | 86.1 (50.8) | 29.6 (1.1) | 24.9 (0.5) | 15.6 (0.2) | 14.6 (0.1) |
-| 1,000 | 94.1 (62.7) | 93.9 (64.0) | 93.4 (61.5) | 68.7 (21.9) | 48.1 (7.7) | 18.6 (0.2) | 23.8 (0.5) |
-| 3,000 | 96.1 (66.0) | 96.8 (68.8) | 95.9 (65.3) | 86.5 (49.8) | 64.5 (19.1) | 45.8 (4.5) | 62.0 (13.3) |
-| 6,000 | 97.3 (69.1) | 96.8 (67.9) | 95.0 (62.5) | 90.5 (55.1) | 72.0 (27.5) | 93.4 (64.4) | 92.1 (62.1) |
+| training puzzles per layout | facet | facet, end to end | GNN B | GNN A | object GNN | MLP | ViT 224 | ViT 224, rows built in |
+|---|---|---|---|---|---|---|---|---|
+| 300 | 90.0 (53.3) | 89.8 (53.1) | 87.0 (53.0) | 86.1 (50.8) | 29.6 (1.1) | 24.9 (0.5) | 15.6 (0.2) | 14.6 (0.1) |
+| 1,000 | 94.1 (62.7) | 93.9 (62.4) | 93.9 (64.0) | 93.4 (61.5) | 68.7 (21.9) | 48.1 (7.7) | 18.6 (0.2) | 23.8 (0.5) |
+| 3,000 | 96.1 (66.0) | 95.8 (65.7) | 96.8 (68.8) | 95.9 (65.3) | 86.5 (49.8) | 64.5 (19.1) | 45.8 (4.5) | 62.0 (13.3) |
+| 6,000 | 97.3 (69.1) | 97.1 (68.8) | 96.8 (67.9) | 95.0 (62.5) | 90.5 (55.1) | 72.0 (27.5) | 93.4 (64.4) | 92.1 (62.1) |
 
-**The gap is largest when data is scarce.** From 300 puzzles per layout the facet model answers 90% and the vision
-transformer 16%, barely above the 12.5% of guessing. The transformer needs twenty times the puzzles to pass the facet
-model's score at 300. This is the comparison the assignment asks for, and it is where the improvement over black-box
-vision lies: 4 points at 6,000 puzzles, 74 at 300.
+**Reading the panels costs little at any size.** End to end the facet model loses 0.2 to 0.3 points at every size,
+almost all of it on the in-out grid, the layout the recognizer misreads most. Trained on 300 puzzles per layout the
+recognizer reads all 16 panels of a puzzle right in 90% of puzzles, and on 3,000 in 96%. Where it misreads a panel the
+facet model still answers 78% of those puzzles at 300 and 89% at 3,000.
+
+**The gap is largest when data is scarce.** From 300 puzzles per layout the facet model answers 90% end to end and
+the vision transformer 16%, barely above the 12.5% of guessing. The transformer needs twenty times the puzzles to pass
+the facet model's score at 300. This is the comparison the assignment asks for: 4 points at 6,000 puzzles, 74 at 300.
+
+**The two do not learn from the same labels.** The recognizer is trained on the labelled objects of all 16 panels of
+every training puzzle, the transformer on the answer's index alone. The end-to-end curve removes the annotation at test
+time, not its help in training. The 74 points therefore measure what an object-level representation, together with the
+labels it is trained from, is worth against learning the whole task from the answer; they are not a contest between two
+pixel learners on the same supervision. A transformer first trained to read the same object labels and then on the
+answer would separate the two, and was not run.
 
 **Most of that gap is the representation.** At 300 puzzles the three models on the attribute graph have 86 to 90%
 and the object GNN has 30%, with the same labels as input. The step from a node per object to a node per attribute is
 worth more than 56 points there. The symmetries are worth 1 to 4 points among the three attribute models. On I-RAVEN, then, the
 graph carries the result and the symmetries refine it. Chapter 6 shows where symmetries carry more: on values, and on
 what the training data never showed.
-
-**A caution on the smallest sizes.** The relational models read the annotation here. A fair end-to-end curve would
-need a recognizer trained on as few puzzles, which we did not train; ours saw 2,000 per layout. The end-to-end
-comparison of Section 5.1 holds at 6,000 puzzles.
 
 ## 5.5 The symmetries carry the result, not the framework
 
@@ -157,9 +181,11 @@ facet model's position channel has none of that structure.
 On I-RAVEN-X with rows of 3 and values 0–10 the plain facet model reaches 99.2 (97.0), with 95.0% of Arithmetic values
 exact.
 
-With rows of 10 the picture changes, and we report it without a ranking. The plain model reaches 85.4% matched at
-values 0–50 and generates 15.0% of answers exactly; Arithmetic values are exact in 18.6% of cases. Variants that build
-in more raise this: with column roles, 94.1 (29.2) and 40.5% on Arithmetic, with a fifth of the weights. A torch
+With rows of 10 the picture changes, and we report it without a ranking. The plain model reaches 87.4 ± 1.8% matched at
+values 0–50 over three seeds and generates 18.4 ± 3.0% of answers exactly; Arithmetic values are exact in 20.7 ± 2.2% of
+cases. Variants that build in more raise this: with column roles, 94.2 ± 0.2 (27.6 ± 2.0) and 39.6 ± 1.3% on
+Arithmetic, with a fifth of the weights (36.0 ± 2.1% on Arithmetic on the test range, scored once at the end; Appendix
+D.6). A torch
 attribute GNN B trained for seven times as many epochs without regularisation reaches 97.9 (45.5) and 98.2 (56.5) in
 two seeds, level with the best facet variant. These runs differ in training length and recipe, most have one seed,
 and the baselines' recipe was tuned on I-RAVEN, so they do not support an order of models, and we give none. What they
@@ -181,24 +207,3 @@ memory, and it updates the weights one puzzle at a time, on CPU.
 Grounding takes 10 to 165 ms per puzzle and is done once; an epoch over all of I-RAVEN takes about 14 minutes. The
 torch baselines of the same size train on one GPU in a few gigabytes. Scoring is cheap by comparison: the whole test
 split, with labels and end to end, took 15 minutes and 16 GB.
-
----
-
-## Notes for you (not thesis text)
-
-- **The baselines' test pass was done today** (job 12032179, `core/baselines/test_eval.py`; RESULTS §1). 15
-  checkpoints, each scored once, each after reproducing its validation record exactly. Their test passes are spent,
-  like the facet model's.
-- **Learning curves and by-rule tables are validation numbers.** Only the 6,000-puzzle checkpoints have test numbers.
-  I kept the two apart in the text and said which is which.
-- **"Twenty times the puzzles"**: the ViT passes 90% only at 6,000 per layout (93.4), and is at 45.8 at 3,000. If you
-  want a tighter statement, a run at 4,500 would give it.
-- **The symbolic template's 98.3 is from its own earlier test pass** (RESULTS §1), with exact not defined for it.
-- **5.7 follows the outline's decision** to print no 3×10 ranking (§2 row 17, §6 item 2). If you rerun GNN A, the
-  object GNN and the MLP without regularisation and train a facet model as long, this section can become a table.
-- **Left out:** copy links on I-RAVEN (98.2 on validation, never scored on test), the row fold, the value axis on
-  I-RAVEN, the literature rows. The copy-link number is higher than the plain model's; it has no test pass, and its
-  per-panel gates break the row symmetry (Chapter 6), so I did not use it as the headline.
-- **5.3's explanation of why a misread panel is not fatal** is my reading, not something measured.
-- **5.6's last two sentences** (position rules are set operations; the position channel has none of that structure)
-  are the notes' assessment (§18.6); check you agree before it goes in.

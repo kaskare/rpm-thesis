@@ -178,6 +178,9 @@ are untouched except where marked.
 
     - The predicted gain on Arithmetic is there, and beyond what copy links reached.
     - Progression (+17), Distribute (+12) and Constant (+5) improved too, which was not predicted.
+    - Three seeds (2026-11-22; RESULTS §7): named 87.4 ± 1.8, roles 94.2 ± 0.2 matched; Arithmetic exact 20.7 ± 2.2
+      against 39.6 ± 1.3. The first named run was the weakest: per seed the gain is +6.8 ± 1.6 matched, and of the
+      unpredicted gains only Distribute's holds (+11.6 ± 0.7); Progression is +6.8 ± 8.9, Constant +1.7 ± 3.2.
     - Swapping middle columns or rows changes nothing on the trained model. The named models lose 15–20
       points of matching under the same swaps.
     - With content gates: 96.3% matched, but 43.7% exact (Distribute falls). Still a quarter of the weights.
@@ -196,7 +199,8 @@ are untouched except where marked.
     | row fold + content gates | 93.7 | 89.8 | 29.4 | 61.0 / 60.5 |
 
     - Progression is the fold's own symmetry (one step, the same everywhere), and the fold is best of all
-      models on it.
+      models on it. Three seeds: 97.2 ± 1.7 exact, against 92.8 ± 1.6 for the roles (+4.4 ± 0.9, every seed) and
+      86.0 ± 7.5 for named columns; matched 91.6 ± 0.6, Arithmetic 32.4 ± 4.6 (RESULTS §7).
     - It reads rows in order, so it loses to the roles on Arithmetic, as predicted. Swapping middle columns
       costs it only 0.5 points: the data teaches what the template leaves open.
     - **Trained on one row length, it does not transfer** (54–61% on rows of 5 and 20, only Constant
@@ -285,6 +289,10 @@ are untouched except where marked.
     | attributes (I-RAVEN-X 3×10, column roles) | 600 | **66.3** (16.4) | 64.6 (14.2) | 52.5 (4.1) | 53.0 (3.6) |
     | | 6000 | **94.1** (29.2) | 93.9 (28.6) | 90.5 (17.8) | 88.1 (17.6) |
 
+    Over three seeds (2026-11-22; RESULTS §7) the small-data gains hold: components at 100, 88.0 ± 1.9 against
+    73.8 ± 1.4 (+14.2 ± 1.9); attributes at 600, 66.2 ± 2.7 against 52.7 ± 0.7 (+13.5 ± 2.1), and at 6000,
+    94.2 ± 0.2 against 87.9 ± 1.6 (+6.3 ± 1.7). Labels stay within 1.5 points of the shared model (89.5 ± 2.1, 64.8 ± 2.1).
+
     | value symmetry, value-axis model (same given primitives) | shared across values (10.8k weights) | weights per value (335k) |
     |---|---|---|
     | 100 training puzzles | **99.0** (97.3) | 38.3 (4.0) |
@@ -322,7 +330,7 @@ are untouched except where marked.
       alike. The gradients on the two label vectors come from statistically identical samples and pull them the
       same way; nothing rewards a difference.
     - So the trained labelled models are almost invariant: mirroring or swapping size and colour moves them by
-      0.2–0.5 points. Labels test whether *exact* invariance matters on top of sharing, and it does not, here.
+      0.2–1.1 points (three seeds). Labels test whether *exact* invariance matters on top of sharing, and it does not, here.
 
     **Why separate weights cost accuracy.**
     - Each copy of a rule trains only on its own component (attribute, value). At 100 puzzles per layout each
@@ -581,10 +589,66 @@ are untouched except where marked.
       below 0.0001 in 22 of 24 runs before). So items 43 and 44 are closed: one cause, one change.
     - The ladder of built-in moves now rises at every rung, as counted: 5.0, 59.9, 89.2, 100.0 at 100 puzzles.
     - Six predictions met; one missed by one row (the shared model right on 1 of 303 rows with an unseen first
-      step, the rate of guessing). Not run: sum in these models. Not studied: why the pooled descriptor collapses.
+      step, the rate of guessing). Not studied: why the pooled descriptor collapses.
+
+48. **On sum, the steps change nothing: the cap is where the answer is read** (2026-11-22, 18 runs, prediction written
+    first; `docs/ARITHMETIC.md`, "Sum with the steps"; RESULTS §11).
+    - The three models of item 47 on sum, three seeds, 100 / 600 puzzles: shared 4.0 / 7.6, doubled 3.4 / 5.2, scaled
+      1.2 / 1.6, against ceilings of 7.9, 7.2 and 1.4. Every mean is at or under its ceiling within sampling error.
+    - So the descriptor was the cause on midpoint only. On sum the answer is read from the question row, and nothing
+      measures from it to row 1, where c₁ − b₁ = a₁ shows the zero.
+    - Next, not run: a template that measures across rows. It needs care, since a template that chains offsets has
+      sum's solving function, c₃ = b₃ + (c₁ − b₁) + (a₃ − a₁), in it by construction.
+
+49. **Rules along rows: the prior costs half the accuracy when the matrix is turned** (2026-11-22, no training;
+    RESULTS §3, `jobs/pynl/submit_transpose.sh`).
+    - On transposed I-RAVEN puzzles (rules down the columns, the answer in its place) the facet model, copy links with
+      content gates and the row fold all fall to 45.0–45.1 matched (3.7–4.1 exact), from 95.8–97.4.
+    - RAVEN's rules applied along rows keep 47.7 on the same kind of puzzles, generic row relations 72.5. The models fail
+      as a row-rule solver fails; Distribute Three, whose Latin square survives transposing, keeps 82 exact.
+    - This is the prior's cost off the generator, not its worth in data, which needs rows and columns both as lines.
+
+50. **A data symmetry is worth the data it reuses, as counted: 2× for components, 2–3× for attributes** (2026-11-22/23, 9 runs, prediction written
+    first; RESULTS §7, "The data factor").
+    - Count: one sample per (puzzle, component); separate weights train each component's copy on its own samples only,
+      and the two components have the same distribution. So separate weights at 2N puzzles give each copy what the
+      shared network gets at N. Attributes: size and colour carry the four rules equally, type never Arithmetic, so the
+      factor is 2 on Arithmetic and 2 to 3 overall.
+    - Components, three seeds each: separate weights at 200 puzzles 88.1 ± 0.2 (42.2 exact) against shared at 100
+      88.0 ± 1.9 (42.4). Met to a tenth of a point.
+    - Attributes at 1200 against shared at 600: with Arithmetic 60.8 ± 1.2 against 63.0 ± 2.9 (factor 2, met), without
+      64.0 ± 0.8 against 68.7 ± 2.8 (behind, as allowed). At 1800, 69.8 ± 0.9 against 66.2 ± 2.7 overall: the factor
+      is between 2 and 3 (about 2.5), about 2 on puzzles with Arithmetic and about 3 on the rest. Met at both points.
+    - Sharing buys data and, on components, nothing else. The value shift's factor (above sixty against a group of about
+      fifty) comes with thirty times the weights, so it is not the symmetry's alone; Chapter 6 now says so.
+
+51. **The test pass leaves Chapters 5 to 7 where they were** (2026-11-23, 187 checkpoints, one pass each; RESULTS §14).
+    - Every final checkpoint behind an I-RAVEN-X, twins or components number, scored once on puzzles 8000–9999 (I-RAVEN-X,
+      twins) or the I-RAVEN test split (components). The rule mix is the same as in the unseen range.
+    - The symmetry gains: components at 100 puzzles +15.5 ± 0.9 (unseen +14.2 ± 1.9), attributes at 600 +12.9 ± 3.6
+      (+13.5 ± 2.1), at 6000 +5.2 ± 1.3 (+6.3 ± 1.7). The counted data factor: separate weights at 200 puzzles 88.3 ± 0.6
+      against shared at 100 88.4 ± 1.3; on attributes shared at 600 between separate at 1200 and 1800, about 2.5, 2 on
+      puzzles with Arithmetic and 3 on the rest.
+    - The twins: sum under each ceiling within sampling error, the ladder in the counted order, the shared model still
+      with the steps 20 points under its count at 100 puzzles (59.4 against 80.0).
+    - The largest move against its sampling error: the facet model on sum at 600 puzzles, 31.2 → 24.7 (one run, 2.6
+      standard errors); the sign of its comparison with midpoint holds (2.9 points instead of 7.2). Column roles'
+      Arithmetic on 3×10 drops 3.6 points at every seed, 39.6 ± 1.3 → 36.0 ± 2.1: 1.4 standard errors of the shared
+      puzzle sample, in the direction their choice on those puzzles would leave. Their lead over named columns is
+      +15.1 ± 1.8 on test instead of +18.9 ± 3.4.
+    - Exact in `best.json` is the old scorer for facet I-RAVEN-X runs before 2026-11-08; the pass uses the fixed one.
+
+52. **End to end, the learning curve loses 0.2–0.3 points at every size** (2026-11-23, RESULTS §8). With the recognizer
+    retrained on the same 300, 1000 and 3000 puzzles per layout, the facet model gets 89.8, 93.9 and 95.8 matched,
+    against 90.0, 94.1 and 96.1 from labels; the loss is almost all in the in-out grid. At 300 puzzles the pipeline is
+    74 points above the ViT on the same puzzles (15.1 / 15.6). The supervision still differs: the recognizer is trained
+    on the labelled objects of all 16 panels, the ViT on the answer's index only.
 
 ## Still open
 - Rerun GNN A, the object GNN and the MLP on 3×10 without dropout and decay, and train a facet model as long (item 37).
-- Seeds for the facet runs: most numbers are one run.
+- A black-box baseline given the same object labels as the recognizer (for example a ViT trained on the panel labels
+  first, then on the answer), which would separate supervision from structure in the comparison of item 52.
+- Seeds for the facet runs: most numbers are one run. Chapter 6's small-data comparisons and the 6000 attributes pair
+  now have three seeds, and so do named columns and the row fold on 3×10 (RESULTS §7). The rest is one run.
 - The attribute-level torch GNN pair (with and without symmetries), learning curves and transformed test
   sets (plan E1–E3). The wrong-symmetry controls (E4) are done (item 36).

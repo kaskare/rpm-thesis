@@ -470,6 +470,8 @@ def main():
     ap.add_argument("--check-scale", action="store_true",
                     help="random weights: outputs of puzzles whose values are multiplied and shifted on the ring")
     ap.add_argument("--eval", default=None, help="score this run directory on --iravenx (any value range)")
+    ap.add_argument("--eval-start", type=int, default=6300, help="with --eval: the first puzzle scored (8000: the test "
+                    "range, once per final checkpoint; the summary goes to <run>/test.json)")
     args = ap.parse_args()
 
     import neuralogic
@@ -491,6 +493,9 @@ def main():
         args.find_zero, args.learned_plus = a.get("find_zero", False), a.get("learned_plus", False)
         args.state_next, args.peano = a.get("state_next", False), a.get("peano", False)
         args.scale, args.gate, args.steps = a.get("scale"), a.get("gate", False), a.get("steps", False)
+        args.kernel, args.ring, args.pair = a.get("kernel", args.kernel), a.get("ring", False), a.get("pair", False)
+        if args.eval_start >= 8000 and os.path.exists(os.path.join(args.eval, "test.json")):
+            raise SystemExit(f"{args.eval}: already scored on the test range (test.json)")
         if args.per_value and maxval != maxval_of(a["iravenx"]):
             raise SystemExit(f"{args.eval}: weights per value are tied to values 0..{maxval_of(a['iravenx'])}")
     if args.find_zero and (args.no_plus or args.per_value):
@@ -536,12 +541,21 @@ def main():
         return
     if args.eval:
         model.load(os.path.join(args.eval, "template_best.bin"))
-        data = B.load_iravenx(args.iravenx, 6300, args.n_val)
+        data = B.load_iravenx(args.iravenx, args.eval_start, args.n_val)
         outs = model.test(list(model.build_dataset(Dataset(samples_of(data, "u")))))
         if args.dump:
             json.dump([np.asarray(o, dtype=float).reshape(len(ATTRS), top + 1).argmax(1).tolist() for o in outs],
                       open(args.dump, "w"))
-        report(f"{args.eval} on {os.path.basename(args.iravenx)}", outs, data, rules_of(args.iravenx, 6300, args.n_val), top)
+        rules = rules_of(args.iravenx, args.eval_start, args.n_val)
+        report(f"{args.eval} on {os.path.basename(args.iravenx)}, puzzles {args.eval_start}..", outs, data, rules, top)
+        if args.eval_start >= 8000:
+            matched, exact, ties, allv, hits = score(outs, data, rules, top)
+            n = len(data)
+            best = json.load(open(os.path.join(args.eval, "best.json")))
+            json.dump({"ckpt": args.eval, "epoch": best.get("epoch"), "data": args.iravenx, "start": args.eval_start,
+                       "puzzles": n, "matched": 100 * matched / n, "exact": 100 * exact["all"] / n,
+                       "all_values": 100 * allv / n, "exact_value_per_rule": {r: list(hits[r]) for r in RULES}},
+                      open(os.path.join(args.eval, "test.json"), "w"), indent=1)
         return
 
     t = time.time()

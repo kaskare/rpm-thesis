@@ -19,6 +19,8 @@ Transforms (the answer and candidates are transformed too wherever the transform
   cols23     columns 2 <-> 3 of every row (two middle columns when a row has 4 or more)
   sizecolor  the size and colour values of every object exchanged (I-RAVEN-X: a data symmetry, §22)
   mirror     left-right and up-down layouts mirrored: slots 14 <-> 15 and 16 <-> 17, so the components swap
+  transpose  rows <-> columns of the 3x3 context (rows of 3 only); the answer keeps its place, so the candidates
+             are unchanged. The rules now run down the columns: this prices the prior that rules run along rows
 
 Run in the pynl environment from the repository root, as a job (grounding 1000 puzzles takes ~48 GB). One
 dataset family per call (I-RAVEN and I-RAVEN-X configure the module differently):
@@ -26,6 +28,10 @@ dataset family per call (I-RAVEN and I-RAVEN-X configure the module differently)
     python3 core/pynl/facet_rule_eval.py experiments/facet_iravenx_n10_m50_roles \\
         --iravenx data/iravenx/center_single_shuffle_n_5_maxval_50.json     # rows of another length
     python3 core/pynl/facet_rule_eval.py experiments/facet_lrud_n100 --transform none mirror
+
+The test pass (--test), once per final checkpoint: I-RAVEN-X puzzles 8000.. (the files' test range, never used before
+2026-11-23), I-RAVEN the test split 0.. per constellation. Writes <ckpt>/test.json; refuses a checkpoint that has one.
+    python3 core/pynl/facet_rule_eval.py experiments/facet_iravenx_n10_m50_roles --test --n 2000
 """
 import argparse, ast, collections, json, os, re, sys
 
@@ -49,8 +55,13 @@ def reflect(pz):                    # every value v -> maxval - v (I-RAVEN-X): t
     return [[{**o, **{a: B.N_SHP - o[a] for a in ("type", "size", "color")}} for o in p] for p in pz]
 
 
+def transpose(pz):                  # panel (r, c) of the context <- panel (c, r); (3, 3) is the answer's place
+    assert len(B.COLS) == 3 and B.N_CTX == 8, "transpose needs rows of 3"
+    return [pz[(i % 3) * 3 + i // 3] for i in range(8)] + pz[8:]
+
+
 TRANSFORMS = {"none": lambda pz: pz, "rows12": rows12, "cols12": cols12, "cols23": cols23, "sizecolor": size_color,
-              "mirror": mirror, "reflect": reflect}
+              "mirror": mirror, "reflect": reflect, "transpose": transpose}
 RULES = ("Constant", "Progression", "Distribute_Three", "Arithmetic")
 NUMPOS = ("Number/Position", "Number", "Position")
 
@@ -112,6 +123,8 @@ def main():
     ap.add_argument("--jvm-gb", type=int, default=48)
     ap.add_argument("--iravenx", default=None, help="score on this I-RAVEN-X file instead of the training one")
     ap.add_argument("--layouts", default=None, help="I-RAVEN: score these layouts (comma list) instead of the run's")
+    ap.add_argument("--test", action="store_true", help="score the test range once: I-RAVEN-X puzzles 8000.., I-RAVEN "
+                    "test 0.. per constellation; writes <ckpt>/test.json")
     args = ap.parse_args()
 
     import neuralogic
@@ -123,31 +136,41 @@ def main():
     from neuralogic.nn import Adam, MSE
 
     for ckpt in args.ckpts:
+        if args.test and os.path.exists(os.path.join(ckpt, "test.json")):
+            print(f"\n{ckpt}: already scored on the test range, skipped (test.json)", flush=True)
+            continue
+        if args.test and args.transform != ["none"]:
+            raise SystemExit("--test scores the puzzles as they are (--transform none)")
+        record = {"ckpt": ckpt, "epoch": None, "n": args.n}
         best = json.load(open(os.path.join(ckpt, "best.json")))
         a = best["args"]
         a = ast.literal_eval(a) if isinstance(a, str) else a
         irx = args.iravenx or a.get("iravenx")
         if irx and "," in irx:
             raise SystemExit(f"{ckpt}: trained on several I-RAVEN-X files; pass --iravenx FILE to score one of them")
-        if args.iravenx and a.get("columns", "named") == "named":
+        if (args.iravenx and a.get("columns", "named") == "named"
+                and os.path.realpath(args.iravenx) != os.path.realpath(a.get("iravenx") or "")):
             raise SystemExit(f"{ckpt}: named columns fix the row length; only roles or fold templates transfer")
         if irx:
             first = B.load_iravenx(irx, 0, 1)[0][0]
             B.configure(n_cols=(len(first) - 7) // 3, maxval=int(irx.split("maxval_")[1].split(".")[0]))
-            data = B.load_iravenx(irx, 6300, args.n)
+            start = 8000 if args.test else 6300
+            data = B.load_iravenx(irx, start, args.n)
             raw = B._IRAVENX[irx]
             rules = [(lambda r: ast.literal_eval(r) if isinstance(r, str) else r)(raw[str(i)]["rules"])[0]
-                     for i in range(6300, 6300 + args.n)]
-            where = f"{args.n} unseen puzzles (6300..) of {os.path.basename(irx)}, rows of {len(B.COLS)}"
+                     for i in range(start, start + args.n)]
+            where = (f"{args.n} {'test' if args.test else 'unseen'} puzzles ({start}..) of {os.path.basename(irx)}, "
+                     f"rows of {len(B.COLS)}")
             irules = None
         else:
             cfgs = list(B.POS_MAP) if a["constellation"] == "all" else a["constellation"].split(",")
             cfgs = args.layouts.split(",") if args.layouts else cfgs
             root = a.get("root", "data/I-RAVEN-10000")
-            data = B.load(root, cfgs, "val", 300, args.n)
+            split, start = ("test", 0) if args.test else ("val", 300)
+            data = B.load(root, cfgs, split, start, args.n)
             rules = None
-            irules = [xml_rules(os.path.join(root, c, f"RAVEN_{i}_val.xml")) for c in cfgs for i in range(300, 300 + args.n)]
-            where = f"{args.n} val puzzles (300..) per constellation of {', '.join(c[:12] for c in cfgs)}"
+            irules = [xml_rules(os.path.join(root, c, f"RAVEN_{i}_{split}.xml")) for c in cfgs for i in range(start, start + args.n)]
+            where = f"{args.n} {split} puzzles ({start}..) per constellation of {', '.join(c[:12] for c in cfgs)}"
         cols = a.get("columns", "named")
         copy, roles, fold = bool(a.get("copy_links")), ("tie12" if cols == "tie12" else cols != "named"), cols == "fold"
         B.FOLD = bool(a.get("fold_values"))
@@ -160,6 +183,7 @@ def main():
         model.load(os.path.join(ckpt, "template_best.bin"))
         n_w = sum(np.asarray(v).size for v in model.state_dict()["weights"].values())
         print(f"\n{ckpt}: {n_w} weights, epoch {best['epoch']}, {where}", flush=True)
+        record.update(epoch=best["epoch"], where=where)
 
         for t in args.transform:
             tdata = [(TRANSFORMS[t](pz), y, cfg) for pz, y, cfg in data]
@@ -185,6 +209,10 @@ def main():
                 print(line + "; per constellation: " + "  ".join(f"{c[:12]} {100 * h / m:.1f}" for c, (h, m) in per_cfg.items()),
                       flush=True)
                 iraven_rule_split(per_puzzle, tdata, irules, t)
+                if args.test:
+                    record.update(matched=100 * matched / n, exact=100 * exact["all"] / n, puzzles=n,
+                                  per_constellation={c: 100 * h / m for c, (h, m) in per_cfg.items()})
+                    json.dump(record, open(os.path.join(ckpt, "test.json"), "w"), indent=1)
                 continue
             hits = collections.defaultdict(lambda: [0, 0])             # rule -> [exact values, values]
             by_ar = collections.defaultdict(lambda: [0, 0])            # has Arithmetic? -> [matched, puzzles]
@@ -202,6 +230,11 @@ def main():
             print(line + "; " + ", ".join(f"matched {k} {100 * h / m:.1f}% of {m}" for k, (h, m) in sorted(by_ar.items())))
             print("    exact value: " + " / ".join(f"{r} {100 * hits[r][0] / max(1, hits[r][1]):.1f} (of {hits[r][1]})"
                                                     for r in RULES), flush=True)
+            if args.test:
+                record.update(matched=100 * matched / n, exact=100 * exact["all"] / n, puzzles=n,
+                              matched_by_arithmetic={k: [h, m] for k, (h, m) in by_ar.items()},
+                              exact_value_per_rule={r: [hits[r][0], hits[r][1]] for r in RULES})
+                json.dump(record, open(os.path.join(ckpt, "test.json"), "w"), indent=1)
 
 
 if __name__ == "__main__":

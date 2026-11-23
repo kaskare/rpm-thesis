@@ -13,6 +13,8 @@
 #   CKPT=experiments/facet_all_copy_content sbatch jobs/pynl/submit_facet_e2e.sh
 # The test split is scored once per final checkpoint, with the mapping picked on the unseen split:
 #   SPLIT=test MODES=labels,hard sbatch jobs/pynl/submit_facet_e2e.sh
+# The learning curve end to end: the facet run on N puzzles per layout with the recognizer trained on the same puzzles:
+#   CKPT=experiments/facet_cmp_n300 PREDS=experiments/recognizer/vit64_n300 MODES=labels,hard sbatch jobs/pynl/submit_facet_e2e.sh
 
 export JAVA_HOME=/mnt/appl/software/Java/21.0.8
 export PATH="${JAVA_HOME}/bin:${PATH}"
@@ -24,6 +26,7 @@ cd /home/kassyask/neuro-vector-symbolic-architectures-raven
 CKPT=${CKPT:-experiments/facet_all_w32-64-128_hidden}
 SPLIT=${SPLIT:-unseen}
 MODES=${MODES:-labels,hard,soft}
-echo "node $(hostname), checkpoint ${CKPT}, split ${SPLIT}, passes ${MODES}"
-python3 -u core/pynl/facet_e2e_eval.py ${CKPT} --split ${SPLIT} --modes ${MODES} --jvm-gb 64 2>&1 | grep --line-buffered -v "^WARNING\|SLF4J"
+PREDS=${PREDS:-experiments/recognizer/vit64}
+echo "node $(hostname), checkpoint ${CKPT}, recognizer ${PREDS}, split ${SPLIT}, passes ${MODES}"
+python3 -u core/pynl/facet_e2e_eval.py ${CKPT} --split ${SPLIT} --modes ${MODES} --preds ${PREDS} --jvm-gb 64 2>&1 | grep --line-buffered -v "^WARNING\|SLF4J"
 exit ${PIPESTATUS[0]}

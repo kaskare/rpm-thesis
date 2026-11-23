@@ -1,10 +1,7 @@
 # Chapter 4. Task, data and models (draft, 2026-11-14)
 
-Chapter 3 (theory) is not drafted. This chapter uses two things from it: a template cannot tell apart constants it
-does not name, and a symmetry is a data symmetry, out of support, or conflicting, by what it does to valid puzzles.
-Numbers are from `docs/RESULTS.md`. Notes for you are at the end.
-
----
+This chapter uses two things from Chapter 3: a template cannot tell apart constants it does not name (Section 3.2),
+and a symmetry is a data symmetry, out of support, or conflicting, by what it does to valid puzzles (Section 3.5).
 
 ## 4.1 The task: generate the answer, then match it
 
@@ -43,14 +40,17 @@ RAVEN, is impossible by construction, on any dataset.
 | dataset | puzzles | training | picks the epoch | reported during development | test |
 |---|---|---|---|---|---|
 | I-RAVEN, seven layouts | 10,000 per layout | train 0–5999 per layout | validation 0–299 | validation 300–1299 (7,000 puzzles) | test 0–1999 (14,000 puzzles) |
-| I-RAVEN-X, per row length and range | 10,000 | 0–5999 | 6000–6299 | 6300–7299 (1,000 puzzles) | 8000–9999, not used |
+| I-RAVEN-X, per row length and range | 10,000 | 0–5999 | 6000–6299 | 6300–7299 (1,000 puzzles) | 8000–9999 (2,000 puzzles), scored at the end |
 
 **Protocol.** A model is trained on the training puzzles, or on the first n of them per layout for the learning
 curves. Its checkpoint is the epoch with the best matched score on the selection puzzles. Its score is reported on
 puzzles that played no part in that choice. For I-RAVEN these are 7,000 validation puzzles, which we call *unseen*.
 They were looked at for the whole of the work, so the final I-RAVEN numbers of Chapter 5 come from the test split,
 which every final checkpoint was scored on exactly once, after all choices were fixed. For I-RAVEN-X the unseen
-puzzles are the reported ones and the test range was not used.
+puzzles are the reported ones. At the very end every final checkpoint of Chapters 5 to 7 was also scored once on
+puzzles 8000 to 9999 of its file, and the components ablation on the I-RAVEN test split (Appendix D.6). Those numbers
+agree with the reported ones within sampling error except in one single-run cell, and the text gives the test number
+wherever the two differ by enough to matter.
 
 **Seeds.** Most results are a single run. Where two seeds exist the text gives the mean and the standard deviation;
 for the object-level baselines the two seeds differ by 1 to 2 points, which is the scale against which single-run
@@ -61,33 +61,9 @@ the occupied slots of a grid, and reading a slot from an object's index in that 
 left about a third of the grid puzzles unanswerable; slots are now derived from the bounding boxes. No puzzle occurs in
 two splits. And a model that sees only the eight candidates is at chance on I-RAVEN, where it scores 90–100% on RAVEN.
 
-**The symmetries the data has.** Chapter 6 depends on knowing which transformations of a puzzle the generators
-respect. We measured this on the data and read it off the generators' code. The table gives the share of rule
-instances that still satisfy a rule of the same kind after the transformation, as Constant / Progression / Arithmetic
-/ Distribute.
-
-| transformation | I-RAVEN | I-RAVEN-X, rows of 3 | I-RAVEN-X, rows of 10 |
-|---|---|---|---|
-| rows 1 and 2 exchanged | 100 / 100 / 100 / 100 | 100 / 100 / 100 / 100 | 100 / 100 / 100 / **0** |
-| columns 1 and 2 exchanged | 100 / **0** / 51 / 100 | 100 / **0** / 55 / 100 | 100 / **0** / 50 / **0** |
-| values reflected, v → max − v | 100 / 100 / **0** / 100 | 100 / 100 / **0** / 100 | 100 / 100 / **0** / 100 |
-| matrix transposed | 58 / 3 / 1 / 100 | – | – |
-
-Three readings are used later.
-- *Rows 1 and 2* can be exchanged in I-RAVEN and in I-RAVEN-X with rows of 3: the generator produces the exchanged
-  puzzle as often as the original (with one small exception, a constraint on Arithmetic over colours). With rows of 10 it does not, because a Distribute row is there the first row
-  shifted by one step, and after the exchange no step fits. The answer is still right, though: it is the value the
-  third row lacks. So the exchange is a symmetry of the task and not of the data, and a model without it can learn a
-  rule that holds only on what the generator produces (Section 6.4).
-- *Columns 1 and 2* cannot be exchanged. A Progression row stops being a Progression row. The exchanged puzzle is not
-  wrong, it simply never occurs: the transformation leads out of the data.
-- *Reflecting the values* keeps Constant, Progression and Distribute rows valid, and equally likely, with the
-  reflected answer. A model that cannot see the difference between v and max − v would have to give a puzzle and its
-  reflection the same answer, and they need different ones.
-
-Further symmetries of the generators: the two components of the left-right and up-down layouts follow identical
-distributions; in I-RAVEN-X, size and colour are drawn by the same function; and the order of objects in a panel and
-of the candidates means nothing.
+**The symmetries the data has.** Which transformations of a puzzle the generators respect was measured on the data
+and read off the generators' code. Section 3.5 gives the table and sorts the symmetries used in this thesis into data
+symmetries, symmetries out of the support and conflicting ones.
 
 ## 4.3 Object recognition
 
@@ -98,8 +74,8 @@ from a recognizer that reads the image of one panel.
 **The recognizer** is a vision transformer with the patch embedding and the blocks of our black-box baseline (Section
 4.6): depth 6, width 64, patches of 16 pixels, 325,718 weights. In place of one answer token it has one learned query
 token per position slot, 22 in all, and one head shared by all slots, which says whether the slot holds an object and
-gives a distribution over its type, size and colour. It reads panels one at a time and knows nothing of rows or
-puzzles. It was trained on the panels of 2,000 puzzles per layout, with the epoch picked on the selection puzzles.
+gives a distribution over its type, size and colour. It reads panels one at a time, at 160 × 160 pixels, and knows nothing of rows or puzzles. The 22 query
+tokens join the 100 patch tokens in every block, so they attend to the whole panel throughout. It was trained on the panels of 2,000 puzzles per layout, with the epoch picked on the selection puzzles.
 
 | | panels read entirely right | puzzles with all 16 panels right |
 |---|---|---|
@@ -128,20 +104,39 @@ component each object belongs to, and for each object and each of type, size and
 carries the thermometer code of that value. Facts also say which objects of neighbouring panels sit in the same
 position. Rule names, arithmetic facts and candidates are not among the facts.
 
-**Rules.** With P a panel, C a component, A an attribute, O an object and Rw a row:
+**The forward pass.** We write $x_{o,a}$ for the thermometer code of object $o$'s value of attribute $a$ (type, size
+or colour), $O(p,k)$ for the objects of component $k$ in panel $p$, $c(p)$ for the column of panel $p$, and $N_j(o)$ for
+the objects in the same position as $o$ in the panel of column $j$ of $o$'s row. Capital letters are learned matrices,
+$\ell = 1, 2$ numbers the two facet layers, and the atom of the template that each line computes is in brackets
+(Appendix C prints the rules themselves):
 
-```
-f(O, A)       from the object's own value, its panel's summary, and the facets of the objects in the
-              same position in the other columns of its row (two layers)
-vF(P, C, A)   the component's value in a panel: the mean of its objects' codes and of their facets
-rel(Rw, C, A) a complete row:  vF of its three panels, each through the weights of its column
-ans(C, A)     the question row's two panels, each through its column's weights, and the mean of
-              rel over the two complete rows
+```math
+f^{0}_{o,a} &= M^{0} x_{o,a} && \text{[f0]}\\
+s^{\ell}_{p,k,a} &= \operatorname*{mean}_{o \in O(p,k)} M^{\ell} f^{\ell-1}_{o,a} && \text{[pv1, pv2]}\\
+f^{\ell}_{o,a} &= \operatorname{norm}\Big( S^{\ell} s^{\ell}_{p(o),k(o),a} + T^{\ell} f^{\ell-1}_{o,a} && \text{[f1, f2]}\\
+&\qquad\qquad + \sum_{j \ne c(o)} \operatorname*{mean}_{o' \in N_j(o)} U^{\ell}_{c(o)\,j}\, f^{\ell-1}_{o',a} \Big) \\
+v_{p,k,a} &= \tanh\Big( A \operatorname*{mean}_{o \in O(p,k)} x_{o,a} + \operatorname*{mean}_{o \in O(p,k)} H f^{2}_{o,a} \Big) && \text{[pt, vF]}\\
+r_{\rho,k,a} &= \tanh\big( W_1 v_{p_1,k,a} + W_2 v_{p_2,k,a} + W_3 v_{p_3,k,a} \big) && \text{[rel]}\\
+g_{k,a} &= R\, \tfrac{1}{2} \big( r_{\rho_1,k,a} + r_{\rho_2,k,a} \big) && \text{[ctx]}\\
+q_{k,a} &= \tanh\big( B_1 v_{p_6,k,a} + B_2 v_{p_7,k,a} + B_3\, g_{k,a} \big) && \text{[ans]}\\
+\hat{y}_{a} &= Q\, q_{k^{*},a} + \beta && \text{[oa]}
 ```
 
-The number of objects is treated as a fourth attribute. Positions have a channel of their own with the same row
-structure, on the occupancy of the component. The output for the queried component is the concatenation of `ans` over
-the attributes and the position channel. The layers have widths 32, 64 and 128, and the template has 266,528 weights.
+Here $\operatorname{norm}(z) = z / \lVert z \rVert$, $\rho = (p_1, p_2, p_3)$ is a complete row, $\rho_1$ and $\rho_2$
+are the two complete rows, $p_6$ and $p_7$
+the panels of the question row, and $k^{*}$ the component the sample asks for. The number of objects is a fourth
+attribute, whose $v$ is $A$ applied to the code of the count, without facets. Positions follow the same row structure,
+starting from the occupancy of a component, the sum of its objects' one-hot slots, with matrices of their own. The
+output is a sigmoid over the concatenation of $\hat{y}$ for the four attributes and the positions, and the loss is the
+squared error against the description of the true answer's component. Every matrix is shared over objects, panels,
+components, attributes and the two complete rows; $U$, $W$ and $B$ are indexed by columns, which the template names.
+The template declares a tanh on some of the linear lines above; Appendix A.2 explains why they run without it, and the
+equations show them as they run.
+
+The layers have widths 32, 64 and 128, and the template has 266,528 weights. Figure 4.1 shows the graph
+that the template grounds to on one puzzle.
+
+![**Figure 4.1.** The facet model's graph of the puzzle in Figure 2.1. Each object has one facet node per attribute. A facet reads its panel node and the same attribute of the objects at the same position in the other columns of its row, with one weight per pair of columns (U). A row node reads its three panels with one weight per column (W). Both complete rows reach their mean through the same weight (R), because one rule with the row as a variable writes it, and the answer reads panels (3,1) and (3,2) and that mean (B). Positions are an attribute of each object, never a node. Grounding the template on another puzzle gives another graph.](../figures/facet_graph.png)
 
 **Training.** Adam with learning rate 3·10⁻⁴, one puzzle per update, 80 epochs on the 42,000 training puzzles of all
 seven layouts together. The checkpoint is epoch 55.
@@ -176,7 +171,7 @@ The experiments of Chapters 6 and 7 change one thing at a time. These are the ch
   comparison fair this is run twice: at the same widths, which doubles or triples the weights, and at narrower widths
   that give the same number of weights as the shared model.
 
-**Copy links** (Section 6.4). A direct connection from each context panel's value to the output, opened or closed by
+**Copy links** (Section 6.5). A direct connection from each context panel's value to the output, opened or closed by
 a learned gate. With *per-panel gates* each of the eight panels has its own gate weights, which names the panels and
 gives up the symmetry between rows 1 and 2. With *content gates* a gate is computed from the panel's own value with
 weights shared over the panels of a row, which keeps it.
@@ -184,9 +179,10 @@ weights shared over the panels of a row, which keeps it.
 **Column roles** (rows of 10). The columns of a row are first, middle and last, and the eight middle columns enter
 through one rule with the panel as a variable. The middle columns can then be exchanged, which is the symmetry of
 Arithmetic's operands. This variant has 288k weights against 1,411k for named columns, and is the model on which the
-attribute symmetry is removed in Section 6.1.
+attribute symmetry is removed in Sections 6.2 and 6.3. Section 6.6 measures what the middle
+columns' symmetry buys.
 
-**Two wrong symmetries** (Section 6.5). *Columns tied*: columns 1 and 2 share their weights and enter symmetrically,
+**Two wrong symmetries** (Section 6.7). *Columns tied*: columns 1 and 2 share their weights and enter symmetrically,
 so the model cannot tell (a, b, c) from (b, a, c). *Values folded*: v and max − v get the same input code, so the
 model cannot tell a puzzle from its reflection. Both are exact with random weights.
 
@@ -260,22 +256,3 @@ They show what remains hard once the rules are known, and they are the only mode
 | object GNN | labels | no | no | objects |
 | MLP | labels | no | no | none |
 | ViT | images of the context; labels for the target | no | no | patches |
-
----
-
-## Notes for you (not thesis text)
-
-- **Section 4.2's symmetry table belongs to Chapter 3 in the outline (3.5, 3.7).** I put a short version here because
-  Chapter 3 is not drafted and Chapter 6 cannot be read without it. Move it when Chapter 3 exists.
-- **The rule listing in 4.4 is a paraphrase** of `build_facet_template`'s docstring. The thesis should print the real
-  template, or an excerpt, in an appendix.
-- **"The trainer refuses to run unless it reproduces the facet pipeline's targets"** is the `check_*` arrays of
-  `data_prep/prepare_baseline_data.py`, on the first 20 puzzles of each split.
-- **Not described on purpose:** the row fold, the hub and ordered templates, the CNN, the ViT with a filter per patch,
-  the capacity sweeps beyond one sentence (outline §5, cut).
-- **The value axis is introduced as a test bed in 4.5**, as the outline decided. Its I-RAVEN version (18.0k weights,
-  99.3 matched) is left out; say if you want one sentence on it.
-- **One thing to check in the code before this is final:** the recognizer's input size and whether its query tokens
-  attend to the patches in every block. I described only what its docstring states.
-- **The 62 numbers:** 3 × 10 code bits, 10 bits for the object count, 22 slots (`meta` of
-  `experiments/baselines/data/iraven.npz`).

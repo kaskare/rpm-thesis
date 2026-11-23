@@ -1,12 +1,15 @@
 # Symmetry results
 
 What each built-in symmetry buys, per model and dataset. Selected from `docs/RESULTS.md`, which stays the full
-record (last updated 2026-11-08: facet exact on I-RAVEN-X rescored after a scorer fix, RESULTS notes on the main table).
+record (last updated 2026-11-23: the test pass of every checkpoint below, RESULTS §14; facet exact on I-RAVEN-X was
+rescored after a scorer fix on 2026-11-08, RESULTS notes on the main table).
 
 Cells are matched % (exact %) on unseen puzzles, one seed unless noted. "With" and "without" mean the same model
 with one symmetry built in or taken out, so only that symmetry differs.
 
 **In short.** Built-in symmetry saves training data and weights, removes shortcuts and reaches what training never showed.
+Counted before the runs, the two components are worth exactly a factor of 2 in training puzzles, the order of their group
+(88.1 at 200 puzzles without the symmetry, 88.0 at 100 with it; section 2).
 On puzzles like the training ones the gain shrinks with data: at full data it is gone on I-RAVEN and survives on 3×10, mainly
 for operand order. On what training never showed it stays large at full data: a layout never seen (99.1 vs 13–24) and a rule
 never seen on an attribute (87.7 vs 18–24). Most of the gain comes from weight sharing. For data symmetries, exact invariance
@@ -20,19 +23,19 @@ answer stays right, but the generator may never produce the transformed puzzle (
 
 | symmetry | kind | prior | model, dataset | what it buys | key result |
 |---|---|---|---|---|---|
-| components (left-right, up-down) | data | generator | facet, I-RAVEN L-R + U-D | less data | 100 puzzles: 86.6 vs 74.6 |
-| attributes (size ↔ colour) | data | general | column roles, 3×10 | less data | 600 puzzles: 66.3 vs 53.0 |
+| components (left-right, up-down) | data | generator | facet, I-RAVEN L-R + U-D | less data | 100 puzzles: 88.0 ± 1.9 vs 73.8 ± 1.4 (3 seeds) |
+| attributes (size ↔ colour) | data | general | column roles, 3×10 | less data | 600 puzzles: 66.2 ± 2.7 vs 52.7 ± 0.7 (3 seeds) |
 | value shift | task; not for Arithmetic | general | value axis, 3×10 | less data, fewer weights, unseen values | 100 puzzles: 99.0 vs 38.3 |
-| operand order (middle columns) | task | generator | column roles, 3×10 | accuracy on full data, fewer weights | 94.9 vs 85.4 at equal size |
+| operand order (middle columns) | task | generator | column roles, 3×10 | accuracy on full data, fewer weights | 94.9 (one run) vs 87.4 ± 1.8 (3 seeds) at equal size |
 | rows 1 ↔ 2 | data on I-RAVEN and 3×3, task on 3×10 | general | content gates, 3×10 | removes a shortcut | swapped rows: 94.9 vs ≈60.0 |
-| one step per column (row fold) | task; Progression only | mixed | row fold, 3×10 | fewer weights, Progression | 305k vs 1,411k; Progression 99.2 vs 77.4 |
+| one step per column (row fold) | task; Progression only | mixed | row fold, 3×10 | fewer weights, Progression | 305k vs 1,411k; Progression 97.2 ± 1.7 vs 86.0 ± 7.5 (3 seeds) |
 | components | data | generator | facet, attribute GNNs, I-RAVEN | an unseen layout | up-down never trained: 99.1–99.9 vs 13–24 |
 | attributes | data | general | facet, attribute GNN B, I-RAVEN | an unseen rule on an attribute | size exact 87.7 and 84.1 vs 18–24 |
-| rows 1 ↔ 2 | data on I-RAVEN | general | ViT, I-RAVEN | less data | 3000 puzzles: 70.7 vs 42.7 |
+| rows 1 ↔ 2 | data on I-RAVEN | general | ViT, I-RAVEN | less data | 3000 puzzles: 62.8 ± 8.5 vs 42.4 ± 4.0 (3 seeds) |
 | sum's moves, one operand with the answer (`plus` used by learned rules) | task | general on small numbers (here 0–50, past them) | value axis, rule twins, rows of 3 | less data | sum, 100 puzzles: 98.2 ± 0.8 vs 4.5 ± 2.3 exact (3 seeds) |
 | value scaling, v → kv + s (rows read in units of their first step, or of its power of two) | task | not classified | value axis, rule twins, rows of 3 | unseen first steps and less data, once the row descriptor reads the steps (§6) | midpoint, 100 puzzles, 3 seeds: scaled 100.0 at every seed and doubled 89.2 ± 2.7, vs 59.9 ± 4.5 with the shift alone; rows with a new first step: 101 of 101 (scaled), 64–69 of the 72 the count allows (doubled), vs 0–1 |
 
-*Prior* (added 2026-11-09; thesis outline, Ch 7): **general** is what a person brings to any such test (objects, comparing and sorting values, small-number addition, "the rule repeats"; Chollet 2019 §II.1.3 and §III.1.2 limit `plus` to numbers below about 10); **generator** is read from how RAVEN is built (its layouts, which columns are operands). Attributes count as general because any attribute may carry any rule; the fixed attribute list itself is a generator prior. Rows 1 ↔ 2 is general (the rule repeats), but that rules run along rows only is a generator prior, held by every model here and not priced. Suggestive only: the general priors carry the largest gains, the generator priors smaller ones that mostly vanish at full data.
+*Prior* (added 2026-11-09; thesis outline, Ch 7): **general** is what a person brings to any such test (objects, comparing and sorting values, small-number addition, "the rule repeats"; Chollet 2019 §II.1.3 and §III.1.2 limit `plus` to numbers below about 10); **generator** is read from how RAVEN is built (its layouts, which columns are operands). Attributes count as general because any attribute may carry any rule; the fixed attribute list itself is a generator prior. Rows 1 ↔ 2 is general (the rule repeats), but that rules run along rows only is a generator prior, held by every model here. Its worth in data is not measured; its cost when the generator turns the matrix is: on transposed I-RAVEN puzzles the facet models fall from 95.8–97.4 to 45.0–45.1 matched, near RAVEN's rules applied along rows (47.7; RESULTS §3, 2026-11-22). Suggestive only: the general priors carry the largest gains, the generator priors smaller ones that mostly vanish at full data.
 
 ## 2. Less training data
 
@@ -41,20 +44,34 @@ The gain is largest with few puzzles and shrinks with more, once the model can l
 | symmetry | model, dataset | puzzles | with | without | gain |
 |---|---|---|---|---|---|
 | components | facet, I-RAVEN L-R + U-D | 100 per layout | 86.6 (40.4) | 74.6 (19.6) | **+12.0** |
+| | | 100, 3 seeds | 88.0 ± 1.9 (42.4 ± 3.0) | 73.8 ± 1.4 (19.4 ± 1.4) | **+14.2 ± 1.9** |
 | | | 1000 | 99.3 (95.6) | 98.5 (84.5) | +0.8 |
 | | | 6000 | 99.9 (97.7) | 100.0 (98.8) | −0.1 |
 | attributes | column roles, 3×10, 0–50 | 600 | 66.3 (16.4) | 53.0 (3.6) | **+13.3** |
+| | | 600, 3 seeds | 66.2 ± 2.7 (13.3 ± 2.8) | 52.7 ± 0.7 (3.6 ± 0.0) | **+13.5 ± 2.1** |
 | | | 6000 | 94.1 (29.2) | 88.1 (17.6) | +6.0 |
+| | | 6000, 3 seeds | 94.2 ± 0.2 (27.6 ± 2.0) | 87.9 ± 1.6 (15.4 ± 2.7) | +6.3 ± 1.7 |
 | value shift | value axis, 3×10, 0–50 | 100 | 99.0 (97.3) | 38.3 (4.0) | **+60.7** |
 | | | 600 | 99.9 (99.9) | 92.7 (81.0) | +7.2 |
 | | | 6000 | 100.0 (100.0) | 98.4 (97.4) | +1.6 |
 | rows 1 ↔ 2 | ViT, width 64, I-RAVEN | 1000 per layout | 24.3 (0.4) | 19.2 (0.2) | +5.1 |
 | | | 3000 | 70.7 (24.2) | 42.7 (3.5) | **+28.0** |
+| | | 3000, 3 seeds | 62.8 ± 8.5 (14.9 ± 9.0) | 42.4 ± 4.0 (3.0 ± 0.7) | **+20.4 ± 11.1** |
 | | | 6000 | 89.4 (55.3) | 79.1 (37.6) | +10.3 |
 | rows 1 ↔ 2 | ViT, width 224, I-RAVEN | 1000 | 23.8 (0.5) | 18.6 (0.2) | +5.2 |
 | | | 3000 | 62.0 (13.3) | 45.8 (4.5) | **+16.2** |
 | | | 6000 | 92.1 (62.1) | 93.4 (64.4) | −1.3 |
 
+- **The saving in data, counted in advance** (RESULTS §7, 2026-11-22): separate weights at twice the puzzles
+  should equal the shared model on components (factor 2, the group's order), and at two to three times on attributes
+  (2 on Arithmetic, which type never carries). Components met: separate at 200 puzzles 88.1 ± 0.2 against shared at 100
+  88.0 ± 1.9 (3 seeds each). Attributes at 1200 met: on puzzles with Arithmetic 60.8 ± 1.2 against 63.0 ± 2.9, on the
+  rest 64.0 ± 0.8 against 68.7 ± 2.8 (behind, as allowed); at 1800 69.8 ± 0.9 against 66.2 ± 2.7 overall, so the
+  attributes' factor is between 2 and 3, about 2 on Arithmetic and about 3 on the rest, as counted.
+- **The test pass agrees** (RESULTS §14, 2026-11-23; every checkpoint of this section scored once on puzzles no run had
+  touched). Gains over the matched count: components at 100 puzzles +15.5 ± 0.9, attributes at 600 +12.9 ± 3.6, at 6000
+  +5.2 ± 1.3. The factor: separate at 200 88.3 ± 0.6 against shared at 100 88.4 ± 1.3; on attributes shared at 600 (68.3)
+  between separate at 1200 (65.0) and 1800 (72.3). The value shift: 98.8 (97.5) against 38.2 (4.6) at 100 puzzles.
 - **The ViT learns late.** Up to 1000 puzzles neither version gets past 25, so its gain peaks at 3000. With 14× the weights the
   gain has gone by 6000.
 - **Equal size:** components 266k vs 266k, attributes 288k vs 288k, rows within 4%. Giving the "without" models the same widths instead
@@ -68,11 +85,15 @@ I-RAVEN-X 3×10, values 0–50, 6000 puzzles.
 
 | model | symmetry added | matched (exact) | the rule it targets, exact | weights |
 |---|---|---|---|---|
-| facet, named columns | – | 85.4 (15.0) | Arithmetic 18.6, Progression 77.4 | 1,411k |
-| column roles | operand order | **94.1** (29.2) | Arithmetic **40.5** | 288k |
-| column roles, wide | operand order | **94.9** (28.6) | Arithmetic 36.6 | 1,390k |
-| row fold | one step per column | 92.2 (28.0) | Progression **99.2** | 305k |
+| facet, named columns | – | 87.4 ± 1.8 (18.4 ± 3.0) | Arithmetic 20.7 ± 2.2, Progression 86.0 ± 7.5 | 1,411k |
+| column roles | operand order | **94.2 ± 0.2** (27.6 ± 2.0) | Arithmetic **39.6 ± 1.3** | 288k |
+| column roles, wide (one run) | operand order | **94.9** (28.6) | Arithmetic 36.6 | 1,390k |
+| row fold | one step per column | 91.6 ± 0.6 (26.7 ± 1.1) | Progression **97.2 ± 1.7** | 305k |
 
+Three seeds each, except the wide model (first runs: named 85.4 (15.0), Arithmetic 18.6, Progression 77.4; roles 94.1,
+Arithmetic 40.5; fold 92.2, Progression 99.2; RESULTS §7). The first named run was the weakest, so one run overstated both
+gains: operand order is +6.8 ± 1.6 matched per seed (was +8.7) and doubles Arithmetic exact (+18.9 ± 3.4); the fold's
+Progression is +11.2 ± 9.2 over named columns (was +21.8), but +4.4 ± 0.9 over column roles at every seed.
 Operand order gives the largest gain on full data, and the equal-size row shows it comes from the symmetry and not from
 being smaller. Arithmetic's exact score stays low in every learned model.
 
@@ -85,10 +106,10 @@ generator produces. I-RAVEN-X 3×10, values 0–50, matched:
 |---|---|---|---|
 | copy links, per-panel gates (no row symmetry) | 97.8 | **≈60.0** | – |
 | copy links, content gates | 94.9 | identical | 74.9 |
-| facet, named columns | 85.4 | identical | 70.2 |
-| column roles | 94.1 | identical | identical |
+| facet, named columns (3 seeds) | 87.4 ± 1.8 | identical | 71.1 ± 1.0 |
+| column roles (3 seeds) | 94.2 ± 0.2 | identical | identical |
 | column roles + content gates | 96.3 | identical | identical |
-| row fold | 92.2 | identical | 91.7 |
+| row fold (3 seeds) | 91.6 ± 0.6 | identical | 91.2 ± 0.5 |
 
 - **The shortcut:** per-panel gates learned Distribute by address, because on 3×10 Distribute rows are row 1 shifted by a
   constant step. Swapping rows drops their Distribute puzzles from 98.3 to 39.5. So the table's highest as-is score is
@@ -128,14 +149,16 @@ Constant, whether trained on one row length or on two (rows of 5 and 10).
 
   | data, puzzles | shared, exact symmetry | labels, shared weights |
   |---|---|---|
-  | components, 100 / 1000 | 86.6 / 99.3 | 87.3 / 99.6 |
-  | attributes, 600 / 6000 | 66.3 / 94.1 | 64.6 / 93.9 |
+  | components, 100 (3 seeds) / 1000 | 88.0 ± 1.9 / 99.3 | 89.5 ± 2.1 / 99.6 |
+  | attributes, 600 (3 seeds) / 6000 | 66.2 ± 2.7 / 94.2 ± 0.2 | 64.8 ± 2.1 / 93.9 (1 seed) |
+
+  Per seed, labels minus symmetry: +1.4 ± 0.8 on components, −1.3 ± 0.7 on attributes.
 
   That holds only on puzzles like the training ones. With a rule held out from one attribute, the labelled torch model
   falls to 42.3 where the symmetric one keeps 84.1 (section 5).
 
-- **Full data.** Components fall to −0.1 and value shift to +1.6 at 6000 puzzles. Attributes keep +6.0 on 3×10 (+3.6 at
-  the same widths, where that model was still improving).
+- **Full data.** Components fall to −0.1 and value shift to +1.6 at 6000 puzzles. Attributes keep +6.3 ± 1.7 on 3×10 (3 seeds; +3.6 at
+  the same widths, one seed, where that model was still improving).
 - **The row fold on I-RAVEN.** 95.8 (63.0) vs the plain facet model's 97.3 (69.1): with three panels, per-column weights
   already read each position, so one shared step gains nothing.
 - **Arithmetic.** It is a relation, and it lacks the value shift built in here: one operand can move if the sum moves with

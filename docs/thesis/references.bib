@@ -1,0 +1,779 @@
+% references.bib -- bibliography for the thesis drafts in docs/thesis/ (checked 2026-11-23).
+%
+% One entry per work cited as (Author, Year) in abstract_introduction.md and ch2-ch8, plus four
+% entries the checks recommend adding (marked "suggested"). The comment line above each entry gives
+% its status: CHECKED (details and the cited claim agree with the source), CORRECTED (something in
+% the drafts' reference list or text differs from the source; the entry here is the corrected one),
+% or UNCHECKED (the source could not be read; the reason is given). REFERENCE_CHECKS.md has what was
+% read, where, and the text changes the drafts need.
+%
+% Diacritics are written as LaTeX escapes so the file works with BibTeX and biber alike.
+% Same-author-same-year pairs (Wang 2023, Zhang 2019, Malkinski 2025) get a/b suffixes automatically
+% under an author-year style (natbib or biblatex-authoryear); the drafts' hand-written suffixes then
+% need to follow the style's order.
+
+% ---------------------------------------------------------------------------------------------
+% Raven's matrices: the test and the datasets
+% ---------------------------------------------------------------------------------------------
+
+% UNCHECKED: book, not available online. Cited (Ch1 1.1, Ch2 2.1) for the test's purpose and format.
+@book{raven1938progressive,
+  author    = {Raven, John C.},
+  title     = {Progressive Matrices: A Perceptual Test of Intelligence},
+  publisher = {H. K. Lewis},
+  address   = {London},
+  year      = {1938}
+}
+
+% UNCHECKED (content): paywalled; a free DTIC copy refused automated download. Bibliographic data
+% CHECKED on Crossref. Cited in Ch1 1.1 for the analysis of the rules behind the items.
+@article{carpenter1990what,
+  author  = {Carpenter, Patricia A. and Just, Marcel A. and Shell, Peter},
+  title   = {What One Intelligence Test Measures: A Theoretical Account of the Processing in the
+             {Raven} {Progressive} {Matrices} Test},
+  journal = {Psychological Review},
+  volume  = {97},
+  number  = {3},
+  pages   = {404--431},
+  year    = {1990},
+  doi     = {10.1037/0033-295X.97.3.404}
+}
+
+% CHECKED: PMLR page; arXiv; Section 6 (arXiv p. 8) "a very different problem".
+@inproceedings{barrett2018measuring,
+  author    = {Barrett, David G. T. and Hill, Felix and Santoro, Adam and Morcos, Ari S. and
+               Lillicrap, Timothy},
+  title     = {Measuring Abstract Reasoning in Neural Networks},
+  booktitle = {Proceedings of the 35th International Conference on Machine Learning (ICML)},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {80},
+  pages     = {511--520},
+  year      = {2018},
+  eprint    = {1807.04225},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: Crossref (IEEE) and arXiv. Drafts cite it as Zhang et al. (2019); with CoPINet also
+% in 2019 the two become 2019a / 2019b.
+@inproceedings{zhang2019raven,
+  author    = {Zhang, Chi and Gao, Feng and Jia, Baoxiong and Zhu, Yixin and Zhu, Song-Chun},
+  title     = {{RAVEN}: A Dataset for Relational and Analogical Visual {REasoNing}},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages     = {5312--5322},
+  year      = {2019},
+  doi       = {10.1109/CVPR.2019.00546},
+  eprint    = {1903.02741},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: Crossref (AAAI) and arXiv; introduction (the answer can be inferred without the context).
+@inproceedings{hu2021stratified,
+  author    = {Hu, Sheng and Ma, Yuqing and Liu, Xianglong and Wei, Yanlu and Bai, Shihao},
+  title     = {Stratified Rule-Aware Network for Abstract Visual Reasoning},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  volume    = {35},
+  number    = {2},
+  pages     = {1567--1574},
+  year      = {2021},
+  doi       = {10.1609/aaai.v35i2.16248},
+  eprint    = {2002.06838},
+  archivePrefix = {arXiv}
+}
+
+% CORRECTED (text): read Sections II.B, V and Tables II, V, VI. The 93% for GPT-4 is on I-RAVEN's
+% centre layout, not on I-RAVEN-X (Ch2 2.5). A journal version exists (see note); the drafts cite
+% the 2024 preprint, which is what was read.
+@misc{hersche2024towards,
+  author       = {Hersche, Michael and Camposampiero, Giacomo and Wattenhofer, Roger and
+                  Sebastian, Abu and Rahimi, Abbas},
+  title        = {Towards Learning to Reason: Comparing {LLMs} with Neuro-Symbolic on Arithmetic
+                  Relations in Abstract Reasoning},
+  year         = {2024},
+  eprint       = {2412.05586},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.AI},
+  note         = {Journal version: \emph{Neurosymbolic Artificial Intelligence} 2 (2026),
+                  doi:10.1177/29498732261419316}
+}
+
+% CHECKED: Crossref (IJCAI) and the proceedings PDF, Table 2 (p. 5 of the paper, proceedings
+% pp. 5932--5940). Suggested: the drafts need it for "independent reruns are lower" (Ch2 2.5).
+@inproceedings{malkinski2025airaven,
+  author    = {Ma{\l}ki{\'n}ski, Miko{\l}aj and Ma{\'n}dziuk, Jacek},
+  title     = {{A-I-RAVEN} and {I-RAVEN-Mesh}: Two New Benchmarks for Abstract Visual Reasoning},
+  booktitle = {Proceedings of the Thirty-Fourth International Joint Conference on Artificial
+               Intelligence (IJCAI-25)},
+  pages     = {5932--5940},
+  year      = {2025},
+  doi       = {10.24963/ijcai.2025/660}
+}
+
+% CORRECTED: published in ACM Computing Surveys 57(7), 2025 (the drafts give only the 2022
+% arXiv id). The arXiv v2 does not support the sentence it is cited for in Ch2 2.5 (reruns).
+@article{malkinski2025deep,
+  author  = {Ma{\l}ki{\'n}ski, Miko{\l}aj and Ma{\'n}dziuk, Jacek},
+  title   = {Deep Learning Methods for Abstract Visual Reasoning: A Survey on {Raven's}
+             {Progressive} {Matrices}},
+  journal = {ACM Computing Surveys},
+  volume  = {57},
+  number  = {7},
+  pages   = {166:1--166:36},
+  year    = {2025},
+  doi     = {10.1145/3715093},
+  eprint  = {2201.12382},
+  archivePrefix = {arXiv}
+}
+
+% ---------------------------------------------------------------------------------------------
+% Solvers of Raven's matrices
+% ---------------------------------------------------------------------------------------------
+
+% CHECKED: arXiv, read in full. Preprint only; no peer-reviewed venue found.
+@misc{zhuo2020solving,
+  author       = {Zhuo, Tao and Kankanhalli, Mohan},
+  title        = {Solving {Raven's} {Progressive} {Matrices} with Neural Networks},
+  year         = {2020},
+  eprint       = {2002.01646},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.CV}
+}
+
+% CHECKED: NeurIPS proceedings index (title, authors). Pages and arXiv id not verified, so left out.
+@inproceedings{zhang2019learning,
+  author    = {Zhang, Chi and Jia, Baoxiong and Gao, Feng and Zhu, Yixin and Lu, Hongjing and
+               Zhu, Song-Chun},
+  title     = {Learning Perceptual Inference by Contrasting},
+  booktitle = {Advances in Neural Information Processing Systems 32 (NeurIPS)},
+  year      = {2019}
+}
+
+% CHECKED: arXiv, abstract and Section 3 (shared networks in the scattering transformation).
+% Preprint only.
+@misc{wu2020scattering,
+  author       = {Wu, Yuhuai and Dong, Honghua and Grosse, Roger and Ba, Jimmy},
+  title        = {The Scattering Compositional Learner: Discovering Objects, Attributes,
+                  Relationships in Analogical Reasoning},
+  year         = {2020},
+  eprint       = {2007.04212},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG}
+}
+
+% CHECKED: Crossref (Springer LNCS, ECCV 2020). Claim matches the paper's object-centric Rel-AIR
+% model as summarised in the project's reading list; the paper itself was not re-read.
+@inproceedings{spratley2020closer,
+  author    = {Spratley, Steven and Ehinger, Krista and Miller, Tim},
+  title     = {A Closer Look at Generalisation in {RAVEN}},
+  booktitle = {Computer Vision -- ECCV 2020},
+  series    = {Lecture Notes in Computer Science},
+  pages     = {601--616},
+  publisher = {Springer},
+  year      = {2020},
+  doi       = {10.1007/978-3-030-58583-9_36}
+}
+
+% CHECKED: OpenReview (ICLR 2020). First author is Duo Wang (not Dian Wang of the 2023 papers).
+@inproceedings{wang2020abstract,
+  author    = {Wang, Duo and Jamnik, Mateja and Li{\`o}, Pietro},
+  title     = {Abstract Diagrammatic Reasoning with Multiplex Graph Networks},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2020}
+}
+
+% CHECKED: OpenReview (ICLR 2023 poster). arXiv id not verified, so left out.
+@inproceedings{mondal2023learning,
+  author    = {Mondal, Shanka Subhra and Webb, Taylor Whittington and Cohen, Jonathan D.},
+  title     = {Learning to Reason over Visual Objects},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2023}
+}
+
+% CORRECTED (text): read Sections 3.2-3.3. Rules given, answer generated, nearest candidate by
+% Jensen-Shannon divergence; but trained by a cross-entropy over the eight candidates with rule
+% labels as an auxiliary loss, so it does see the candidates in training (Ch2 2.6).
+@inproceedings{zhang2021abstract,
+  author    = {Zhang, Chi and Jia, Baoxiong and Zhu, Song-Chun and Zhu, Yixin},
+  title     = {Abstract Spatial-Temporal Reasoning via Probabilistic Abduction and Execution},
+  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages     = {9731--9741},
+  year      = {2021},
+  doi       = {10.1109/CVPR46437.2021.00961},
+  eprint    = {2103.14230},
+  archivePrefix = {arXiv}
+}
+
+% CORRECTED (year): the drafts cite "Zhang et al., 2021b" with "(ECCV 2022)". The published
+% version is ECCV 2022; cite it as 2022 (then PrAE becomes plain 2021). Claim as in the project's
+% reading list (read to Section 5); not re-read here.
+@inproceedings{zhang2022learning,
+  author    = {Zhang, Chi and Xie, Sirui and Jia, Baoxiong and Wu, Ying Nian and Zhu, Song-Chun and
+               Zhu, Yixin},
+  title     = {Learning Algebraic Representation for Systematic Generalization in Abstract Reasoning},
+  booktitle = {Computer Vision -- ECCV 2022},
+  series    = {Lecture Notes in Computer Science},
+  pages     = {692--709},
+  publisher = {Springer},
+  year      = {2022},
+  doi       = {10.1007/978-3-031-19842-7_40},
+  eprint    = {2111.12990},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: Crossref (Nature Machine Intelligence).
+@article{hersche2023neuro,
+  author  = {Hersche, Michael and Zeqiri, Mustafa and Benini, Luca and Sebastian, Abu and
+             Rahimi, Abbas},
+  title   = {A Neuro-Vector-Symbolic Architecture for Solving {Raven's} Progressive Matrices},
+  journal = {Nature Machine Intelligence},
+  volume  = {5},
+  number  = {4},
+  pages   = {363--375},
+  year    = {2023},
+  doi     = {10.1038/s42256-023-00630-8}
+}
+
+% CHECKED: Crossref (Springer LNCS, NeSy 2024) and arXiv; read Section 4.1 and Table 2 (trained on
+% the 2x2 layout only, ground-truth attributes; 92.6 is the programmed-then-trained version).
+@inproceedings{camposampiero2024towards,
+  author    = {Camposampiero, Giacomo and Hersche, Michael and Terzi{\'c}, Aleksandar and
+               Wattenhofer, Roger and Sebastian, Abu and Rahimi, Abbas},
+  title     = {Towards Learning Abductive Reasoning Using {VSA} Distributed Representations},
+  booktitle = {Neural-Symbolic Learning and Reasoning (NeSy 2024)},
+  series    = {Lecture Notes in Computer Science},
+  pages     = {370--385},
+  publisher = {Springer},
+  year      = {2024},
+  doi       = {10.1007/978-3-031-71167-1_20},
+  eprint    = {2406.19121},
+  archivePrefix = {arXiv}
+}
+
+% ---------------------------------------------------------------------------------------------
+% Graph and relational models
+% ---------------------------------------------------------------------------------------------
+
+% CHECKED: arXiv. Cited for "relational inductive biases".
+@misc{battaglia2018relational,
+  author       = {Battaglia, Peter W. and Hamrick, Jessica B. and Bapst, Victor and
+                  Sanchez-Gonzalez, Alvaro and Zambaldi, Vinicius and Malinowski, Mateusz and
+                  Tacchetti, Andrea and Raposo, David and Santoro, Adam and Faulkner, Ryan and
+                  Gulcehre, Caglar and Song, Francis and Ballard, Andrew and Gilmer, Justin and
+                  Dahl, George and Vaswani, Ashish and Allen, Kelsey and Nash, Charles and
+                  Langston, Victoria and Dyer, Chris and Heess, Nicolas and Wierstra, Daan and
+                  Kohli, Pushmeet and Botvinick, Matt and Vinyals, Oriol and Li, Yujia and
+                  Pascanu, Razvan},
+  title        = {Relational Inductive Biases, Deep Learning, and Graph Networks},
+  year         = {2018},
+  eprint       = {1806.01261},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG}
+}
+
+% CHECKED: Crossref (Elsevier).
+@article{zhou2020graph,
+  author  = {Zhou, Jie and Cui, Ganqu and Hu, Shengding and Zhang, Zhengyan and Yang, Cheng and
+             Liu, Zhiyuan and Wang, Lifeng and Li, Changcheng and Sun, Maosong},
+  title   = {Graph Neural Networks: A Review of Methods and Applications},
+  journal = {AI Open},
+  volume  = {1},
+  pages   = {57--81},
+  year    = {2020},
+  doi     = {10.1016/j.aiopen.2021.01.001}
+}
+
+% CHECKED: arXiv (journal reference) and OpenAlex; quote in Section 3.2, Example 2 (arXiv p. 12),
+% attention and gating at the end of Section 5.1 (arXiv p. 19).
+@article{sourek2021beyond,
+  author  = {{\v{S}}ourek, Gustav and {\v{Z}}elezn{\'y}, Filip and Ku{\v{z}}elka, Ond{\v{r}}ej},
+  title   = {Beyond Graph Neural Networks with Lifted Relational Neural Networks},
+  journal = {Machine Learning},
+  volume  = {110},
+  number  = {7},
+  pages   = {1695--1738},
+  year    = {2021},
+  doi     = {10.1007/s10994-021-06017-3},
+  eprint  = {2007.06286},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: Crossref (JAIR).
+@article{sourek2018lifted,
+  author  = {{\v{S}}ourek, Gustav and Aschenbrenner, Vojt{\v{e}}ch and {\v{Z}}elezn{\'y}, Filip and
+             Schockaert, Steven and Ku{\v{z}}elka, Ond{\v{r}}ej},
+  title   = {Lifted Relational Neural Networks: Efficient Learning of Latent Relational Structures},
+  journal = {Journal of Artificial Intelligence Research},
+  volume  = {62},
+  pages   = {69--100},
+  year    = {2018},
+  doi     = {10.1613/jair.1.11203}
+}
+
+% ---------------------------------------------------------------------------------------------
+% Symmetry and equivariance
+% ---------------------------------------------------------------------------------------------
+
+% CHECKED: arXiv. Cited for the geometric-deep-learning reading of architectures.
+@misc{bronstein2021geometric,
+  author       = {Bronstein, Michael M. and Bruna, Joan and Cohen, Taco and Veli{\v{c}}kovi{\'c}, Petar},
+  title        = {Geometric Deep Learning: Grids, Groups, Graphs, Geodesics, and Gauges},
+  year         = {2021},
+  eprint       = {2104.13478},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG}
+}
+
+% CHECKED: PMLR page. The claim needs rewording (Ch2 2.4): G-CNNs extend the translation
+% equivariance of CNNs to other groups.
+@inproceedings{cohen2016group,
+  author    = {Cohen, Taco and Welling, Max},
+  title     = {Group Equivariant Convolutional Networks},
+  booktitle = {Proceedings of the 33rd International Conference on Machine Learning (ICML)},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {48},
+  pages     = {2990--2999},
+  year      = {2016},
+  eprint    = {1602.07576},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: NeurIPS proceedings index. Covers sets only; the drafts also cite it for graphs.
+@inproceedings{zaheer2017deep,
+  author    = {Zaheer, Manzil and Kottur, Satwik and Ravanbakhsh, Siamak and P{\'o}czos, Barnab{\'a}s and
+               Salakhutdinov, Ruslan and Smola, Alexander J.},
+  title     = {Deep Sets},
+  booktitle = {Advances in Neural Information Processing Systems 30 (NIPS)},
+  year      = {2017},
+  eprint    = {1703.06114},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: PMLR page; abstract ("equivariant ... iff G explains the symmetries of the network
+% parameters") and Section 2.
+@inproceedings{ravanbakhsh2017equivariance,
+  author    = {Ravanbakhsh, Siamak and Schneider, Jeff and P{\'o}czos, Barnab{\'a}s},
+  title     = {Equivariance Through Parameter-Sharing},
+  booktitle = {Proceedings of the 34th International Conference on Machine Learning (ICML)},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {70},
+  pages     = {2892--2901},
+  year      = {2017},
+  eprint    = {1702.08389},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: PMLR page; abstract (convolution necessary and sufficient, given natural constraints).
+@inproceedings{kondor2018generalization,
+  author    = {Kondor, Risi and Trivedi, Shubhendu},
+  title     = {On the Generalization of Equivariance and Convolution in Neural Networks to the
+               Action of Compact Groups},
+  booktitle = {Proceedings of the 35th International Conference on Machine Learning (ICML)},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {80},
+  pages     = {2747--2755},
+  year      = {2018},
+  eprint    = {1802.03690},
+  archivePrefix = {arXiv}
+}
+
+% CORRECTED (text): read Sections 1-3 and Theorems 1-3. The bound on the generalisation error is
+% up to sqrt(T) smaller, not T (Ch2 2.4); T is the number of transformations.
+@inproceedings{sokolic2017generalization,
+  author    = {Sokoli{\'c}, Jure and Giryes, Raja and Sapiro, Guillermo and Rodrigues, Miguel R. D.},
+  title     = {Generalization Error of Invariant Classifiers},
+  booktitle = {Proceedings of the 20th International Conference on Artificial Intelligence and
+               Statistics (AISTATS)},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {54},
+  pages     = {1094--1103},
+  year      = {2017},
+  eprint    = {1610.04574},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: PMLR page; read Sections 1, 6 (Lemma 6, Theorem 7). Squared loss, invariant input
+% distribution; exact gap for linear least squares. Not a "times the group size" result (Ch3 3.8).
+@inproceedings{elesedy2021provably,
+  author    = {Elesedy, Bryn and Zaidi, Sheheryar},
+  title     = {Provably Strict Generalisation Benefit for Equivariant Models},
+  booktitle = {Proceedings of the 38th International Conference on Machine Learning (ICML)},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {139},
+  pages     = {2959--2969},
+  year      = {2021},
+  eprint    = {2102.10333},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: NeurIPS proceedings index; abstract and contributions (gain by a factor of the group
+% size for invariant kernels on the sphere, finite permutation groups, large enough samples).
+% The arXiv v2 title adds "Invariance and"; the NeurIPS title is the one below.
+@inproceedings{bietti2021sample,
+  author    = {Bietti, Alberto and Venturi, Luca and Bruna, Joan},
+  title     = {On the Sample Complexity of Learning under Geometric Stability},
+  booktitle = {Advances in Neural Information Processing Systems 34 (NeurIPS)},
+  year      = {2021},
+  eprint    = {2106.07148},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: Crossref (Curran) and arXiv; abstract and Theorem 4.1 (p. 5): for a finite group the
+% effective number of samples is multiplied by |G|.
+@inproceedings{tahmasebi2023exact,
+  author    = {Tahmasebi, Behrooz and Jegelka, Stefanie},
+  title     = {The Exact Sample Complexity Gain from Invariances for Kernel Regression},
+  booktitle = {Advances in Neural Information Processing Systems 36 (NeurIPS)},
+  pages     = {55616--55646},
+  year      = {2023},
+  doi       = {10.52202/075280-2427},
+  eprint    = {2303.14269},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: PMLR page; abstract (bound improves by sqrt(n!) for DeepSets). Not a "times the group
+% size" result either (Ch3 3.8).
+@inproceedings{sannai2021improved,
+  author    = {Sannai, Akiyoshi and Imaizumi, Masaaki and Kawano, Makoto},
+  title     = {Improved Generalization Bounds of Group Invariant / Equivariant Deep Networks via
+               Quotient Feature Spaces},
+  booktitle = {Proceedings of the Thirty-Seventh Conference on Uncertainty in Artificial
+               Intelligence (UAI)},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {161},
+  pages     = {771--780},
+  year      = {2021},
+  eprint    = {1910.06552},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: Crossref (Curran) and arXiv; read Sections 1-7 and Appendices A-C. See
+% REFERENCE_CHECKS.md, "Wang et al. (2023)", for what it covers of the ceiling argument.
+@inproceedings{wang2023general,
+  author    = {Wang, Dian and Zhu, Xupeng and Park, Jung Yeon and Jia, Mingxi and Su, Guanang and
+               Platt, Robert and Walters, Robin},
+  title     = {A General Theory of Correct, Incorrect, and Extrinsic Equivariance},
+  booktitle = {Advances in Neural Information Processing Systems 36 (NeurIPS)},
+  pages     = {40006--40029},
+  year      = {2023},
+  doi       = {10.52202/075280-1740},
+  eprint    = {2303.04745},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: OpenReview (ICLR 2023) and reference [58] of wang2023general, which credits it with the
+% three names and with showing that extrinsic equivariance can help. Suggested: the drafts
+% mention it only in a note, but Ch2 2.4 needs it for "can help".
+@inproceedings{wang2023surprising,
+  author    = {Wang, Dian and Park, Jung Yeon and Sortur, Neel and Wong, Lawson L. S. and
+               Walters, Robin and Platt, Robert},
+  title     = {The Surprising Effectiveness of Equivariant Models in Domains with Latent Symmetry},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2023},
+  url       = {https://openreview.net/forum?id=P4MUGRM4Acu}
+}
+
+% CHECKED: Crossref (Curran) and arXiv; abstract.
+@inproceedings{petrache2023approximation,
+  author    = {Petrache, Mircea and Trivedi, Shubhendu},
+  title     = {Approximation-Generalization Trade-offs under (Approximate) Group Equivariance},
+  booktitle = {Advances in Neural Information Processing Systems 36 (NeurIPS)},
+  pages     = {61936--61959},
+  year      = {2023},
+  doi       = {10.52202/075280-2708},
+  eprint    = {2305.17592},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: NeurIPS proceedings index and arXiv; abstract.
+@inproceedings{finzi2021residual,
+  author    = {Finzi, Marc and Benton, Gregory and Wilson, Andrew Gordon},
+  title     = {Residual Pathway Priors for Soft Equivariance Constraints},
+  booktitle = {Advances in Neural Information Processing Systems 34 (NeurIPS)},
+  year      = {2021},
+  eprint    = {2112.01388},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: PMLR page and arXiv; abstract. First author is Rui Wang.
+@inproceedings{wang2022approximately,
+  author    = {Wang, Rui and Walters, Robin and Yu, Rose},
+  title     = {Approximately Equivariant Networks for Imperfectly Symmetric Dynamics},
+  booktitle = {Proceedings of the 39th International Conference on Machine Learning (ICML)},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {162},
+  pages     = {23078--23091},
+  year      = {2022},
+  eprint    = {2201.11969},
+  archivePrefix = {arXiv}
+}
+
+% ---------------------------------------------------------------------------------------------
+% Inductive bias, priors, shortcuts
+% ---------------------------------------------------------------------------------------------
+
+% CHECKED: the author's PDF (CMU); Sections 1-3 (biases are necessary for the inductive leap).
+@techreport{mitchell1980need,
+  author      = {Mitchell, Tom M.},
+  title       = {The Need for Biases in Learning Generalizations},
+  institution = {Rutgers University},
+  number      = {CBM-TR-117},
+  address     = {New Brunswick, NJ},
+  year        = {1980}
+}
+
+% CORRECTED (claim): bibliographic data CHECKED on Crossref, but this paper is about optimisation
+% (search) algorithms. For "no learner beats another" cite wolpert1996lack instead (Ch2 2.4).
+@article{wolpert1997no,
+  author  = {Wolpert, David H. and Macready, William G.},
+  title   = {No Free Lunch Theorems for Optimization},
+  journal = {IEEE Transactions on Evolutionary Computation},
+  volume  = {1},
+  number  = {1},
+  pages   = {67--82},
+  year    = {1997},
+  doi     = {10.1109/4235.585893}
+}
+
+% Suggested replacement for wolpert1997no in Ch2 2.4. Bibliographic data CHECKED on Crossref;
+% content not read (paywalled), so the sentence should stay at the level of the title.
+@article{wolpert1996lack,
+  author  = {Wolpert, David H.},
+  title   = {The Lack of A Priori Distinctions Between Learning Algorithms},
+  journal = {Neural Computation},
+  volume  = {8},
+  number  = {7},
+  pages   = {1341--1390},
+  year    = {1996},
+  doi     = {10.1162/neco.1996.8.7.1341}
+}
+
+% CHECKED: the essay page (dated March 13, 2019), first paragraph.
+@misc{sutton2019bitter,
+  author       = {Sutton, Richard S.},
+  title        = {The Bitter Lesson},
+  year         = {2019},
+  month        = mar,
+  howpublished = {\url{http://www.incompleteideas.net/IncIdeas/BitterLesson.html}},
+  note         = {Essay, 13 March 2019}
+}
+
+% CHECKED: arXiv.
+@misc{marcus2018deep,
+  author       = {Marcus, Gary},
+  title        = {Deep Learning: A Critical Appraisal},
+  year         = {2018},
+  eprint       = {1801.00631},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.AI}
+}
+
+% CHECKED: Crossref (Cambridge) and arXiv. Article number e253.
+@article{lake2017building,
+  author  = {Lake, Brenden M. and Ullman, Tomer D. and Tenenbaum, Joshua B. and Gershman, Samuel J.},
+  title   = {Building Machines That Learn and Think Like People},
+  journal = {Behavioral and Brain Sciences},
+  volume  = {40},
+  pages   = {e253},
+  year    = {2017},
+  doi     = {10.1017/S0140525X16001837}
+}
+
+% CHECKED: arXiv v2; pages 1, 19, 25, 26, 43, 49, 51 read for the quotations.
+@misc{chollet2019measure,
+  author       = {Chollet, Fran{\c{c}}ois},
+  title        = {On the Measure of Intelligence},
+  year         = {2019},
+  eprint       = {1911.01547},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.AI}
+}
+
+% CHECKED: Crossref (Nature) and arXiv.
+@article{geirhos2020shortcut,
+  author  = {Geirhos, Robert and Jacobsen, J{\"o}rn-Henrik and Michaelis, Claudio and Zemel, Richard and
+             Brendel, Wieland and Bethge, Matthias and Wichmann, Felix A.},
+  title   = {Shortcut Learning in Deep Neural Networks},
+  journal = {Nature Machine Intelligence},
+  volume  = {2},
+  number  = {11},
+  pages   = {665--673},
+  year    = {2020},
+  doi     = {10.1038/s42256-020-00257-z}
+}
+
+% CHECKED: OpenReview (ICLR 2020) and arXiv; abstract (algorithmic alignment, sample complexity).
+@inproceedings{xu2020what,
+  author    = {Xu, Keyulu and Li, Jingling and Zhang, Mozhi and Du, Simon S. and
+               Kawarabayashi, Ken-ichi and Jegelka, Stefanie},
+  title     = {What Can Neural Networks Reason About?},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2020},
+  eprint    = {1905.13211},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: OpenReview (ICLR 2021, oral) and arXiv; abstract. "relies on", not "only when".
+@inproceedings{xu2021how,
+  author    = {Xu, Keyulu and Zhang, Mozhi and Li, Jingling and Du, Simon S. and
+               Kawarabayashi, Ken-ichi and Jegelka, Stefanie},
+  title     = {How Neural Networks Extrapolate: From Feedforward to Graph Neural Networks},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2021},
+  eprint    = {2009.11848},
+  archivePrefix = {arXiv}
+}
+
+% ---------------------------------------------------------------------------------------------
+% Arithmetic in networks; values without a zero
+% ---------------------------------------------------------------------------------------------
+
+% CHECKED: NeurIPS proceedings index and arXiv; abstract and the project's reading-list quote.
+@inproceedings{trask2018neural,
+  author    = {Trask, Andrew and Hill, Felix and Reed, Scott E. and Rae, Jack and Dyer, Chris and
+               Blunsom, Phil},
+  title     = {Neural Arithmetic Logic Units},
+  booktitle = {Advances in Neural Information Processing Systems 31 (NeurIPS)},
+  year      = {2018},
+  eprint    = {1808.00508},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: arXiv; abstract. Preprint (also shown at an ICLR 2021 workshop).
+@misc{power2022grokking,
+  author       = {Power, Alethea and Burda, Yuri and Edwards, Harri and Babuschkin, Igor and Misra, Vedant},
+  title        = {Grokking: Generalization Beyond Overfitting on Small Algorithmic Datasets},
+  year         = {2022},
+  eprint       = {2201.02177},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG}
+}
+
+% CHECKED: OpenReview (ICLR 2023) and arXiv; abstract ("convert addition to rotation about a circle").
+@inproceedings{nanda2023progress,
+  author    = {Nanda, Neel and Chan, Lawrence and Lieberum, Tom and Smith, Jess and Steinhardt, Jacob},
+  title     = {Progress Measures for Grokking via Mechanistic Interpretability},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2023},
+  eprint    = {2301.05217},
+  archivePrefix = {arXiv}
+}
+
+% CORRECTED (title): the ICML title reads "Analysis on", not "Analysis of". Read Section 3.1.2 and
+% Theorem 3.4 (p. 8): permutation-equivariant kernel methods, modular addition.
+@inproceedings{mohamadi2024why,
+  author    = {Mohamadi, Mohamad Amin and Li, Zhiyuan and Wu, Lei and Sutherland, Danica J.},
+  title     = {Why Do You Grok? {A} Theoretical Analysis on Grokking Modular Addition},
+  booktitle = {Proceedings of the 41st International Conference on Machine Learning (ICML)},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {235},
+  pages     = {35934--35967},
+  year      = {2024},
+  eprint    = {2407.12332},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: Crossref (Science) for the details; content read from a scanned copy (Table 1 on
+% p. 678; the interval scale on p. 679).
+@article{stevens1946theory,
+  author  = {Stevens, S. S.},
+  title   = {On the Theory of Scales of Measurement},
+  journal = {Science},
+  volume  = {103},
+  number  = {2684},
+  pages   = {677--680},
+  year    = {1946},
+  doi     = {10.1126/science.103.2684.677}
+}
+
+% CORRECTED (claim): the page supports "an affine space is like a vector space that has forgotten
+% its origin" and "points can be subtracted, not added", but not the weights-sum-to-one statement
+% it is cited for in Ch2 2.4. Add gallier2011geometric for that.
+@misc{baez2009torsors,
+  author       = {Baez, John C.},
+  title        = {Torsors Made Easy},
+  year         = {2009},
+  month        = dec,
+  howpublished = {\url{https://math.ucr.edu/home/baez/torsors.html}},
+  note         = {Web page, 27 December 2009}
+}
+
+% Suggested for Ch2 2.4 (barycentres need no origin when the weights sum to one). Lemma 2.2.1 read
+% in the author's course notes of this chapter; the book's page number was not checked.
+@incollection{gallier2011geometric,
+  author    = {Gallier, Jean},
+  title     = {Basics of Affine Geometry},
+  booktitle = {Geometric Methods and Applications: For Computer Science and Engineering},
+  edition   = {2},
+  series    = {Texts in Applied Mathematics},
+  volume    = {38},
+  chapter   = {2},
+  publisher = {Springer},
+  address   = {New York},
+  year      = {2011},
+  doi       = {10.1007/978-1-4419-9961-0_2}
+}
+
+% CHECKED: arXiv (journal reference) and Crossref DOI. Cited in Ch3 3.8 via the project's reading
+% list (Theorem 9.1, Pexider's equation); Section 9 not re-read here.
+@article{reem2017remarks,
+  author  = {Reem, Daniel},
+  title   = {Remarks on the {Cauchy} Functional Equation and Variations of It},
+  journal = {Aequationes Mathematicae},
+  volume  = {91},
+  number  = {2},
+  pages   = {237--264},
+  year    = {2017},
+  doi     = {10.1007/s00010-016-0463-6},
+  eprint  = {1002.3721},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: PMLR page and arXiv (extended version in JMLR 2024); abstract.
+@inproceedings{abbe2023generalization,
+  author    = {Abbe, Emmanuel and Bengio, Samy and Lotfi, Aryo and Rizk, Kevin},
+  title     = {Generalization on the Unseen, Logic Reasoning and Degree Curriculum},
+  booktitle = {Proceedings of the 40th International Conference on Machine Learning (ICML)},
+  series    = {Proceedings of Machine Learning Research},
+  volume    = {202},
+  pages     = {31--60},
+  year      = {2023},
+  eprint    = {2301.13105},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: OpenReview (ICLR 2024) and arXiv; abstract.
+@inproceedings{boixadsera2024when,
+  author    = {Boix-Ads{\`e}ra, Enric and Saremi, Omid and Abbe, Emmanuel and Bengio, Samy and
+               Littwin, Etai and Susskind, Joshua M.},
+  title     = {When Can Transformers Reason with Abstract Symbols?},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2024},
+  eprint    = {2310.09753},
+  archivePrefix = {arXiv}
+}
+
+% ---------------------------------------------------------------------------------------------
+% Cited in appendices.md, E.2 (added 2026-11-23)
+% ---------------------------------------------------------------------------------------------
+
+% CHECKED: the paper's first page ("Published as a conference paper at ICLR 2023") and OpenReview
+% (ICLR 2023, notable top 25%); abstract and Section 3 (large initialisation induces grokking, MNIST).
+@inproceedings{liu2023omnigrok,
+  author    = {Liu, Ziming and Michaud, Eric J. and Tegmark, Max},
+  title     = {Omnigrok: Grokking Beyond Algorithmic Data},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2023},
+  eprint    = {2210.01117},
+  archivePrefix = {arXiv}
+}
+
+% CHECKED: arXiv PDF (Google DeepMind, 5 September 2023); abstract and Sections 1-4 (critical
+% dataset size, ungrokking). A preprint: OpenReview lists it as submitted to ICLR 2024, not accepted.
+@misc{varma2023explaining,
+  author       = {Varma, Vikrant and Shah, Rohin and Kenton, Zachary and Kram{\'a}r, J{\'a}nos and
+                  Kumar, Ramana},
+  title        = {Explaining Grokking through Circuit Efficiency},
+  year         = {2023},
+  eprint       = {2309.02390},
+  archivePrefix = {arXiv},
+  primaryClass = {cs.LG}
+}

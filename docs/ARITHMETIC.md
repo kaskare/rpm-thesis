@@ -1036,10 +1036,65 @@ The failure in "The rule gate" had one cause in both models, and one change remo
   to 0.15 ("Wired in" above); after training it was below 0.0001 in 22 runs. That was not studied.
 - **That the shared model reaches its count at 100 puzzles.** It stays 20 points under (59.9 against 80.0), and the
   steps do not move its total there. The gap is in rows whose first step training had: 277 to 319 of 404 right.
-- **Anything on sum.** The models with the steps were run on midpoint only. That sum stays at its ceiling in them is
-  expected and not measured.
+- **Anything on sum.** See the next section: sum stays at its ceiling in these models.
 - **More than three seeds show.** The scaled result has no spread at all; the others have standard deviations of 0.2
   to 4.5 points.
+
+### Sum with the steps (2026-11-22)
+
+Jobs 12074371–88: the three models with `--steps` on sum, 100 and 600 puzzles, seeds 1 to 3, the epoch picked by exact
+on the selection puzzles (`analysis/twins_seeds.py`).
+
+**Prediction** (written before the runs, RESULTS §11): each model stays at its ceiling, 7.9 / 7.2 / 1.4%. In a sum row
+the step c₁ − b₁ is a₁, so a descriptor that reads the steps can see where zero is in row 1. But the template still
+never measures from the question row to row 1, and the function that solves sum needs that offset, a₃ − a₁.
+
+| sum, exact %, seeds 1 / 2 / 3 | 100 puzzles | 600 puzzles | ceiling |
+|---|---|---|---|
+| shared with the steps | 4.9 / 2.0 / 5.1 (4.0 ± 1.8) | 8.1 / 6.7 / 8.1 (7.6 ± 0.8) | 7.9 |
+| doubled with the steps | 4.3 / 3.0 / 3.0 (3.4 ± 0.8) | 5.9 / 4.5 / 5.1 (5.2 ± 0.7) | 7.2 |
+| scaled with the steps | 1.4 / 1.2 / 1.0 (1.2 ± 0.2) | 2.4 / 1.0 / 1.6 (1.6 ± 0.7) | 1.4 |
+| the same without the steps: shared, doubled, scaled | 4.5, 3.6, 2.0 | 6.2, 4.1, 2.6 | |
+
+- **Met.** Every mean is at or under its ceiling within sampling error (507 rows fix a rate near 7.9 to ±1.2 points,
+  near 1.4 to ±0.5). Three single runs are just above: 8.1 twice (shared, 600) and 2.4 (scaled, 600). The steps move
+  the means by 0.2 to 1.4 points.
+- **What it shows.** On midpoint the cost was in the descriptor; on sum it is not. On sum the cap is where the answer
+  is read, from the question row only. Seeing a₁ inside row 1 does not help without the offset from row 1 to the
+  question row.
+- **What it does not show.** That a template which measures across rows would learn sum. The function that solves
+  it, c₃ = b₃ + (c₁ − b₁) + (a₃ − a₁), chains offsets. A template that chains offsets for every answer has this
+  function in it by construction, so how such a template is built decides what the test means (thesis 8.7, item 1).
+
+## The test pass (2026-11-23)
+
+Every twins checkpoint of this file and the Arithmetic numbers of the facet and value-axis models on 3×10 were scored once
+on puzzles 8000–9999 of their files, which no run had touched (RESULTS §14; 963 midpoint and 1014 sum rows, about twice
+the unseen range's). Exact % on the twin rule, unseen → test, mean of seeds 1–3:
+
+| model | sum 100 | sum 600 | midpoint 100 | midpoint 600 |
+|---|---|---|---|---|
+| shared, shift-equivariant | 4.5 → 3.4 | 6.2 → 5.6 | 60.3 → 57.8 | 91.0 → 89.6 |
+| per value | 4.8 → 4.4 | 19.4 → 17.1 | 5.0 → 5.6 | 18.0 → 19.0 |
+| shared + `plus` used by learned rules | 98.2 → 97.6 | 99.7 → 99.0 | 63.9 → 61.5 | 91.7 → 91.0 |
+| shared with the steps | 4.0 → 3.6 | 7.6 → 6.6 | 59.9 → 59.4 | 98.3 → 97.4 |
+| doubled with the steps | 3.4 → 2.2 | 5.2 → 4.0 | 89.2 → 88.2 | 99.2 → 99.1 |
+| scaled with the steps | 1.2 → 1.3 | 1.6 → 1.2 | 100 → 100 | 100 → 100 |
+
+- Sum stays at or under each ceiling (7.9, 7.2, 1.4) within sampling error; the ladder keeps its counted order; the
+  shared model with the steps stays about 20 points under its count at 100 puzzles. Scaled seed 2 is again the only
+  run without the steps at 100 on midpoint.
+- The facet model (one run each), 600 / 6000 puzzles: sum 31.2 → 24.7 / 65.5 → 64.4, midpoint 24.0 → 21.8 / 76.6 → 78.0.
+  Sum at 600 is the largest move of the whole pass against its sampling error (2.6 standard errors). "A rule's symmetry pays only if
+  the model has it" keeps its sign: on test the facet model leads midpoint with sum by 2.9 points at 600 (7.2 on unseen),
+  and midpoint leads at 6000 by 13.6 (11.1).
+- On I-RAVEN-X 3×10, 0–50, Arithmetic exact, unseen → test, three seeds: column roles 39.6 ± 1.3 → **36.0 ± 2.1** (the
+  first run 40.5 → 33.8), named columns 20.7 ± 2.2 → 20.9 ± 0.5, row fold 32.4 ± 4.6 → 30.5 ± 4.4; one run: copy links
+  26.5 on test, the value axis with `plus` 99.9. Column roles' Arithmetic drops by 3.6 points at
+  every seed. The seeds share the same 507 unseen rows, so that is 1.4 standard errors of the puzzle sample, but it is
+  the direction a choice made with those puzzles in view would leave. Their lead over named columns is 15.1 points on
+  test instead of 18.9, so Arithmetic goes up 1.7 times rather than 1.9.
+- The 0 of 101 unseen first steps was not recounted on test.
 
 ## Plus and minus apart
 
