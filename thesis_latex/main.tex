@@ -1,0 +1,126 @@
+% The thesis, for the ctuthesis class (CTU in Prague), compiled with pdfLaTeX, then BibTeX, then pdfLaTeX twice.
+% On Overleaf: upload this folder (main.tex, chapters/, figures/, references.bib, abstract-*.tex) and set the
+% compiler to pdfLaTeX. The class is in TeX Live; if Overleaf cannot find it, start from Overleaf's ctuthesis
+% template and copy these files into it.
+%
+% The chapters are generated from docs/thesis/*.md by md2tex.py. Once you edit the .tex files, stop regenerating
+% them, or your edits are overwritten.
+%
+% Marked TODO: things only you can fill in. Marked CHECK: drafted by Claude, check before submitting.
+
+\documentclass[twoside]{ctuthesis}
+
+\ctusetup{
+	mainlanguage = english,
+	titlelanguage = english,
+	title-english = {What a Symmetry Is Worth},
+	subtitle-english = {Pricing Inductive Bias in Relational Models of Raven's Matrices},
+	title-czech = {Jakou cenu má symetrie},                                                   % CHECK
+	subtitle-czech = {Oceňování induktivního biasu v~relačních modelech Ravenových matic},    % CHECK
+	doctype = M,                    % CHECK: M = master's (diploma) thesis in ctuthesis
+	faculty = F3,                   % Faculty of Electrical Engineering
+	department-english = {Department of Computer Science},                                    % CHECK
+	department-czech = {Katedra počítačů},                                                    % CHECK
+	fieldofstudy-english = {TODO: your study programme},
+	fieldofstudy-czech = {TODO: váš studijní program},
+	author = {TODO: your name},
+	supervisor = {Gustav Šír},      % TODO: add his academic titles
+	keywords-english = {Raven's Progressive Matrices, inductive bias, symmetry, equivariance, lifted relational
+		neural networks, graph neural networks, neuro-symbolic learning, sample efficiency},
+	keywords-czech = {Ravenovy progresivní matice, induktivní bias, symetrie, ekvivariance, liftované relační
+		neuronové sítě, grafové neuronové sítě, neurosymbolické učení, efektivita vzhledem k~datům},  % CHECK
+	day = 1, month = 1, year = 2027,  % TODO: the submission date
+	% specification-file = {assignment.pdf},  % TODO: the assignment PDF from KOS; put the file next to main.tex
+	% front-specification = true,
+}
+\ctuprocess
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs,array,tabularx,xltabular}
+\usepackage{fvextra}
+\usepackage[round]{natbib}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+% Unicode characters used in the text, so the Markdown sources could keep them.
+\DeclareUnicodeCharacter{00B1}{\ensuremath{\pm}}
+\DeclareUnicodeCharacter{00B2}{\textsuperscript{2}}
+\DeclareUnicodeCharacter{00B3}{\textsuperscript{3}}
+\DeclareUnicodeCharacter{00B7}{\ensuremath{\cdot}}
+\DeclareUnicodeCharacter{00B9}{\textsuperscript{1}}
+\DeclareUnicodeCharacter{00BD}{\ensuremath{\tfrac{1}{2}}}
+\DeclareUnicodeCharacter{00D7}{\ensuremath{\times}}
+\DeclareUnicodeCharacter{02B2}{\textsuperscript{j}}
+\DeclareUnicodeCharacter{03B2}{\ensuremath{\beta}}
+\DeclareUnicodeCharacter{03B8}{\ensuremath{\theta}}
+\DeclareUnicodeCharacter{03C3}{\ensuremath{\sigma}}
+\DeclareUnicodeCharacter{2070}{\textsuperscript{0}}
+\DeclareUnicodeCharacter{2074}{\textsuperscript{4}}
+\DeclareUnicodeCharacter{2075}{\textsuperscript{5}}
+\DeclareUnicodeCharacter{2076}{\textsuperscript{6}}
+\DeclareUnicodeCharacter{2077}{\textsuperscript{7}}
+\DeclareUnicodeCharacter{2078}{\textsuperscript{8}}
+\DeclareUnicodeCharacter{2079}{\textsuperscript{9}}
+\DeclareUnicodeCharacter{207B}{\textsuperscript{\ensuremath{-}}}
+\DeclareUnicodeCharacter{207F}{\textsuperscript{n}}
+\DeclareUnicodeCharacter{2080}{\textsubscript{0}}
+\DeclareUnicodeCharacter{2081}{\textsubscript{1}}
+\DeclareUnicodeCharacter{2082}{\textsubscript{2}}
+\DeclareUnicodeCharacter{2083}{\textsubscript{3}}
+\DeclareUnicodeCharacter{2192}{\ensuremath{\rightarrow}}
+\DeclareUnicodeCharacter{2194}{\ensuremath{\leftrightarrow}}
+\DeclareUnicodeCharacter{220E}{\ensuremath{\blacksquare}}
+\DeclareUnicodeCharacter{2212}{\ensuremath{-}}
+\DeclareUnicodeCharacter{2218}{\ensuremath{\circ}}
+\DeclareUnicodeCharacter{221A}{\ensuremath{\surd}}
+\DeclareUnicodeCharacter{2248}{\ensuremath{\approx}}
+\DeclareUnicodeCharacter{2260}{\ensuremath{\neq}}
+\DeclareUnicodeCharacter{2264}{\ensuremath{\leq}}
+\DeclareUnicodeCharacter{2265}{\ensuremath{\geq}}
+\DeclareUnicodeCharacter{2299}{\ensuremath{\odot}}
+
+\begin{document}
+
+\begin{abstract-english}
+\input{abstract-english}
+\end{abstract-english}
+
+\begin{abstract-czech}
+\input{abstract-czech}
+\end{abstract-czech}
+
+\begin{thanks}
+TODO: your acknowledgements.
+\end{thanks}
+
+\begin{declaration}
+% CHECK against FEL's current rules before signing. The usual ČVUT wording (in Czech):
+%   Prohlašuji, že jsem předloženou práci vypracoval(a) samostatně a že jsem uvedl(a) veškeré použité informační
+%   zdroje v souladu s Metodickým pokynem o dodržování etických principů při přípravě vysokoškolských závěrečných
+%   prací.
+% CHECK also whether the current ČVUT guideline asks you to state how AI tools were used (see OPEN_ITEMS.md).
+I declare that the presented work was developed independently and that I have listed all sources of information
+used within it in accordance with the methodical instructions for observing the ethical principles in the
+preparation of university theses.
+
+Prague, \ctufield{day}.~\monthinlanguage{title}~\ctufield{year}
+\end{declaration}
+
+\maketitle
+
+\include{chapters/ch1}
+\include{chapters/ch2}
+\include{chapters/ch3}
+\include{chapters/ch4}
+\include{chapters/ch5}
+\include{chapters/ch6}
+\include{chapters/ch7}
+\include{chapters/ch8}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\appendix
+\include{chapters/appendices}
+
+\end{document}
