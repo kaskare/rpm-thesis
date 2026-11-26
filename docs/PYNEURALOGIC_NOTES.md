@@ -1036,7 +1036,10 @@ I-RAVEN by layout, matched %, seed 0 (seed 1 within 3 points, except the MLP on 
 ### 23.3 Regularization
 Seed 0, at the facet model's weight count (`submit_regularized.sh`, job 11913187, 40 runs).
 - **Every run:** LayerNorm after each hidden layer of the MLP, cosine learning rate after 5 warm-up epochs,
-  gradient norm clipped at 1.
+  gradient norm clipped at 1. *(Note, 2026-11-24: from 2026-11-02 to 2026-11-23 the cosine schedule had a bug, the
+  step count it read was overwritten by each batch's loss, so after warm-up the rate was full and zero in turn. The
+  runs of this section and of §23.4 to §27 predate it and decayed as meant; 8 later ViT runs had it and were rerun
+  (FINDINGS 53). `--schedule alternating` reproduces it. Fixed in `train_baseline.py`.)*
 - **Grid:** dropout 0 / 0.1 / 0.3 × weight decay 0 / 0.05 / 0.5 (AdamW, weight matrices only).
 - **Extra runs at dropout 0.1, weight decay 0.05:** GNN message dropout 0.2; row-swap augmentation, I-RAVEN
   only.

@@ -490,8 +490,8 @@ except for values 0–100 and 0–1000, which can rise by at most 0.4 and 0.1.
 | attribute GNN B, relative labels (symmetric) | 267k / 1,599k | 96.8 (67.9) | – | 85.8 (3.5) | – | – |
 | **Black-box vision, end to end** | | | | | | |
 | ViT over the matrix as one image, width 64 | 335k / 335k / 428k | 79.1 (37.6) | 35.4 (2.6) | 52.9 (0.0) | – | – |
-| ViT, width 224 | 3,753k / 3,753k / 4,079k | 93.4 (64.4) | 47.5 (5.6) | 43.1 (0.4) | – | – |
-| ViT, rows 1 and 2 built in, width 224 | 3,709k / 3,709k / 3,919k | 92.1 (62.1) | 44.0 (5.6) | 40.1 (0.0) | – | – |
+| ViT, width 224 | 3,753k / 3,753k / 4,079k | 93.4 (64.4) | 47.5 (5.6) | 45.3 (0.2) | – | – |
+| ViT, rows 1 and 2 built in, width 224 | 3,709k / 3,709k / 3,919k | 92.1 (62.1) | 44.0 (5.6) | 46.0 (0.1) | – | – |
 | **Literature (reported, other protocols)** | | | | | | |
 | ARLC, learned (trains on 2×2 only) | | 92.6 | 98.4 | 95.0 | 95.0 | 90.6 |
 | ARLC, programmed | | – | 97.2 | 100 | 100 | 99.7 |
@@ -556,8 +556,8 @@ in" that this holds by construction.
 | object GNN, regularized (seed 0) | 84.0 | 52.7 | 71.6 | 85.0 |
 | MLP, regularized (seed 0) | 84.4 | 47.7 | 63.9 | 83.5 |
 | ViT, width 64 | 52.9 | 38.5 | 47.3 | – |
-| ViT, width 224 | 43.1 | 37.9 | 44.4 | – |
-| ViT, rows 1 and 2 built in, width 224 | 40.1 | identical | 39.9 | – |
+| ViT, width 224 | 45.3 | 39.2 | 45.6 | – |
+| ViT, rows 1 and 2 built in, width 224 | 46.0 | 45.9 (built in; one puzzle of 1,000 differs) | 46.0 | – |
 
 On I-RAVEN, where these are data symmetries, the models that lack them barely move: attribute GNN A 95.0 as is, 95.0
 with rows swapped and 95.0 mirrored; the regularized object GNN (seed 0) 91.3, 91.3 and 91.1; the regularized MLP
@@ -905,6 +905,7 @@ between the facet family and the torch baselines are not like for like (FINDINGS
 | Torch baselines (D.1) | `data_prep/prepare_baseline_data.py`, `data_prep/prepare_baseline_images.py`, `data_prep/render_iravenx.py`; `core/baselines/train_baseline.py`; table `analysis/summarize_baselines.py` | `jobs/baselines/submit_baselines.sh`, `submit_sweep.sh`, `submit_regularized.sh`, `submit_final.sh`, `submit_attr_gnn.sh`, `submit_vit.sh`, `submit_iravenx_vit.sh` |
 | The test pass of Chapters 5 to 7 (D.6) | `facet_rule_eval.py --test`, `value_axis.py --eval --eval-start 8000`; summary `analysis/test_pass_summary.py` | `jobs/pynl/submit_test_pass.sh` (lists in `experiments/test_pass/`) |
 | The learning curve end to end (Section 5.4) | `train_vit_recognizer.py --per-layout N`; `facet_e2e_eval.py` | `jobs/frontend/submit_recognizer.sh` (`PER_LAYOUT`), then `jobs/pynl/submit_facet_e2e.sh` (`CKPT`, `PREDS`) |
+| The recognizer with a transformer (Section 5.4) | `train_baseline.py --arch rec-tf --recognizer DIR`, `--finetune` | `jobs/baselines/submit_rec_tf.sh` (job 12081101) |
 | The baselines' one test pass (D.2) | `core/baselines/test_eval.py`; test arrays from `prepare_baseline_data.py --test` | `jobs/baselines/submit_test_once.sh` (job 12032179) |
 | Symbolic models and reference solvers | `core/pynl/pynl_symbolic.py`, `rpm_symbolic.py`, `rpm_reference_solvers.py`, `pynl_symbolic_e2e.py` | `jobs/pynl/submit_symbolic.sh`, `submit_symbolic_e2e.sh`, `submit_symbolic_extra.sh` |
 | ResNet-18 perception for the symbolic models end to end | `core/frontend/train_frontend.py`, `core/pynl/pixel_pipeline.py` | `jobs/pynl/submit_pixels.sh` |
@@ -922,6 +923,14 @@ between the facet family and the torch baselines are not like for like (FINDINGS
 - **Seeds.** The early PyNeuraLogic runs were not seeded, and for the single runs of the ablation table (D.4) the seed was
   not recorded. A rerun of such a run gives a number within the spread of its seeds, not the same digits. Runs made
   since `--seed` was added, and the torch baselines, carry a recorded seed.
+- **The torch baselines' schedule.** From 2 to 23 November 2026, after gradient accumulation (`--accum`) was added,
+  `train_baseline.py` overwrote the step count that its cosine schedule read with the loss of each batch, so after
+  warm-up the learning rate alternated between its peak and zero and never decayed. Eight runs were trained with the
+  cosine schedule in that time (their `best.json` has an `accum` key): the ViT at width 224 and its row-symmetric
+  version on 3×10, the two finer-grid ViTs, and seeds 1 and 2 of the ViT with and without rows built in at 3,000
+  puzzles. They were rerun with the fix, every one scored 2 to 11 points higher, and the tables give the reruns.
+  `--schedule alternating` reproduces the bug step for step. The runs made before
+  2 November decayed as the text describes; 99 of them were rerun with the fixed trainer and reproduced.
 - **Checkpoints.** A facet checkpoint is `template_best.bin` with `best.json`; the template is rebuilt from the arguments
   stored in `best.json`, and `facet_rule_eval.py` rescores any I-RAVEN-X checkpoint that way. A torch checkpoint is
   `model_best.pt` with `best.json`.

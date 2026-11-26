@@ -41,13 +41,24 @@ answer's). Candidates are never seen in training.
   cnn: the ordinary convolutional reference, for the question of what translation symmetry buys. A small ResNet in the
        usual RPM setup: the context panels stacked as channels, four stages of two residual blocks (widths H, 2H, 4H,
        8H, overall stride 16), global average pooling, the component asked for, one hidden layer.
+  rec-tf: the facet model's perception with a black-box reasoner, the control for supervision (RESULTS §8, 2026-11-23).
+       The ViT slot recognizer of the facet model end to end (--recognizer, core/frontend/train_vit_recognizer.py),
+       trained on the labelled objects of all 16 panels of the same training puzzles, reads each of the eight context
+       panels at 160 px; its 22 final slot states per panel, projected to width H and given a learned embedding of the
+       panel's place, go with the component token into the vit's plain pre-norm blocks (depth 6), whose output is the
+       answer's facet code. So it gets the facet model's supervision and perception and differs only in the reasoner.
+       Frozen recognizer by default (its slot states computed once); --finetune trains it too, keeping its label loss
+       on the context panels (--aux, the recognizer's own loss on the same XML labels). --width is required.
   H is the width whose weight count is closest to the facet model's (meta "budget"); vit: a multiple of 32.
 
 Regularization, all off by default (the runs before 2026-10-28 used none): --norm puts a LayerNorm after every
 hidden layer of the MLP (the GNN has one per layer already); --dropout drops hidden units (MLP: after every
 hidden layer; GNN: the encoded nodes and every update); --drop-edge drops GNN messages; --wd is decoupled
 weight decay (AdamW) on the weight matrices; --schedule cosine decays the learning rate to 0 after --warmup
-epochs; --clip bounds the gradient norm; --augment rows swaps context rows 1 and 2 of half the training
+epochs (fixed 2026-11-23: from 2026-11-02, when --accum came in, the step count it read was overwritten by each batch's
+loss, so after warm-up the rate was full and zero in turn, never decaying; --schedule alternating reproduces that. Only
+runs whose best.json has "schedule": "cosine" and an "accum" key ran it, 8 in all; the earlier runs decayed as meant,
+and their reruns with the fix reproduce them); --clip bounds the gradient norm; --augment rows swaps context rows 1 and 2 of half the training
 samples. That swap keeps every I-RAVEN rule but breaks Distribute on I-RAVEN-X 3x10 (notes section 22.2),
 so it is refused there. --tag names the run directory.
 
@@ -66,7 +77,7 @@ Data: data_prep/prepare_baseline_data.py. Environment: nvsa (Python 3.7, torch 1
 repository root:
     python core/baselines/train_baseline.py --data iraven --arch gnn --seed 0
 """
-import argparse, copy, json, os, time
+import argparse, copy, json, os, sys, time
 
 import numpy as np
 import torch
@@ -161,6 +172,20 @@ class Data:
             perm[:2 * n] = torch.cat([perm[n:2 * n], perm[:n]])
             im = torch.where(swap[:, None, None, None], im[:, perm], im)
         return 1 - im.float() / 255, k
+
+    def rec_panels(self, idx):
+        """rec-tf: the context panels [B, C, s, s] as the recognizer reads them (raw / 255: paper 1, ink 0)."""
+        return self.img[torch.as_tensor(idx, device=self.img.device)].float() / 255
+
+    def rec_labels(self, idx):
+        """rec-tf: the context panels' object labels in the recognizer's format, [B, C, 22, 4] (occupied, type, size,
+        colour; -1 where empty), from the same XML values (identical to experiments/recognizer/data's labels)."""
+        v = self.vals[torch.as_tensor(idx, device=self.vals.device), :self.m["n_ctx"]]          # [B, C, M, 4]
+        lab = torch.full(v.shape[:2] + (self.m["n_pos"], 4), -1, dtype=torch.long, device=v.device)
+        lab[..., 0] = 0
+        b, p, o = torch.nonzero(v[..., 0] >= 0, as_tuple=True)
+        lab[b, p, v[b, p, o, 0]] = torch.cat([torch.ones_like(b)[:, None], v[b, p, o, 1:]], 1)
+        return lab
 
     def gnn_input(self, idx, k, swap=None):
         """Nodes [B, n_ctx * M + 1, d] (the query node last) and their mask."""
@@ -393,6 +418,64 @@ class SymViT(nn.Module):
         return self.head(self.norm(self.blocks(x)[:, -1]))
 
 
+class RecTF(nn.Module):
+    """rec-tf: the facet model's perception with a black-box reasoner (see the module docstring). rec is a trained
+    SlotViT (core/frontend/train_vit_recognizer.py); its 22 slot states per context panel go, projected to width h and
+    with a learned embedding of the panel's place, into plain pre-norm blocks with one query token per component."""
+
+    def __init__(self, rec, h, d_out, n_ctx, depth=6, dropout=0.0, finetune=False):
+        super().__init__()
+        self.rec, self.finetune = rec, finetune
+        for p in rec.parameters():
+            p.requires_grad_(finetune)
+        self.proj = nn.Linear(rec.norm.normalized_shape[0], h)
+        self.panel = nn.Parameter(torch.zeros(1, n_ctx, 1, h))
+        self.query = nn.Parameter(torch.zeros(2, h))
+        nn.init.trunc_normal_(self.panel, std=0.02)
+        nn.init.trunc_normal_(self.query, std=0.02)
+        self.blocks = vit_blocks(h, depth, dropout)
+        self.norm = nn.LayerNorm(h)
+        self.head = nn.Linear(h, d_out)
+
+    def slots(self, panels):
+        """[B, C, s, s] -> the recognizer's final slot states [B, C, 22, h_rec] (what its head reads)."""
+        B_, C = panels.shape[:2]
+        r = self.rec
+        x = r.embed(panels.flatten(0, 1)[:, None]).flatten(2).transpose(1, 2) + r.pos
+        n_slots = r.slot.shape[1]
+        x = torch.cat([x, r.slot.expand(len(x), -1, -1)], 1)
+        return r.norm(r.blocks(x)[:, -n_slots:]).view(B_, C, n_slots, -1)
+
+    def reason(self, s, k):
+        x = self.proj(s) + self.panel                                                    # [B, C, 22, h]
+        x = torch.cat([x.flatten(1, 2), self.query[k][:, None]], 1)
+        return self.head(self.norm(self.blocks(x)[:, -1]))
+
+    def forward(self, inp, k):
+        """inp: the context panels (finetune) or their precomputed slot states (frozen recognizer)."""
+        return self.reason(self.slots(inp) if self.finetune else inp.float(), k)
+
+
+def load_recognizer(run_dir, dev):
+    """The trained SlotViT of run_dir (model_best.pt, best.json), on dev."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend"))
+    import train_vit_recognizer as R
+    a = json.load(open(os.path.join(run_dir, "best.json")))["args"]
+    rec = R.SlotViT(a["width"], a["depth"], patch=a["patch"]).to(dev)
+    rec.load_state_dict(torch.load(os.path.join(run_dir, "model_best.pt"), map_location=dev))
+    return rec, R
+
+
+@torch.no_grad()
+def precompute_slots(model, data, bs=256):
+    """Frozen recognizer: every context panel's slot states once, kept as float16 [N, C, 22, h_rec] on the device;
+    the images are then dropped."""
+    model.rec.eval()
+    out = [model.slots(data.rec_panels(np.arange(s, min(s + bs, len(data.y))))).half()
+           for s in range(0, len(data.y), bs)]
+    data.slots, data.img = torch.cat(out), None
+
+
 class ResBlock(nn.Module):
     def __init__(self, c_in, c_out, stride=1):
         super().__init__()
@@ -429,7 +512,8 @@ def n_weights(model):
 
 
 IMAGES = ("vit", "vit-sym", "cnn")
-ARCHS = ("mlp", "gnn", "attr-abs", "attr-rel") + IMAGES
+RECOG = ("rec-tf",)                                                                     # read 160 px panels, built apart
+ARCHS = ("mlp", "gnn", "attr-abs", "attr-rel") + IMAGES + RECOG
 
 
 def dims(arch, meta):
@@ -437,7 +521,7 @@ def dims(arch, meta):
     for vit: (None, output width)."""
     T, S, n, P = meta["therm"], len(meta["slots"]), meta["n_cols"], meta["n_pos"]
     d_out = 4 * T + P
-    if arch in IMAGES:
+    if arch in IMAGES or arch in RECOG:
         return None, d_out
     if arch.startswith("attr"):
         extra = arch == "attr-abs"
@@ -498,6 +582,9 @@ def model_input(arch, data, idx, k, swap=None):
         return data.vit_input(idx, k, swap)
     if arch in ("vit-sym", "cnn"):
         return data.vit_panels(idx, k, swap)
+    if arch == "rec-tf":
+        assert swap is None, "rec-tf: no augmentation"
+        return (data.rec_panels(idx) if data.img is not None else data.slots[torch.as_tensor(idx, device=data.slots.device)]), k
     return data.attr_input(idx, k, swap, absolute=arch == "attr-abs")
 
 
@@ -704,7 +791,7 @@ def symmetry_check(model, arch, data, meta, n_puzzles=32):
 
 def images(data_dir, name, arch, z, size=80):
     """vit: the context images per split, checked against the arrays' answer indices; other archs: none."""
-    if arch not in IMAGES:
+    if arch not in IMAGES and arch not in RECOG:
         return {}
     zi = np.load(os.path.join(data_dir, f"{name}_images{size if size != 80 else ''}.npz"))
     for s in ("train", "sel", "unseen"):
@@ -751,7 +838,8 @@ def main():
     ap.add_argument("--drop-edge", type=float, default=0.0, help="GNN: share of messages dropped in training")
     ap.add_argument("--wd", type=float, default=0.0, help="decoupled weight decay on the weight matrices")
     ap.add_argument("--beta2", type=float, default=0.999, help="Adam's second-moment decay (the grokking papers use 0.98)")
-    ap.add_argument("--schedule", choices=["constant", "cosine"], default="constant")
+    ap.add_argument("--schedule", choices=["constant", "cosine", "alternating"], default="constant",
+                    help="after --warmup: constant, cosine to 0, or alternating (the old cosine, see the docstring)")
     ap.add_argument("--warmup", type=int, default=0, help="epochs of linear warm-up")
     ap.add_argument("--clip", type=float, default=0.0, help="gradient-norm bound (0: none)")
     ap.add_argument("--augment", choices=["none", "rows"], default="none")
@@ -771,12 +859,18 @@ def main():
     ap.add_argument("--eval-only", metavar="RUN_DIR", help="score RUN_DIR's model_best.pt on the transformed "
                     "unseen puzzles and add them to its best.json; no training")
     ap.add_argument("--check-symmetry", action="store_true", help="random weights: print the symmetry check, no training")
+    ap.add_argument("--recognizer", metavar="RUN_DIR", help="rec-tf: the trained ViT slot recognizer (experiments/recognizer/...)")
+    ap.add_argument("--finetune", action="store_true", help="rec-tf: train the recognizer with the reasoner (default: frozen)")
+    ap.add_argument("--aux", type=float, default=1.0, help="rec-tf --finetune: weight of the recognizer's label loss on the "
+                    "context panels")
     args = ap.parse_args()
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
     dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     if args.eval_only:
+        if json.load(open(os.path.join(args.eval_only, "best.json")))["args"]["arch"] in RECOG:
+            raise SystemExit("--eval-only does not cover rec-tf")
         info = json.load(open(os.path.join(args.eval_only, "best.json")))
         a = info["args"]
         z = np.load(os.path.join(args.data_dir, f"{a['data']}.npz"))
@@ -793,6 +887,10 @@ def main():
         ap.error("--data and --arch are required")
     z = np.load(os.path.join(args.data_dir, f"{args.data}.npz"))
     meta = json.loads(str(z["meta"]))
+    if args.arch in RECOG:
+        if not (args.recognizer and args.width) or args.augment != "none":
+            ap.error("rec-tf needs --recognizer and --width, and no --augment")
+        args.image_size = 160                                                           # the recognizer's panels
     set_vit(meta, vars(args))
     img = images(args.data_dir, args.data, args.arch, z, args.image_size)
     sets = {s: Data(z, s, meta, dev, img.get(s)) for s in ("train", "sel", "unseen")}
@@ -811,28 +909,42 @@ def main():
     if args.augment == "rows" and meta["n_cols"] != 3:
         raise SystemExit("swapping rows 1 and 2 breaks Distribute on I-RAVEN-X 3x10 (notes section 22.2)")
     budget = int(round(args.scale * meta["budget"]))
-    h = args.width or width_for(args.arch, meta, budget, args.norm)
-    model = build(args.arch, meta, h, args.norm, args.dropout, args.drop_edge).to(dev)
+    if args.arch in RECOG:
+        rec, R = load_recognizer(args.recognizer, dev)
+        h = args.width
+        model = RecTF(rec, h, dims(args.arch, meta)[1], meta["n_ctx"], dropout=args.dropout, finetune=args.finetune).to(dev)
+        rec_masks = R.layout_masks(meta["constellations"], dev)                        # [layouts, 22]
+        if not args.finetune:
+            for d in sets.values():
+                precompute_slots(model, d)
+    else:
+        h = args.width or width_for(args.arch, meta, budget, args.norm)
+        model = build(args.arch, meta, h, args.norm, args.dropout, args.drop_edge).to(dev)
     if args.check_symmetry:
         symmetry_check(model, args.arch, sets["sel"], meta)
         return
-    params = list(model.parameters())
+    params = [p for p in model.parameters() if p.requires_grad]
     opt = torch.optim.AdamW([{"params": [p for p in params if p.dim() > 1], "weight_decay": args.wd},
                              {"params": [p for p in params if p.dim() <= 1], "weight_decay": 0.0}], lr=args.lr,
                             betas=(0.9, args.beta2))
     per_epoch = -(-len(sets["train"].units) // args.batch)
-    warm, total = args.warmup * per_epoch, args.epochs * per_epoch
+    warm_steps, total_steps = args.warmup * per_epoch, args.epochs * per_epoch
 
     def lr_factor(step):
-        if step < warm:
-            return (step + 1) / warm
-        return 0.5 * (1 + np.cos(np.pi * (step - warm) / max(1, total - warm))) if args.schedule == "cosine" else 1.0
+        if step < warm_steps:
+            return (step + 1) / warm_steps
+        if args.schedule == "cosine":
+            return 0.5 * (1 + np.cos(np.pi * (step - warm_steps) / max(1, total_steps - warm_steps)))
+        if args.schedule == "alternating":                     # what "cosine" did 2026-11-02 to 11-23 (module docstring)
+            return 1.0 if (step - warm_steps) % 2 == 0 else 0.0
+        return 1.0
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_factor)
     name = f"{args.data}_{args.arch}" + (f"_x{args.scale:g}" if args.scale != 1 else "") + \
            (f"_{args.tag}" if args.tag else "") + f"_s{args.seed}"
     out_dir = os.path.join(args.out, name)
     os.makedirs(out_dir, exist_ok=True)
-    info = {"args": vars(args), "width": h, "weights": n_weights(model), "budget": budget, "facet_weights": meta["budget"],
+    info = {"args": vars(args), "width": h, "weights": n_weights(model), "trained_weights": sum(p.numel() for p in params),
+            "budget": budget, "facet_weights": meta["budget"],
             "budget_from": meta["budget_from"], "device": str(dev),
             "samples": {s: len(d.units) for s, d in sets.items()}, "puzzles": {s: int(d.keep.sum()) for s, d in sets.items()}}
     print(json.dumps(info), flush=True)
@@ -863,19 +975,26 @@ def main():
         for s in range(0, len(units), args.batch):
             b = units[s:s + args.batch]
             opt.zero_grad()
-            total = 0.0
+            batch_loss = 0.0
             for part in np.array_split(b, args.accum):                         # the same update, in less GPU memory
                 k = torch.as_tensor(part[:, 1], device=dev)
                 swap = torch.rand(len(part), device=dev) < 0.5 if args.augment == "rows" else None
-                out = model(*model_input(args.arch, train, part[:, 0], k, swap))
-                loss = F.mse_loss(torch.sigmoid(out), train.batch_target(part[:, 0], k)) * len(part) / len(b)
+                aux = 0.0
+                if args.arch in RECOG and args.finetune and args.aux:                     # keep the labels' supervision
+                    sl = model.slots(train.rec_panels(part[:, 0]))
+                    out = model.reason(sl, k)
+                    m = rec_masks[torch.as_tensor(train.cfg[part[:, 0]], device=dev)][:, None].expand(-1, sl.shape[1], -1)
+                    aux = R.loss_fn(model.rec.head(sl).flatten(0, 1), train.rec_labels(part[:, 0]).flatten(0, 1), m.flatten(0, 1))
+                else:
+                    out = model(*model_input(args.arch, train, part[:, 0], k, swap))
+                loss = (F.mse_loss(torch.sigmoid(out), train.batch_target(part[:, 0], k)) + args.aux * aux) * len(part) / len(b)
                 loss.backward()
-                total += loss.item()
+                batch_loss += loss.item()
             if args.clip:
                 nn.utils.clip_grad_norm_(model.parameters(), args.clip)
             opt.step()
             sched.step()
-            losses.append(total)
+            losses.append(batch_loss)
         if ep % args.eval_every and ep != args.epochs:
             continue
         rec = {"epoch": ep, "train_loss": float(np.mean(losses)), "sel": evaluate(model, args.arch, sets["sel"], meta),
@@ -898,7 +1017,8 @@ def main():
     print(f"best on selection: epoch {best['epoch']}, unseen matched {100 * best['unseen']['matched']:.1f}%, "
           f"exact {100 * best['unseen']['exact']:.1f}%", flush=True)
     model.load_state_dict(torch.load(os.path.join(out_dir, "model_best.pt"), map_location=dev))
-    info["transforms"] = transform_results(model, args.arch, sets["unseen"], meta)
+    if args.arch not in RECOG:                                                          # its inputs are not transformed
+        info["transforms"] = transform_results(model, args.arch, sets["unseen"], meta)
     json.dump(dict(info, best=best), open(os.path.join(out_dir, "best.json"), "w"), indent=1)
 
 

@@ -36,9 +36,13 @@ else
     esac
 fi
 
+# SCHEDULE: cosine (default) or alternating, the old cosine's bug of 2026-11-02 to 11-23 (train_baseline.py docstring).
+# This script's runs all predate the bug; their reruns with the fix (TAGSUFFIX=_cosfix, 2026-11-23) reproduce them.
+# TAGSUFFIX is added to the run's tag.
+
 source /mnt/appl/software/Anaconda3/2024.02-1/etc/profile.d/conda.sh
 conda activate nvsa
 cd /home/kassyask/neuro-vector-symbolic-architectures-raven
 nvidia-smi -L
 python core/baselines/train_baseline.py --data "$DATA" --arch "$ARCH" --seed 0 --epochs "${EPOCHS:-300}" \
-    --norm --schedule cosine --warmup 5 --clip 1 --dropout "$DROP" --wd "$WD" "${EXTRA[@]}" --tag "$TAG"
+    --norm --schedule ${SCHEDULE:-cosine} --warmup 5 --clip 1 --dropout "$DROP" --wd "$WD" "${EXTRA[@]}" --tag "${TAG}${TAGSUFFIX}"

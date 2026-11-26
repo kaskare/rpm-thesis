@@ -16,9 +16,13 @@ SIZES=(100 600 6000)
 i=${SLURM_ARRAY_TASK_ID}
 RULE=${RULES[$((i % 4))]}; N=${SIZES[$(((i / 4) % 3))]}; SEED=$((i / 12)); F=$((6000 / N))
 
+# SCHEDULE: cosine (default) or alternating, the old cosine's bug of 2026-11-02 to 11-23 (train_baseline.py docstring).
+# This script's runs all predate the bug; their reruns with the fix (TAGSUFFIX=_cosfix, 2026-11-23) reproduce them.
+# TAGSUFFIX is added to the run's tag.
+
 source /mnt/appl/software/Anaconda3/2024.02-1/etc/profile.d/conda.sh
 conda activate nvsa
 cd /home/kassyask/neuro-vector-symbolic-architectures-raven
 export CUDA_VISIBLE_DEVICES=
 python core/baselines/train_baseline.py --data twin_${RULE}_m50 --arch mlp --seed ${SEED} --n-train ${N} --epochs $((300 * F)) \
-    --warmup $((5 * F)) --eval-every $((3 * F)) --norm --schedule cosine --clip 1 --dropout 0.3 --wd 0.5 --tag twin_n${N}
+    --warmup $((5 * F)) --eval-every $((3 * F)) --norm --schedule ${SCHEDULE:-cosine} --clip 1 --dropout 0.3 --wd 0.5 --tag "twin_n${N}${TAGSUFFIX}"

@@ -387,7 +387,7 @@ are untouched except where marked.
     - The loss is on grids. It matches the facet model on single-object layouts (99.3–99.6) and falls behind on
       2×2 (93.0 vs 95.5), 3×3 (81.8 vs 89.8) and the in-out grid (81.1 vs 97.8).
     - Resolution does not explain that at this amount of data. Trained on the grids alone (18,000 puzzles), finer
-      patches and larger images stay at the control, 28–43, and all three memorise. The same 18,000 grid puzzles with
+      patches and larger images stay near the control, 33–47 against 28–43, and all three memorise. The same 18,000 grid puzzles with
       18,000 single-object puzzles added reach 73–83, which suggests the ViT picks up the rules on the easy layouts.
     - It needs 14 times the facet model's weights, and it shares weights too: one filter for every patch, one
       block for every token. The facet model's own end-to-end score is still missing, so the two have not yet been
@@ -642,12 +642,33 @@ are untouched except where marked.
     retrained on the same 300, 1000 and 3000 puzzles per layout, the facet model gets 89.8, 93.9 and 95.8 matched,
     against 90.0, 94.1 and 96.1 from labels; the loss is almost all in the in-out grid. At 300 puzzles the pipeline is
     74 points above the ViT on the same puzzles (15.1 / 15.6). The supervision still differs: the recognizer is trained
-    on the labelled objects of all 16 panels, the ViT on the answer's index only.
+    on the labelled objects of all 16 panels, the ViT on the answer's index only. Item 54 gives a black-box reasoner
+    the same labels.
+
+53. **A schedule bug hit 8 torch runs** (2026-11-23, fixed; corrected and rerun 2026-11-24). From 2026-11-02, when gradient
+    accumulation (`--accum`) came in, `train_baseline.py`'s cosine schedule read a step count that each batch overwrote
+    with its loss, so after warm-up the rate was full and zero in turn (`--schedule alternating` reproduces it). It was
+    first taken to affect all 149 runs with `--schedule cosine`, and all were queued for a rerun; the reruns showed
+    otherwise. The trainer of 2026-10-28 and 2026-10-31 in git has no such overwrite, and 99 reruns of runs made before
+    2026-11-02 reproduce them, 95 to the last digit and 4 within float or GPU noise. The 8 runs that had the bug: the
+    ViT at width 224 and its row-symmetric version on 3×10, the two finer-grid ViTs (RESULTS §7), and seeds 1 and 2 of
+    the ViT with and without rows built in at 3000 puzzles. Their reruns with the fix all score higher, by 2 to 11 points
+    matched, and replace them. One comparison changes direction: on 3×10 the ViT with rows built in was 3.0 points under
+    the plain one (40.1 against 43.1) and is now 0.7 above it (46.0 against 45.3), and 6.7 above it on puzzles with rows 1
+    and 2 exchanged. The gain from rows built in at 3000 puzzles stays the same, +20.0 ± 10.1 against +20.4 ± 11.1. The
+    reruns of unaffected runs still queued were cancelled on 2026-11-25.
+
+54. **With the same labels, a black-box reasoner needs the data the facet model does not** (2026-11-24, RESULTS §8).
+    The recognizer of item 52 reads the context panels and a plain transformer over its slot states generates the
+    answer (`--arch rec-tf`, fixed schedule, one seed). At 300 and 1000 puzzles per layout it gets 18.9 and 35.9, near
+    guessing like the ViT, against the facet model's 89.8 and 93.9 end to end with the same recognizer; it memorises
+    the training puzzles. At 3000 it gets 87.6 to 90.0, and at 6000 with 14× the weights 95.1 (69.9), 2.0 below the facet
+    model in matched and level in exact; what remains is on the 2×2 and 3×3 grids. So at 300 puzzles the 74 points over
+    the ViT are about 4 from the labels and 71 from the structure; from 3000 the labels explain most of the ViT's gap.
+    Fine-tuning the recognizer with its label loss kept helps at 1000 (76.3), not at 300.
 
 ## Still open
 - Rerun GNN A, the object GNN and the MLP on 3×10 without dropout and decay, and train a facet model as long (item 37).
-- A black-box baseline given the same object labels as the recognizer (for example a ViT trained on the panel labels
-  first, then on the answer), which would separate supervision from structure in the comparison of item 52.
 - Seeds for the facet runs: most numbers are one run. Chapter 6's small-data comparisons and the 6000 attributes pair
   now have three seeds, and so do named columns and the row fold on 3×10 (RESULTS §7). The rest is one run.
 - The attribute-level torch GNN pair (with and without symmetries), learning curves and transformed test

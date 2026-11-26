@@ -1,7 +1,8 @@
 # Results tables
 
-Every result that still holds, in one place (last updated 2026-11-23: the test pass of Chapters 5–7, §14, and the
-end-to-end learning curve, §8). How each was obtained: the lab notes
+Every result that still holds, in one place (last updated 2026-11-25: the 8 torch runs with the schedule bug, rerun with the fix, §1, §3 and §7; 2026-11-24: the
+black-box reasoner on the recognizer's labels, §8; 2026-11-23: the test pass of
+Chapters 5–7, §14, and the end-to-end learning curve, §8). How each was obtained: the lab notes
 (`docs/PYNEURALOGIC_NOTES.md`, section numbers below); in what order: `docs/FINDINGS.md`.
 
 **Conventions.**
@@ -71,9 +72,9 @@ end-to-end learning curve, §8). How each was obtained: the lab notes
 | attribute GNN B, relative labels (symmetric) | 267k / 1,599k | 96.8 (67.9) | – | 85.8 (3.5) | – | – |
 | **Black-box vision, end to end** (reads the images; same task and metrics) | | | | | | |
 | ViT over the matrix as one image, width 64 (job 11931310) | 335k / 335k / 428k | 79.1 (37.6) | 35.4 (2.6) | 52.9 (0.0) | – | – |
-| ViT, width 224 (job 11931310) | 3,753k / 3,753k / 4,079k | 93.4 (64.4) | 47.5 (5.6) | 43.1 (0.4) | – | – |
+| ViT, width 224 (job 11931310) | 3,753k / 3,753k / 4,079k | 93.4 (64.4) | 47.5 (5.6) | 45.3 (0.2) | – | – |
 | ViT, rows 1 ↔ 2 built in, width 64 | 323k | 89.4 (55.3) | – | – | – | – |
-| ViT, rows 1 ↔ 2 built in, width 224 | 3,709k / 3,709k / 3,919k | 92.1 (62.1) | 44.0 (5.6) | 40.1 (0.0) | – | – |
+| ViT, rows 1 ↔ 2 built in, width 224 | 3,709k / 3,709k / 3,919k | 92.1 (62.1) | 44.0 (5.6) | 46.0 (0.1) | – | – |
 | ViT, width 64, a separate filter per patch | 4,019k | 49.8 (9.2) | – | – | – | – |
 | CNN (small ResNet, panels stacked as channels) | 286k | 39.4 (2.1) | – | – | – | – |
 | CNN, 16× | 4,270k | 50.5 (6.3) | – | – | – | – |
@@ -108,6 +109,19 @@ Notes on the main table:
   - "regularized" is the setting picked on selection puzzles of I-RAVEN and 3×10 0–50 (§23.3), run unchanged
     on every dataset with 2 seeds: LayerNorm (MLP), weight decay 0.5, dropout 0 on I-RAVEN and 0.3 on
     I-RAVEN-X, cosine schedule, clipping.
+  - **The schedule bug** (found 2026-11-23, fixed; corrected 2026-11-24). From 2026-11-02, when `--accum` came in,
+    `train_baseline.py` overwrote the step count its cosine schedule read with each batch's loss, so after warm-up the
+    learning rate was full and zero in turn, never decaying (`--schedule alternating` reproduces it step for step).
+    Only 8 runs here were trained with that code: the ViT at width 224 and its row-symmetric version on 3×10 (rerun with accumulated batches on 2026-11-02), the two finer-grid ViTs of §7 (`grids_p8_s80`, `grids_p16_s160`), and seeds 1 and 2 of the ViT with and without rows built in at 3000 puzzles (2026-11-22). Every other
+    torch run predates it and had the decaying schedule. This was first missed: all 149 runs with `--schedule cosine`
+    were queued for a rerun on 2026-11-23 (`_cosfix`, job ids in `experiments/baselines/cosfix_jobs.txt`), and the 99
+    reruns of unaffected runs that finished reproduce them, 95 to the last digit and 4 within float or GPU noise
+    (the ViT at 1000 puzzles diverges inside warm-up: 19.8 against 19.2). The 8 were rerun with the fix (jobs
+    12081327_33–34, 12081328–29, 12081330_4–5), and their cells here are the reruns. Every one went up, by 2 to 11
+    points matched: on 3×10 the ViT 43.1 → 45.3 and with rows built in 40.1 → 46.0; the grid ViTs of §7 25.8 → 29.3
+    and 24.3 → 28.3 over all layouts; at 3000 puzzles seeds 1 and 2 46.2 / 38.2 → 53.0 / 49.0 without rows built in
+    and 53.9 / 63.8 → 61.7 / 72.2 with. The other reruns were cancelled on 2026-11-25 once these had finished (their
+    unfinished folders are listed in `cosfix_jobs.txt`). The supervision control (§8) used the fixed code.
   - "strongest" is the run with the highest selection accuracy among all object-level runs on that dataset
     (MLP and GNN, 1× to 64×, with and without regularization, §23.4). Selection is 300 puzzles, so it does not
     always pick the best unseen score (3×3: the regularized MLP reaches 95.1).
@@ -239,8 +253,8 @@ Each transformation is either a symmetry of the data or one under which the answ
 | object GNN, regularized (seed 0) | 84.0 | 52.7 | 71.6 | 85.0 | – |
 | MLP, regularized (seed 0) | 84.4 | 47.7 | 63.9 | 83.5 | – |
 | ViT, width 64 | 52.9 | 38.5 | 47.3 | – | – |
-| ViT, width 224 | 43.1 | 37.9 | 44.4 | – | – |
-| ViT, rows 1 ↔ 2 built in, width 224 | 40.1 | identical | 39.9 | – | – |
+| ViT, width 224 | 45.3 | 39.2 | 45.6 | – | – |
+| ViT, rows 1 ↔ 2 built in, width 224 | 46.0 | 45.9 (built in; one puzzle of 1000 differs) | 46.0 | – | – |
 
 The rows-swap row for per-panel gates combines §21.5's two groups (646 puzzles with a Distribute attribute,
 354 without).
@@ -388,7 +402,7 @@ Every run takes the same number of updates: epochs scale with 6000/n. At 6000, M
 | 300 | 90.0 (53.3) | 87.0 (53.0) | 86.1 (50.8) | 29.6 (1.1) | 24.9 (0.5) | 15.1 (0.1) | 15.6 (0.2) | 16.0 (0.1) | 14.6 (0.1) |
 | 1000 | 94.1 (62.7) | 93.9 (64.0) | 93.4 (61.5) | 68.7 (21.9) | 48.1 (7.7) | 19.2 (0.2) | 18.6 (0.2) | 24.3 (0.4) | 23.8 (0.5) |
 | 3000 | 96.1 (66.0) | 96.8 (68.8) | 95.9 (65.3) | 86.5 (49.8) | 64.5 (19.1) | 42.7 (3.5) | 45.8 (4.5) | 70.7 (24.2) | 62.0 (13.3) |
-| 3000, seeds 0–2 | | | | | | 42.4 ± 4.0 | | 62.8 ± 8.5 | |
+| 3000, seeds 0–2 | | | | | | 48.2 ± 5.2 | | 68.2 ± 5.7 | |
 | 6000 | 97.3 (69.1) | 96.8 (67.9) | 95.0 (62.5) | 90.5 (55.1) | 72.0 (27.5) | 79.1 (37.6) | 93.4 (64.4) | 89.4 (55.3) | 92.1 (62.1) |
 
 Facet by rule at 1000: 81.8 / 85.6 / 84.8 / 75.8. GNN A and B at 3000 are level with or above their 6000 runs, so the
@@ -591,8 +605,8 @@ labels, and loses 43.6.
 
 **Rows 1 ↔ 2 built into the ViT** (the same ViT with the two rows given as a set; same-size comparison in the learning curves
 above). Width 64: 79.1 → 89.4 at 6000 and 42.7 → 70.7 at 3000 (seed 0). Seeds 0 / 1 / 2 at 3000 (2026-11-22, jobs
-12074391–92): without 42.7 / 46.2 / 38.2 (42.4 ± 4.0; exact 3.0 ± 0.7), with 70.7 / 53.9 / 63.8 (62.8 ± 8.5; exact
-14.9 ± 9.0); the gain is 28.0 / 7.6 / 25.6, +20.4 ± 11.1. Seed 0 was the best seed of the symmetric model. Width 224: 93.4 → 92.1 and 45.8 → 62.0. Neither learns
+12074391–92; seeds 1 and 2 rerun with the fixed schedule, jobs 12081328–29): without 42.7 / 53.0 / 49.0 (48.2 ± 5.2;
+exact 5.0 ± 2.1), with 70.7 / 61.7 / 72.2 (68.2 ± 5.7; exact 20.6 ± 7.0); the gain is 28.0 / 8.6 / 23.2, +20.0 ± 10.1. Width 224: 93.4 → 92.1 and 45.8 → 62.0. Neither learns
 at 300 or 1000. Rows built in do not help transfer: up-down stays at chance, 13.7.
 
 **Weight sharing across patches in the ViT** (width 64): a separate filter per patch, 4,019k weights, gets 49.8 (9.2) at 6000
@@ -604,14 +618,15 @@ pixels). The last three rows are the runs above, read by layout:
 | trained on | puzzles | of them grid | panel, patch | 2×2 | 3×3 | in-out grid |
 |---|---|---|---|---|---|---|
 | grids only | 18,000 | 18,000 | 80, 16 | 37.6 | 28.3 | 43.0 |
-| grids only, finer patches (3,861k) | 18,000 | 18,000 | 80, 8 | 31.5 | 29.9 | 38.6 |
-| grids only, larger images (3,904k) | 18,000 | 18,000 | 160, 16 | 38.6 | 29.2 | 32.4 |
+| grids only, finer patches (3,861k) | 18,000 | 18,000 | 80, 8 | 34.1 | 32.9 | 47.3 |
+| grids only, larger images (3,904k) | 18,000 | 18,000 | 160, 16 | 41.8 | 36.5 | 44.1 |
 | all layouts | 21,000 | 9,000 | 80, 16 | 41.8 | 37.1 | 41.8 |
 | all but up-down | 36,000 | 18,000 | 80, 16 | 82.7 | 73.4 | 73.8 |
 | all layouts | 42,000 | 18,000 | 80, 16 | 93.0 | 81.8 | 81.1 |
 
-Exact is at most 0.4 in the three grids-only runs. All three memorise: training loss ends at 0.0002–0.0025 while selection
-stays at 33–36, with the best epochs at 54, 108 and 168. Finer images change nothing at this amount of data. The same
+Exact is at most 0.4 in the three grids-only runs. All three memorise: training loss ends at 0.0002–0.0004 while selection
+ends at 35–42, with the best epochs at 54, 192 and 159. Finer images move a grid layout by −3.5 to +8.2 points at this
+amount of data. The same
 18,000 grid puzzles reach 73–83 once 18,000 single-object puzzles are added, and 9,000 grid puzzles with 12,000 others match
 the grids-only runs. Finer images on a ViT that has learned the task (42,000 puzzles) were not tested.
 
@@ -709,10 +724,52 @@ candidates perceived. Val 300–1299, 7000 puzzles; matched (exact):
 - So the end-to-end pipeline at 300 puzzles per layout is 74 points above the ViT on the same puzzles, as with labels.
   The two do not see the same supervision: the recognizer learns from the labelled objects of all 16 panels of each
   training puzzle, the ViT only from the answer's index (its target is the facet code of the answer panel). The curve
-  removes the labels at test time, not the labels' help in training.
+  removes the labels at test time, not the labels' help in training; the control below gives a black-box reasoner the
+  same labels.
 - The labels pass reproduces each checkpoint's record exactly (6302 / 3734, 6589 / 4388, 6725 / 4623 of 7000). The first
   submission of these three scorings ran the labels pass only (`MODES=labels,hard` inside `sbatch --export`, whose commas
   split it); its files are kept in `experiments/e2e_curve_labels_only/`.
+
+**The same labels with a black-box reasoner** (2026-11-24; job 12081101, `core/baselines/train_baseline.py --arch rec-tf`,
+`jobs/baselines/submit_rec_tf.sh`). The control for supervision. The recognizer of the curve above, trained on the same
+first N puzzles per layout (at 6000 the one trained on 2000), reads the eight context panels, and a plain transformer of
+depth 6 over its 8 × 22 slot states generates the answer's facet code, on the baselines' task, splits and metrics. With
+the recognizer frozen, the reasoner at width 64 has 309k trained weights (635k with the recognizer, against the facet
+pipeline's 592k) and at width 224 3,661k. Fine-tuned: the recognizer trained along, with its label loss kept on the
+context panels (`--aux 1`), width 64, all 635k weights trained. The ViT's recipe with the fixed cosine schedule
+(conventions, "The schedule bug"), epochs 300·6000/N, the epoch picked on the selection puzzles; one seed.
+Val 300–1299, 7000 puzzles; matched (exact):
+
+| puzzles per layout | facet, end to end | recognizer + transformer 64 | recognizer + transformer 224 | the same, fine-tuned, 64 | ViT 64 / ViT 224 (old schedule) |
+|---|---|---|---|---|---|
+| 300 | **89.84** (53.13) | 18.94 (0.39) | 17.57 (0.33) | 20.41 (0.46) | 15.1 / 15.6 |
+| 1000 | **93.90** (62.43) | 35.89 (1.79) | 32.47 (1.96) | 76.27 (33.41) | 19.2 / 18.6 |
+| 3000 | **95.77** (65.67) | 87.60 (56.00) | 88.77 (60.63) | 90.01 (59.80) | 42.7 / 45.8 |
+| 6000 | **97.13** (68.79) | 91.43 (59.06) | 95.11 (69.87) | – | 79.1 / 93.4 |
+
+By layout at 6000 (center / 2×2 / 3×3 / L-R / U-D / in-out / in-out grid):
+
+| | | | | | | | |
+|---|---|---|---|---|---|---|---|
+| facet, end to end | 99.3 | 95.5 | 89.8 | 99.5 | 99.7 | 99.6 | 96.5 |
+| recognizer + transformer 224 | 99.8 | 91.7 | 78.9 | 99.7 | 99.5 | 99.8 | 96.4 |
+| recognizer + transformer 64 | 99.2 | 80.4 | 75.7 | 99.5 | 98.8 | 99.6 | 86.8 |
+
+- **With little data the labels are not what the facet model has over the ViT.** At 300 and 1000 puzzles the reasoner on
+  the recognizer's slots stays near guessing (12.5), as the ViT does: 71 and 58 points below the facet model reading the
+  same recognizer. Its training loss falls to 10⁻⁴ while selection stays at 20 and 36, so it memorises the training
+  puzzles. The width does not matter there (17.6 and 32.5 at 224).
+- **From 3000 puzzles the labels carry most of the ViT's gap.** At 3000 the reasoner is 45 points above the ViT at the
+  same width (87.6 against 42.7) and 6 to 8 below the facet model. At 6000, with 14× the facet model's weights, it is 2.0
+  below in matched (95.11 against 97.13; a proportion's standard error on 7000 puzzles is about 0.3) and level in exact
+  (69.87 against 68.79). At width 64 it stays 5.7 below.
+- **What remains at 6000 is the grids.** Level on the single-object layouts and on the in-out grid, 3.8 points below on
+  2×2 and 10.9 on 3×3, the layouts with the most objects per panel.
+- **Fine-tuning the recognizer** with its label loss kept helps at 1000 (76.3 against 35.9) and at 3000 a little (90.0
+  against 87.6), not at 300 (20.4).
+- So of the 74 points between the facet model end to end and the ViT at 300 puzzles, about 4 come with the labels and 71
+  with the structure. At 6000 and width 224 the two are 1.7 and 2.0 points. The ViT runs of this curve predate the
+  schedule bug, and their reruns with the fix reproduce them.
 
 ## 9. Weight counts
 

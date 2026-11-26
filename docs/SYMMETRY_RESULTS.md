@@ -1,7 +1,8 @@
 # Symmetry results
 
 What each built-in symmetry buys, per model and dataset. Selected from `docs/RESULTS.md`, which stays the full
-record (last updated 2026-11-23: the test pass of every checkpoint below, RESULTS §14; facet exact on I-RAVEN-X was
+record (last updated 2026-11-25: the 8 ViT runs with the schedule bug, rerun with the fix, sections 1, 2 and 7;
+2026-11-24: the black-box reasoner with the recognizer's labels, section 7; 2026-11-23: the test pass of every checkpoint below, RESULTS §14; facet exact on I-RAVEN-X was
 rescored after a scorer fix on 2026-11-08, RESULTS notes on the main table).
 
 Cells are matched % (exact %) on unseen puzzles, one seed unless noted. "With" and "without" mean the same model
@@ -31,7 +32,7 @@ answer stays right, but the generator may never produce the transformed puzzle (
 | one step per column (row fold) | task; Progression only | mixed | row fold, 3×10 | fewer weights, Progression | 305k vs 1,411k; Progression 97.2 ± 1.7 vs 86.0 ± 7.5 (3 seeds) |
 | components | data | generator | facet, attribute GNNs, I-RAVEN | an unseen layout | up-down never trained: 99.1–99.9 vs 13–24 |
 | attributes | data | general | facet, attribute GNN B, I-RAVEN | an unseen rule on an attribute | size exact 87.7 and 84.1 vs 18–24 |
-| rows 1 ↔ 2 | data on I-RAVEN | general | ViT, I-RAVEN | less data | 3000 puzzles: 62.8 ± 8.5 vs 42.4 ± 4.0 (3 seeds) |
+| rows 1 ↔ 2 | data on I-RAVEN | general | ViT, I-RAVEN | less data | 3000 puzzles: 68.2 ± 5.7 vs 48.2 ± 5.2 (3 seeds) |
 | sum's moves, one operand with the answer (`plus` used by learned rules) | task | general on small numbers (here 0–50, past them) | value axis, rule twins, rows of 3 | less data | sum, 100 puzzles: 98.2 ± 0.8 vs 4.5 ± 2.3 exact (3 seeds) |
 | value scaling, v → kv + s (rows read in units of their first step, or of its power of two) | task | not classified | value axis, rule twins, rows of 3 | unseen first steps and less data, once the row descriptor reads the steps (§6) | midpoint, 100 puzzles, 3 seeds: scaled 100.0 at every seed and doubled 89.2 ± 2.7, vs 59.9 ± 4.5 with the shift alone; rows with a new first step: 101 of 101 (scaled), 64–69 of the 72 the count allows (doubled), vs 0–1 |
 
@@ -56,7 +57,7 @@ The gain is largest with few puzzles and shrinks with more, once the model can l
 | | | 6000 | 100.0 (100.0) | 98.4 (97.4) | +1.6 |
 | rows 1 ↔ 2 | ViT, width 64, I-RAVEN | 1000 per layout | 24.3 (0.4) | 19.2 (0.2) | +5.1 |
 | | | 3000 | 70.7 (24.2) | 42.7 (3.5) | **+28.0** |
-| | | 3000, 3 seeds | 62.8 ± 8.5 (14.9 ± 9.0) | 42.4 ± 4.0 (3.0 ± 0.7) | **+20.4 ± 11.1** |
+| | | 3000, 3 seeds | 68.2 ± 5.7 (20.6 ± 7.0) | 48.2 ± 5.2 (5.0 ± 2.1) | **+20.0 ± 10.1** |
 | | | 6000 | 89.4 (55.3) | 79.1 (37.6) | +10.3 |
 | rows 1 ↔ 2 | ViT, width 224, I-RAVEN | 1000 | 23.8 (0.5) | 18.6 (0.2) | +5.2 |
 | | | 3000 | 62.0 (13.3) | 45.8 (4.5) | **+16.2** |
@@ -264,8 +265,8 @@ not replace them. MLP and object GNN at full data are regularized, mean of 2 see
 | object GNN | 90.5 (55.1), 265k | 93.9 (67.7), 265k | 85.3 (4.2), 1,593k |
 | MLP | 72.0 (27.5), 264k | 95.1 (74.3), 266k | 84.5 (2.7), 1,599k |
 | ViT, width 64 | 79.1 (37.6), 335k | 35.4 (2.6), 335k | 52.9 (0.0), 428k |
-| ViT, width 224 (14× the weights) | 93.4 (64.4), 3,753k | 47.5 (5.6), 3,753k | 43.1 (0.4), 4,079k |
-| ViT, width 224, rows 1 ↔ 2 built in | 92.1 (62.1), 3,709k | 44.0 (5.6), 3,709k | 40.1 (0.0), 3,919k |
+| ViT, width 224 (14× the weights) | 93.4 (64.4), 3,753k | 47.5 (5.6), 3,753k | 45.3 (0.2), 4,079k |
+| ViT, width 224, rows 1 ↔ 2 built in | 92.1 (62.1), 3,709k | 44.0 (5.6), 3,709k | 46.0 (0.1), 3,919k |
 | CNN | 39.4 (2.1), 286k | – | – |
 
 **Less training data** (I-RAVEN, puzzles per layout):
@@ -285,8 +286,8 @@ not replace them. MLP and object GNN at full data are regularized, mean of 2 see
 | attribute GNN A | 95.0 → 95.0 | 95.0 → **55.5** | 82.0 |
 | object GNN | 91.3 → 91.3 | 84.0 → **52.7** | 71.6 |
 | MLP | 72.8 → 72.4 | 84.4 → **47.7** | 63.9 |
-| ViT, width 224 | 93.4 → 93.4 | 43.1 → **37.9** | 44.4 |
-| ViT, width 224, rows 1 ↔ 2 built in | 92.1 → identical | 40.1 → identical | 39.9 |
+| ViT, width 224 | 93.4 → 93.4 | 45.3 → **39.2** | 45.6 |
+| ViT, width 224, rows 1 ↔ 2 built in | 92.1 → identical | 46.0 → 45.9 (built in; one puzzle of 1000 differs) | 46.0 |
 | ViT, width 64 | 79.1 → 78.9 | 52.9 → **38.5** | 47.3 |
 
 What they add:
@@ -302,15 +303,21 @@ What they add:
   are level (85.3 vs 84.5). That fits: the symmetry has nothing to act on there.
 - **Every baseline without the row symmetry fails the 3×10 swap, and none fails it on I-RAVEN**, which matches the kinds
   in section 1: rows 1 ↔ 2 are a task symmetry on 3×10 and a data symmetry on I-RAVEN. The ViT is no exception, 52.9 → 38.5
-  at width 64 and 43.1 → 37.9 at width 224. With the rows built in it gets 40.1, so every ViT sits at 38–40 without the row
-  order, and 9.5× the weights add nothing on 3×10.
+  at width 64 and 45.3 → 39.2 at width 224. With the rows built in it gets 46.0 as generated and 45.9 with the rows
+  exchanged, so at width 224 the symmetry is worth 0.7 points on generated puzzles and 6.7 on exchanged ones. 9.5× the
+  weights add nothing on 3×10.
 - **ViT and the grids:** resolution does not explain the loss at this amount of data. Trained on the grids alone, finer
-  patches and larger images stay at the control (2×2 / 3×3 / in-out grid 31.5 / 29.9 / 38.6 and 38.6 / 29.2 / 32.4, control
+  patches and larger images stay near the control (2×2 / 3×3 / in-out grid 34.1 / 32.9 / 47.3 and 41.8 / 36.5 / 44.1, control
   37.6 / 28.3 / 43.0), and all three memorise. The same 18,000 grid puzzles with 18,000 single-object puzzles added get
   82.7 / 73.4 / 73.8 (`docs/RESULTS.md` §7). Finer images on the fully trained ViT were not tested.
 - **ViT and translation:** it is not translation invariant. Trained without shifted images, width 224 falls from 93.4 to
   43.3 at a 1-pixel shift and 21.8 at 16 pixels. Sharing one filter across patches still helps: at width 64 a separate
   filter per patch gets 49.8 (9.2) with 12× the weights, against 79.1 (37.6); at 1000 puzzles both fail (22.5, 19.2).
+- **The same labels do not make a black box data-efficient** (RESULTS §8, 2026-11-24). The recognizer's slot states
+  with a plain transformer as the reasoner, no symmetry built in, fixed schedule: 18.9 / 35.9 / 87.6 / 91.4 at 300 /
+  1000 / 3000 / 6000 puzzles at width 64, and 95.1 (69.9) at 6000 at width 224, against the facet model end to end at
+  89.8 / 93.9 / 95.8 / 97.1 with the same recognizer. The structure is what makes 300 puzzles enough; from 3000 the
+  labels close most of the ViT's gap. What is left at 6000 is on the 2×2 and 3×3 grids.
 - **The CNN is not the better vision model here.** It has 39.4 (2.1), and 50.5 (6.3) at 16×. It holds up better at 1 pixel
   (46.6 of 50.5) and is not invariant either (26.4 at 8 pixels). It differs from the ViT in more than filters.
 

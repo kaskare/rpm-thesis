@@ -23,9 +23,13 @@ DATA=${DATASETS[$((i / 2))]}
 ARCH=${ARCHS[$((i % 2))]}
 if [ "$DATA" = iraven ]; then BATCH=32; DROP=0; else BATCH=64; DROP=0.3; fi
 
+# SCHEDULE: cosine (default) or alternating, the old cosine's bug of 2026-11-02 to 11-23 (train_baseline.py docstring).
+# This script's runs all predate the bug; their reruns with the fix (TAGSUFFIX=_cosfix, 2026-11-23) reproduce them.
+# TAGSUFFIX is added to the run's tag.
+
 source /mnt/appl/software/Anaconda3/2024.02-1/etc/profile.d/conda.sh
 conda activate nvsa
 cd /home/kassyask/neuro-vector-symbolic-architectures-raven
 nvidia-smi -L
 python core/baselines/train_baseline.py --data "$DATA" --arch "$ARCH" --seed 0 --epochs "${EPOCHS:-300}" --batch "$BATCH" \
-    --schedule cosine --warmup 5 --clip 1 --wd 0.5 --dropout "$DROP" --tag reg_do${DROP}_wd0.5
+    --schedule ${SCHEDULE:-cosine} --warmup 5 --clip 1 --wd 0.5 --dropout "$DROP" --tag "reg_do${DROP}_wd0.5${TAGSUFFIX}"

@@ -71,12 +71,17 @@ vit-sym 16 6000 holdPS --hold-pair Progression:Size
 EOF
 LINE=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" <<< "$TABLE")
 read -r ARCH SCALE N TAG FLAGS <<< "$LINE"
+TAG="${TAG}${TAGSUFFIX}"
 F=$((6000 / N))
 case "$ARCH" in
-  mlp|gnn)  SET="--norm --wd 0.5 --schedule cosine --clip 1 --dropout 0"; WARM=5 ;;
-  attr-*)   SET="--batch 32 --wd 0.5 --schedule cosine --clip 1 --dropout 0"; WARM=5 ;;
-  *)        SET="--lr 5e-4 --wd 0.05 --schedule cosine --clip 1 --dropout 0.1"; WARM=10 ;;
+  mlp|gnn)  SET="--norm --wd 0.5 --schedule ${SCHEDULE:-cosine} --clip 1 --dropout 0"; WARM=5 ;;
+  attr-*)   SET="--batch 32 --wd 0.5 --schedule ${SCHEDULE:-cosine} --clip 1 --dropout 0"; WARM=5 ;;
+  *)        SET="--lr 5e-4 --wd 0.05 --schedule ${SCHEDULE:-cosine} --clip 1 --dropout 0.1"; WARM=10 ;;
 esac
+
+# SCHEDULE: cosine (default) or alternating, the old cosine's bug of 2026-11-02 to 11-23 (train_baseline.py docstring).
+# Of this script's runs only tasks 33 and 34 (2026-11-02) and the seed runs of 2026-11-22 ran the bug; the others predate
+# it, and their reruns with the fix (TAGSUFFIX=_cosfix) reproduce them. TAGSUFFIX is added to the run's tag.
 
 source /mnt/appl/software/Anaconda3/2024.02-1/etc/profile.d/conda.sh
 conda activate nvsa

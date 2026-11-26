@@ -335,8 +335,8 @@ attribute GNN A, absolute labels & 266k / 1,596k & 95.0 (62.5) & – & 95.0 (27.
 attribute GNN B, relative labels (symmetric) & 267k / 1,599k & 96.8 (67.9) & – & 85.8 (3.5) & – & – \\
 \textbf{Black-box vision, end to end} &  &  &  &  &  &  \\
 ViT over the matrix as one image, width 64 & 335k / 335k / 428k & 79.1 (37.6) & 35.4 (2.6) & 52.9 (0.0) & – & – \\
-ViT, width 224 & 3,753k / 3,753k / 4,079k & 93.4 (64.4) & 47.5 (5.6) & 43.1 (0.4) & – & – \\
-ViT, rows 1 and 2 built in, width 224 & 3,709k / 3,709k / 3,919k & 92.1 (62.1) & 44.0 (5.6) & 40.1 (0.0) & – & – \\
+ViT, width 224 & 3,753k / 3,753k / 4,079k & 93.4 (64.4) & 47.5 (5.6) & 45.3 (0.2) & – & – \\
+ViT, rows 1 and 2 built in, width 224 & 3,709k / 3,709k / 3,919k & 92.1 (62.1) & 44.0 (5.6) & 46.0 (0.1) & – & – \\
 \textbf{Literature (reported, other protocols)} &  &  &  &  &  &  \\
 ARLC, learned (trains on 2×2 only) &  & 92.6 & 98.4 & 95.0 & 95.0 & 90.6 \\
 ARLC, programmed &  & – & 97.2 & 100 & 100 & 99.7 \\
@@ -410,8 +410,8 @@ attribute GNN A & 95.0 & 55.5 (Distribute exact 59.9 to 1.0) & 82.0 & 95.0 \\
 object GNN, regularized (seed 0) & 84.0 & 52.7 & 71.6 & 85.0 \\
 MLP, regularized (seed 0) & 84.4 & 47.7 & 63.9 & 83.5 \\
 ViT, width 64 & 52.9 & 38.5 & 47.3 & – \\
-ViT, width 224 & 43.1 & 37.9 & 44.4 & – \\
-ViT, rows 1 and 2 built in, width 224 & 40.1 & identical & 39.9 & – \\
+ViT, width 224 & 45.3 & 39.2 & 45.6 & – \\
+ViT, rows 1 and 2 built in, width 224 & 46.0 & 45.9 (built in; one puzzle of 1,000 differs) & 46.0 & – \\
 \bottomrule
 \end{tabularx}
 \end{center}
@@ -741,11 +741,12 @@ No run grokked. The runs fall into three groups. With 1000 or more training puzz
 
 \section{Where each main result comes from}\label{sec:F.2}
 
-\begin{center}\small
-\begin{tabularx}{\linewidth}{@{}YYY@{}}
+{\small
+\begin{xltabular}{\linewidth}{@{}YYY@{}}
 \toprule
 result & script & job file \\
 \midrule
+\endhead
 Facet model on I-RAVEN, 97.3 (69.1), Chapter~\ref{ch:5} & \texttt{core/pynl/bench\_hub\_grounding.py --template facet --constellation all --widths 32,64,128 --lr 3e-4 --n 6000 --n-sel 300 --n-val 1000 --n-train-eval 300 --train-epochs 80 --eval-every 5 --save-dir experiments/facet\_all\_w32-64-128\_hidden --jvm-gb 300} & submitted with \texttt{sbatch --wrap} (job 11882029); 150 epochs and the fold on I-RAVEN: \texttt{jobs/pynl/submit\_facet\_long.sh} \\
 Facet model end to end and its one test pass, 97.19 and 97.03 & \texttt{core/pynl/facet\_e2e\_eval.py}; the recognizer \texttt{core/frontend/train\_vit\_recognizer.py} with data from \texttt{data\_prep/prepare\_recognizer\_data.py} & \texttt{jobs/frontend/submit\_recognizer.sh}, then \texttt{jobs/pynl/submit\_facet\_e2e.sh} (job 12028100; \texttt{SPLIT=test} once per final checkpoint, job 12031767) \\
 Facet model on I-RAVEN-X, copy links and content gates & \texttt{bench\_hub\_grounding.py --iravenx FILE}, \texttt{--copy-links}, \texttt{--copy-gates content}; per-rule scores \texttt{core/pynl/facet\_rule\_eval.py} & \texttt{sbatch --wrap} as above with \texttt{--iravenx}; \texttt{jobs/pynl/submit\_fill\_table.sh}, \texttt{jobs/pynl/submit\_facet\_long.sh}; rescoring after the scorer fix \texttt{jobs/pynl/submit\_rescore\_exact.sh} \\
@@ -758,6 +759,7 @@ Symmetries of the model and of the data (Chapter~\ref{ch:3}, Appendix~\ref{sec:B
 Torch baselines (D.1) & \texttt{data\_prep/prepare\_baseline\_data.py}, \texttt{data\_prep/prepare\_baseline\_images.py}, \texttt{data\_prep/render\_iravenx.py}; \texttt{core/baselines/train\_baseline.py}; table \texttt{analysis/summarize\_baselines.py} & \texttt{jobs/baselines/submit\_baselines.sh}, \texttt{submit\_sweep.sh}, \texttt{submit\_regularized.sh}, \texttt{submit\_final.sh}, \texttt{submit\_attr\_gnn.sh}, \texttt{submit\_vit.sh}, \texttt{submit\_iravenx\_vit.sh} \\
 The test pass of Chapters~\ref{ch:5} to \ref{ch:7} (D.6) & \texttt{facet\_rule\_eval.py --test}, \texttt{value\_axis.py --eval --eval-start 8000}; summary \texttt{analysis/test\_pass\_summary.py} & \texttt{jobs/pynl/submit\_test\_pass.sh} (lists in \texttt{experiments/test\_pass/}) \\
 The learning curve end to end (Section~\ref{sec:5.4}) & \texttt{train\_vit\_recognizer.py --per-layout N}; \texttt{facet\_e2e\_eval.py} & \texttt{jobs/frontend/submit\_recognizer.sh} (\texttt{PER\_LAYOUT}), then \texttt{jobs/pynl/submit\_facet\_e2e.sh} (\texttt{CKPT}, \texttt{PREDS}) \\
+The recognizer with a transformer (Section~\ref{sec:5.4}) & \texttt{train\_baseline.py --arch rec-tf --recognizer DIR}, \texttt{--finetune} & \texttt{jobs/baselines/submit\_rec\_tf.sh} (job 12081101) \\
 The baselines' one test pass (D.2) & \texttt{core/baselines/test\_eval.py}; test arrays from \texttt{prepare\_baseline\_data.py --test} & \texttt{jobs/baselines/submit\_test\_once.sh} (job 12032179) \\
 Symbolic models and reference solvers & \texttt{core/pynl/pynl\_symbolic.py}, \texttt{rpm\_symbolic.py}, \texttt{rpm\_reference\_solvers.py}, \texttt{pynl\_symbolic\_e2e.py} & \texttt{jobs/pynl/submit\_symbolic.sh}, \texttt{submit\_symbolic\_e2e.sh}, \texttt{submit\_symbolic\_extra.sh} \\
 ResNet-18 perception for the symbolic models end to end & \texttt{core/frontend/train\_frontend.py}, \texttt{core/pynl/pixel\_pipeline.py} & \texttt{jobs/pynl/submit\_pixels.sh} \\
@@ -768,8 +770,7 @@ Plus and minus apart (RESULTS \S{}13) & \texttt{data\_prep/arith\_op\_data.py} &
 Checks on the data (Appendix~\ref{sec:B.4}) & \texttt{analysis/sanity\_checks.py} & no job file \\
 Notebooks and their HTML copies & \texttt{notebooks/*.ipynb} & \texttt{jobs/pynl/submit\_notebook.sh} \\
 \bottomrule
-\end{tabularx}
-\end{center}
+\end{xltabular}}
 
 \texttt{docs/CODE\_INDEX.md} describes every file in more detail, and \texttt{docs/RESULTS.md} gives the job number behind each cell.
 
@@ -777,6 +778,7 @@ Notebooks and their HTML copies & \texttt{notebooks/*.ipynb} & \texttt{jobs/pynl
 
 \begin{itemize}
 \item \textbf{Seeds.} The early PyNeuraLogic runs were not seeded, and for the single runs of the ablation table (D.4) the seed was not recorded. A rerun of such a run gives a number within the spread of its seeds, not the same digits. Runs made since \texttt{--seed} was added, and the torch baselines, carry a recorded seed.
+\item \textbf{The torch baselines' schedule.} From 2 to 23 November 2026, after gradient accumulation (\texttt{--accum}) was added, \texttt{train\_baseline.py} overwrote the step count that its cosine schedule read with the loss of each batch, so after warm-up the learning rate alternated between its peak and zero and never decayed. Eight runs were trained with the cosine schedule in that time (their \texttt{best.json} has an \texttt{accum} key): the ViT at width 224 and its row-symmetric version on 3×10, the two finer-grid ViTs, and seeds 1 and 2 of the ViT with and without rows built in at 3,000 puzzles. They were rerun with the fix, every one scored 2 to 11 points higher, and the tables give the reruns. \texttt{--schedule alternating} reproduces the bug step for step. The runs made before 2 November decayed as the text describes; 99 of them were rerun with the fixed trainer and reproduced.
 \item \textbf{Checkpoints.} A facet checkpoint is \texttt{template\_best.bin} with \texttt{best.json}; the template is rebuilt from the arguments stored in \texttt{best.json}, and \texttt{facet\_rule\_eval.py} rescores any I-RAVEN-X checkpoint that way. A torch checkpoint is \texttt{model\_best.pt} with \texttt{best.json}.
 \item \textbf{The test split.} The I-RAVEN checkpoints of D.2 and every final checkpoint of Chapters~\ref{ch:5} to \ref{ch:7} (D.6) have had their one test pass, and \texttt{test\_eval.py}, \texttt{facet\_rule\_eval.py --test} and \texttt{value\_axis.py} skip or refuse any run that already has a \texttt{test.json}. The I-RAVEN models other than these, the copy-link variants and the row fold on I-RAVEN, and the CNNs were never scored on test. Someone reproducing the work should train a new checkpoint, pick its epoch on the selection puzzles, and score test once.
 \end{itemize}

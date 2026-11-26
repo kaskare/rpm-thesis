@@ -13,7 +13,9 @@ is built in by leaving the transformed things unnamed, and holds exactly for eve
 method we build a model that generates the missing panel from a graph of the puzzle's objects, without being given the
 rules or seeing the answer candidates. On the I-RAVEN test set it reaches 97.2% from object labels and 97.0% end to end
 behind an object recognizer trained on the labelled objects of every panel. The vision transformer, which is given the
-label of the answer only, reaches 93.1% with six times the weights.
+label of the answer only, reaches 93.1% with six times the weights. Given the same labels, a black-box transformer over
+the recognizer's output needs about ten times the training puzzles to reach the 90% the facet model gets from 300 per
+layout.
 
 We then put a price on symmetries. Counting the orbits of a rule's table under the model's symmetry predicts how much
 data the symmetry saves, and the ceiling it sets when the rule does not share it. Two rules matched in form and size,
@@ -126,7 +128,9 @@ closed by construction. On the I-RAVEN test set it answers 97.2% of puzzles from
 end to end, when a recognizer built on the same transformer as our black-box baseline names the objects of every panel,
 the candidates' included (Chapter 5). On the same test puzzles the black-box transformer reaches 93.1%, with six times
 the weights of the whole pipeline. The two are not given the same supervision: the recognizer learns from the labelled
-objects of every panel, the transformer from the label of the answer only.
+objects of every panel, the transformer from the label of the answer only. Given the same labels, a plain transformer
+over the recognizer's output answers 19% from 300 puzzles per layout, where the facet model answers 90%, and needs about
+ten times the data to catch up (Section 5.4).
 
 **A price for a symmetry.** The orbit count above gives, for a pair of model and rule, the data a symmetry saves and
 the ceiling a mismatched one sets (Chapter 3). It needs no network: a learner that only counts, one answer per orbit,

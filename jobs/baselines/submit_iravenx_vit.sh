@@ -17,9 +17,13 @@ TASKS=("iravenx_n3_m10 vit 64 80 16" "iravenx_n3_m10 vit 224 80 16" "iravenx_n3_
        "iravenx_n10_m50 vit 64 160 32" "iravenx_n10_m50 vit 224 160 32 4" "iravenx_n10_m50 vit-sym 224 160 32 4")
 read -r DATA ARCH WIDTH SIZE PATCH ACCUM <<< "${TASKS[$SLURM_ARRAY_TASK_ID]}"
 
+# SCHEDULE: cosine (default) or alternating, the old cosine's bug of 2026-11-02 to 11-23 (train_baseline.py docstring).
+# Tasks 4 and 5, rerun on 2026-11-02 with accumulated batches, ran the bug; tasks 0-3 predate it. TAGSUFFIX is added to
+# the run's tag (_cosfix for the reruns with the fix, 2026-11-23).
+
 source /mnt/appl/software/Anaconda3/2024.02-1/etc/profile.d/conda.sh
 conda activate nvsa
 cd /home/kassyask/neuro-vector-symbolic-architectures-raven
 nvidia-smi -L
 python core/baselines/train_baseline.py --data "$DATA" --arch "$ARCH" --seed "${SEED:-0}" --width "$WIDTH" --epochs 300 --eval-every 3 \
-    --image-size "$SIZE" --patch "$PATCH" --lr 5e-4 --wd 0.05 --schedule cosine --warmup 10 --clip 1 --dropout 0.1 --accum "${ACCUM:-1}" --tag "w$WIDTH"
+    --image-size "$SIZE" --patch "$PATCH" --lr 5e-4 --wd 0.05 --schedule ${SCHEDULE:-cosine} --warmup 10 --clip 1 --dropout 0.1 --accum "${ACCUM:-1}" --tag "w${WIDTH}${TAGSUFFIX}"

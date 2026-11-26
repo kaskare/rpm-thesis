@@ -77,7 +77,7 @@ ViT, width 224 & 99.1 & 92.8 & 80.5 & 99.8 & 99.6 & 99.8 & 80.0 \\
 \end{tabular}
 \end{center}
 
-Every model except the MLP solves the four layouts whose components hold a single object. The differences are in the grids. The 3×3 grid is the hardest layout for every learned model, the facet model included: it loses 6.4 points there to the rules-given template, and less than one point on any other layout. The vision transformer loses most on the 3×3 grid and the in-out grid. Training it on the grid layouts alone, with finer patches or larger images, did not help; it memorised (training loss near zero, selection accuracy 33–36\%). The same grid puzzles were learned once the single-object layouts were added to the training set, so at this amount of data the transformer needs the easy layouts to find the task at all.
+Every model except the MLP solves the four layouts whose components hold a single object. The differences are in the grids. The 3×3 grid is the hardest layout for every learned model, the facet model included: it loses 6.4 points there to the rules-given template, and less than one point on any other layout. The vision transformer loses most on the 3×3 grid and the in-out grid. Training it on the grid layouts alone, with finer patches or larger images, moved no grid layout by more than 8 points; it memorised (training loss near zero, selection accuracy 35–42\%). The same grid puzzles were learned once the single-object layouts were added to the training set, so at this amount of data the transformer needs the easy layouts to find the task at all.
 
 \section{End to end}\label{sec:5.3}
 
@@ -121,7 +121,22 @@ training puzzles per layout & facet & facet, end to end & GNN B & GNN A & object
 
 \textbf{The gap is largest when data is scarce.} From 300 puzzles per layout the facet model answers 90\% end to end and the vision transformer 16\%, barely above the 12.5\% of guessing. The transformer needs twenty times the puzzles to pass the facet model's score at 300. This is the comparison the assignment asks for: 4 points at 6,000 puzzles, 74 at 300.
 
-\textbf{The two do not learn from the same labels.} The recognizer is trained on the labelled objects of all 16 panels of every training puzzle, the transformer on the answer's index alone. The end-to-end curve removes the annotation at test time, not its help in training. The 74 points therefore measure what an object-level representation, together with the labels it is trained from, is worth against learning the whole task from the answer; they are not a contest between two pixel learners on the same supervision. A transformer first trained to read the same object labels and then on the answer would separate the two, and was not run.
+\textbf{The labels help only once data is plentiful.} The recognizer is trained on the labelled objects of all 16 panels of every training puzzle, the transformer on the answer's description alone, so the end-to-end curve removes the annotation at test time but not its help in training. To separate the two, a black-box reasoner was given the same perception: the recognizer of each size reads the context panels, and a plain transformer over its slot states generates the answer (Section~\ref{sec:4.6}). It has the facet model's labels and none of its structure.
+
+\begin{center}\small
+\begin{tabularx}{\linewidth}{@{}YlYYY@{}}
+\toprule
+training puzzles per layout & facet, end to end & recognizer + transformer 64 & recognizer + transformer 224 & the same, recognizer fine-tuned, 64 \\
+\midrule
+300 & 89.8 (53.1) & 18.9 (0.4) & 17.6 (0.3) & 20.4 (0.5) \\
+1,000 & 93.9 (62.4) & 35.9 (1.8) & 32.5 (2.0) & 76.3 (33.4) \\
+3,000 & 95.8 (65.7) & 87.6 (56.0) & 88.8 (60.6) & 90.0 (59.8) \\
+6,000 & 97.1 (68.8) & 91.4 (59.1) & 95.1 (69.9) & – \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+With 300 or 1,000 puzzles per layout the labels do not rescue the black box. It memorises the training puzzles and stays near guessing, as the vision transformer does, 71 and 58 points below the facet model reading the same recognizer. Training the recognizer along with it lifts 1,000 puzzles to 76\%, and does nothing at 300. From 3,000 puzzles the labels carry most of the vision transformer's gap: the reasoner is 6 to 8 points below the facet model at 3,000, and at 6,000, with 14 times the facet model's weights, 2.0 points below in matched and level in exact. What it still misses is on the 2×2 and 3×3 grids, the layouts with the most objects. It needs about ten times the puzzles to reach the 90\% the facet model gets from 300. Of the 74 points at 300 puzzles, about 4 come with the labels and 71 with the structure. These runs have one seed each.
 
 \textbf{Most of that gap is the representation.} At 300 puzzles the three models on the attribute graph have 86 to 90\% and the object GNN has 30\%, with the same labels as input. The step from a node per object to a node per attribute is worth more than 56 points there. The symmetries are worth 1 to 4 points among the three attribute models. On I-RAVEN, then, the graph carries the result and the symmetries refine it. Chapter~\ref{ch:6} shows where symmetries carry more: on values, and on what the training data never showed.
 

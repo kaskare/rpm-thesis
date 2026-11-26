@@ -33,7 +33,9 @@ is built in by leaving the transformed things unnamed, and holds exactly for eve
 method we build a model that generates the missing panel from a graph of the puzzle's objects, without being given the
 rules or seeing the answer candidates. On the I-RAVEN test set it reaches 97.2% from object labels and 97.0% end to end
 behind an object recognizer trained on the labelled objects of every panel. The vision transformer, which is given the
-label of the answer only, reaches 93.1% with six times the weights.
+label of the answer only, reaches 93.1% with six times the weights. Given the same labels, a black-box transformer over
+the recognizer's output needs about ten times the training puzzles to reach the 90% the facet model gets from 300 per
+layout.
 
 We then put a price on symmetries. Counting the orbits of a rule's table under the model's symmetry predicts how much
 data the symmetry saves, and the ceiling it sets when the rule does not share it. Two rules matched in form and size,
@@ -154,7 +156,9 @@ closed by construction. On the I-RAVEN test set it answers 97.2% of puzzles from
 end to end, when a recognizer built on the same transformer as our black-box baseline names the objects of every panel,
 the candidates' included (Chapter 5). On the same test puzzles the black-box transformer reaches 93.1%, with six times
 the weights of the whole pipeline. The two are not given the same supervision: the recognizer learns from the labelled
-objects of every panel, the transformer from the label of the answer only.
+objects of every panel, the transformer from the label of the answer only. Given the same labels, a plain transformer
+over the recognizer's output answers 19% from 300 puzzles per layout, where the facet model answers 90%, and needs about
+ten times the data to catch up (Section 5.4).
 
 A price for a symmetry. The orbit count above gives, for a pair of model and rule, the data a symmetry saves and
 the ceiling a mismatched one sets (Chapter 3). It needs no network: a learner that only counts, one answer per orbit,
@@ -1353,27 +1357,31 @@ same loss, the same choice of epoch and the same two measures. The trainer refus
 facet pipeline's targets on a sample of puzzles. Only the architecture differs. Each is sized to the facet model's
 number of weights, about 265k on I-RAVEN.
 
-model               input                                             what it shares
-------------------  ------------------------------------------------  ------------------------------------------------
-MLP                 all context panels as one vector: per panel and   nothing
-                    slot, occupancy and the three codes
+model                     input                                          what it shares
+------------------------  ---------------------------------------------  ---------------------------------------------
+MLP                       all context panels as one vector: per panel    nothing
+                          and slot, occupancy and the three codes
 
-object GNN          one node per object, with its row, column, slot   weights over objects
-                    and component as labels; every node connected to
-                    every other
+object GNN                one node per object, with its row, column,     weights over objects
+                          slot and component as labels; every node
+                          connected to every other
 
-attribute GNN A     the facet model's graph: one node per object and  weights over objects, as in B, but the labels
-                    attribute; nodes labelled with row, column,       let it tell everything apart
-                    component, attribute and slot
+attribute GNN A           the facet model's graph: one node per object   weights over objects, as in B, but the labels
+                          and attribute; nodes labelled with row,        let it tell everything apart
+                          column, component, attribute and slot
 
-attribute GNN B     the same graph; nodes labelled only relatively:   the facet model's symmetries: rows 1 and 2,
-                    complete or question row, column, query           components, attributes
+attribute GNN B           the same graph; nodes labelled only            the facet model's symmetries: rows 1 and 2,
+                          relatively: complete or question row, column,  components, attributes
+                          query
 
-ViT                 the images of the eight context panels as one     weights over patches
-                    picture, cut into 16-pixel patches
+ViT                       the images of the eight context panels as one  weights over patches
+                          picture, cut into 16-pixel patches
 
-ViT, rows built in  the same, with the two complete rows given as a   also rows 1 and 2
-                    set
+ViT, rows built in        the same, with the two complete rows given as  also rows 1 and 2
+                          a set
+
+recognizer + transformer  the recognizer's slot states for the eight     nothing beyond the recognizer's patches
+                          context panels (Section 4.3)
 
 A and B are the pair that separates two things the facet model changes at once: the granularity of the graph and
 the symmetries. Both are written in PyTorch on the facet model's graph. B has the facet model's symmetries and A does
@@ -1385,13 +1393,21 @@ weights, the closest to the facet model) and width 224 (3,753k). It generates th
 model. Its target and the candidates it is matched against come from the annotation, so it is given labels for the
 answer and the candidates, and images for the context.
 
+The recognizer with a transformer is the control for supervision. The recognizer of Section 4.3, trained on the
+labelled panels of the same training puzzles, reads the eight context panels, and a plain transformer of depth 6 over
+its 8 × 22 slot states generates the answer's description. It is given what the facet model end to end is given, the
+same labels in training and the same perception at test time, and no structure for the task. The recognizer is either
+frozen, with the reasoner at width 64 (309k weights; 635k with the recognizer, against the facet pipeline's 592k) or
+224 (3,661k), or trained along with its own label loss kept on the context panels. It uses the ViT's recipe.
+
 Training. MLP, object GNN and the attribute GNNs: AdamW, 300 epochs, with the regularisation picked on the
 selection puzzles from a grid of 40 runs of the MLP and the object GNN (weight decay 0.5, cosine schedule, gradient
 clipping; layer normalisation in
 the MLP). The plain versions without regularisation are reported too. The ViT uses the usual recipe for a transformer
 trained from scratch (learning rate 5·10⁻⁴, weight decay 0.05, cosine schedule with warm-up, dropout 0.1), not tuned
 here. Larger versions of the MLP and the object GNN, up to 64 times the weights, were trained to check that size is
-not what they lack.
+not what they lack. Eight late runs of the ViT, made after an option for accumulating gradients was added, had a bug
+in the schedule and were rerun with it fixed (Appendix F.3).
 
 Symbolic references. Two models mark the level reached when the rules are given: a template in which the four
 rules are written out as logic and only 41 weights are learned, and a solver in plain Python with nothing learned.
@@ -1399,23 +1415,25 @@ They show what remains hard once the rules are known, and they are the only mode
 
 What each model is given.
 
-                     objects                                 rules  candidates  symmetries built in
--------------------  --------------------------------------  -----  ----------  --------------------------------------
-symbolic references  labels                                  yes    yes         –
+                          objects                              rules  candidates  symmetries built in
+------------------------  -----------------------------------  -----  ----------  ------------------------------------
+symbolic references       labels                               yes    yes         –
 
-facet model          labels, or the recognizer               no     no          objects, rows 1 and 2, components,
-                                                                                attributes
+facet model               labels, or the recognizer            no     no          objects, rows 1 and 2, components,
+                                                                                  attributes
 
-attribute GNN B      labels                                  no     no          the same
+attribute GNN B           labels                               no     no          the same
 
-attribute GNN A      labels                                  no     no          objects
+attribute GNN A           labels                               no     no          objects
 
-object GNN           labels                                  no     no          objects
+object GNN                labels                               no     no          objects
 
-MLP                  labels                                  no     no          none
+MLP                       labels                               no     no          none
 
-ViT                  images of the context; labels for the   no     no          patches
-                     target
+ViT                       images of the context; labels for    no     no          patches
+                          the target
+
+recognizer + transformer  the recognizer                       no     no          none beyond the recognizer
 
 
 CHAPTER 5. THE SOLVER: ACCURACY, END TO END, AND AGAINST THE BASELINES
@@ -1504,8 +1522,9 @@ ViT, width 224                  99.1    92.8  80.5  99.8        99.6     99.8   
 Every model except the MLP solves the four layouts whose components hold a single object. The differences are in the
 grids. The 3×3 grid is the hardest layout for every learned model, the facet model included: it loses 6.4 points
 there to the rules-given template, and less than one point on any other layout. The vision transformer loses most on
-the 3×3 grid and the in-out grid. Training it on the grid layouts alone, with finer patches or larger images, did
-not help; it memorised (training loss near zero, selection accuracy 33–36%). The same grid puzzles were learned once
+the 3×3 grid and the in-out grid. Training it on the grid layouts alone, with finer patches or larger images, moved
+no grid layout by more than 8 points; it memorised (training loss near zero, selection accuracy 35–42%). The same grid
+puzzles were learned once
 the single-object layouts were added to the training set, so at this amount of data the transformer needs the easy
 layouts to find the task at all.
 
@@ -1563,12 +1582,31 @@ The gap is largest when data is scarce. From 300 puzzles per layout the facet mo
 the vision transformer 16%, barely above the 12.5% of guessing. The transformer needs twenty times the puzzles to pass
 the facet model's score at 300. This is the comparison the assignment asks for: 4 points at 6,000 puzzles, 74 at 300.
 
-The two do not learn from the same labels. The recognizer is trained on the labelled objects of all 16 panels of
-every training puzzle, the transformer on the answer's index alone. The end-to-end curve removes the annotation at test
-time, not its help in training. The 74 points therefore measure what an object-level representation, together with the
-labels it is trained from, is worth against learning the whole task from the answer; they are not a contest between two
-pixel learners on the same supervision. A transformer first trained to read the same object labels and then on the
-answer would separate the two, and was not run.
+The labels help only once data is plentiful. The recognizer is trained on the labelled objects of all 16 panels
+of every training puzzle, the transformer on the answer's description alone, so the end-to-end curve removes the
+annotation at test time but not its help in training. To separate the two, a black-box reasoner was given the same
+perception: the recognizer of each size reads the context panels, and a plain transformer over its slot states
+generates the answer (Section 4.6). It has the facet model's labels and none of its structure.
+
+training puzzles per     facet, end to end  recognizer +             recognizer +             the same, recognizer
+layout                                      transformer 64           transformer 224          fine-tuned, 64
+-----------------------  -----------------  -----------------------  -----------------------  ------------------------
+300                      89.8 (53.1)        18.9 (0.4)               17.6 (0.3)               20.4 (0.5)
+
+1,000                    93.9 (62.4)        35.9 (1.8)               32.5 (2.0)               76.3 (33.4)
+
+3,000                    95.8 (65.7)        87.6 (56.0)              88.8 (60.6)              90.0 (59.8)
+
+6,000                    97.1 (68.8)        91.4 (59.1)              95.1 (69.9)              –
+
+With 300 or 1,000 puzzles per layout the labels do not rescue the black box. It memorises the training puzzles and
+stays near guessing, as the vision transformer does, 71 and 58 points below the facet model reading the same
+recognizer. Training the recognizer along with it lifts 1,000 puzzles to 76%, and does nothing at 300. From 3,000
+puzzles the labels carry most of the vision transformer's gap: the reasoner is 6 to 8 points below the facet model at
+3,000, and at 6,000, with 14 times the facet model's weights, 2.0 points below in matched and level in exact. What it
+still misses is on the 2×2 and 3×3 grids, the layouts with the most objects. It needs about ten times the puzzles to
+reach the 90% the facet model gets from 300. Of the 74 points at 300 puzzles, about 4 come with the labels and 71 with
+the structure. These runs have one seed each.
 
 Most of that gap is the representation. At 300 puzzles the three models on the attribute graph have 86 to 90%
 and the object GNN has 30%, with the same labels as input. The step from a node per object to a node per attribute is
@@ -1766,8 +1804,8 @@ with two to three times the weights, they score 75.6 on components at 100 puzzle
 within a point of the narrowed versions.
 
 The same holds in a model that is not relational. Giving the vision transformer the two complete rows as a set
-builds in the exchange of rows 1 and 2. At 3,000 puzzles per layout this raises the small transformer from 42.4 to
-62.8 (means of three seeds; the gain per seed is 7.6 to 28.0 points) and the large one from 45.8 to 62.0 (one seed).
+builds in the exchange of rows 1 and 2. At 3,000 puzzles per layout this raises the small transformer from 48.2 to
+68.2 (means of three seeds; the gain per seed is 8.6 to 28.0 points) and the large one from 45.8 to 62.0 (one seed).
 At 6,000 the small one keeps a gain of 10 points and the large one none
 (92.1 against 93.4). Below 3,000 neither version learns the task, so there is nothing for the symmetry to multiply.
 
@@ -2709,7 +2747,7 @@ Background facts cost too: the plus facts grow with the square of the value rang
   Sum and midpoint at 100 and 600 puzzles have three, with standard deviations of 0.4 to 3.9 points for the
   models of Sections 7.4 to 7.6. So do Chapter 6's comparisons with little data and the attributes at 6,000: standard
   deviations of 0.2 to 2.7 points, and each seed's gain within 2 points of the mean gain (+14.2, +13.5, +6.3). The
-  vision transformer varies more: its gain from the exchange of rows is 7.6 to 28.0 points across three seeds. The
+  vision transformer varies more: its gain from the exchange of rows is 8.6 to 28.0 points across three seeds. The
   first scaled model of Section 7.7 had two outcomes, 100% at one seed and about 20%
   at two, which went with whether its row descriptor carried the rule; with a descriptor that reads the steps it is at
   100% in six runs of six.
@@ -2727,7 +2765,8 @@ Background facts cost too: the plus facts grow with the square of the value rang
 - Rows of 10 are not compared across model families. The runs differ in training length and recipe (Section 5.7).
 - Perception is trained apart, with labelled objects, and the reasoning model cannot take graded inputs as it
   stands (Section 5.3). The pipeline is end to end at test time only, and its labels give it more supervision than the
-  black-box transformer gets (Section 5.4).
+  black-box transformer gets. A black-box reasoner given the same labels closes most of that gap only from 3,000
+  puzzles per layout (Section 5.4).
 - The fixed encoding. Thermometer codes tie the facet model to the value range it was trained on, and the list of
   attributes is given.
 - The I-RAVEN-X test pass came last. The text reports puzzles 6300 to 7299, which were looked at throughout the
@@ -2773,8 +2812,9 @@ In a lifted relational template these symmetries are declared by leaving things 
 built this way generates the answers of I-RAVEN without the rules and without the candidates: 97.2% on the test
 split from object labels and 97.0% end to end behind an object recognizer, against 93.1% for a vision transformer
 with six times the weights, and 90% against 16% when each layout has 300 training puzzles, end to end as from
-labels. The recognizer learns from labelled objects and the transformer from the answer alone, so that gap is what
-the object representation and its labels are worth together. A graph network with the
+labels. The recognizer learns from labelled objects and the transformer from the answer alone. Given the same labels,
+a black-box transformer over the recognizer's output gets 19% from 300 puzzles per layout and needs about ten times the
+data to reach 90%, so where data is scarce the gap is the structure, not the labels. A graph network with the
 same symmetries does as well, so the credit goes to the structure and not to the framework.
 
 The assignment asked for symmetry-aware architectures that combine object recognition with priors on how objects
@@ -3353,10 +3393,10 @@ ViT over the     335k / 335k /    79.1 (37.6)      35.4 (2.6)       52.9 (0.0)  
 matrix as one    428k
 image, width 64
 
-ViT, width 224   3,753k / 3,753k  93.4 (64.4)      47.5 (5.6)       43.1 (0.4)       –                –
+ViT, width 224   3,753k / 3,753k  93.4 (64.4)      47.5 (5.6)       45.3 (0.2)       –                –
                  / 4,079k
 
-ViT, rows 1 and  3,709k / 3,709k  92.1 (62.1)      44.0 (5.6)       40.1 (0.0)       –                –
+ViT, rows 1 and  3,709k / 3,709k  92.1 (62.1)      44.0 (5.6)       46.0 (0.1)       –                –
 2 built in,      / 3,919k
 width 224
 
@@ -3501,10 +3541,10 @@ MLP, regularized (seed 0)  84.4         47.7                       63.9         
 
 ViT, width 64              52.9         38.5                       47.3                        –
 
-ViT, width 224             43.1         37.9                       44.4                        –
+ViT, width 224             45.3         39.2                       45.6                        –
 
-ViT, rows 1 and 2 built    40.1         identical                  39.9                        –
-in, width 224
+ViT, rows 1 and 2 built    46.0         45.9 (built in; one        46.0                        –
+in, width 224                           puzzle of 1,000 differs)
 
 On I-RAVEN, where these are data symmetries, the models that lack them barely move: attribute GNN A 95.0 as is, 95.0
 with rows swapped and 95.0 mirrored; the regularized object GNN (seed 0) 91.3, 91.3 and 91.1; the regularized MLP
@@ -4016,6 +4056,9 @@ The learning curve end to end (Section  train_vit_recognizer.py --per-layout    
                                                                                 jobs/pynl/submit_facet_e2e.sh (CKPT,
                                                                                 PREDS)
 
+The recognizer with a transformer       train_baseline.py --arch rec-tf         jobs/baselines/submit_rec_tf.sh (job
+(Section 5.4)                           --recognizer DIR, --finetune            12081101)
+
 The baselines' one test pass (D.2)      core/baselines/test_eval.py; test       jobs/baselines/submit_test_once.sh
                                         arrays from prepare_baseline_data.py    (job 12032179)
                                         --test
@@ -4058,6 +4101,14 @@ F.3 What a rerun reproduces
 - Seeds. The early PyNeuraLogic runs were not seeded, and for the single runs of the ablation table (D.4) the seed was
   not recorded. A rerun of such a run gives a number within the spread of its seeds, not the same digits. Runs made
   since --seed was added, and the torch baselines, carry a recorded seed.
+- The torch baselines' schedule. From 2 to 23 November 2026, after gradient accumulation (--accum) was added,
+  train_baseline.py overwrote the step count that its cosine schedule read with the loss of each batch, so after
+  warm-up the learning rate alternated between its peak and zero and never decayed. Eight runs were trained with the
+  cosine schedule in that time (their best.json has an accum key): the ViT at width 224 and its row-symmetric
+  version on 3×10, the two finer-grid ViTs, and seeds 1 and 2 of the ViT with and without rows built in at 3,000
+  puzzles. They were rerun with the fix, every one scored 2 to 11 points higher, and the tables give the reruns.
+  --schedule alternating reproduces the bug step for step. The runs made before
+  2 November decayed as the text describes; 99 of them were rerun with the fixed trainer and reproduced.
 - Checkpoints. A facet checkpoint is template_best.bin with best.json; the template is rebuilt from the arguments
   stored in best.json, and facet_rule_eval.py rescores any I-RAVEN-X checkpoint that way. A torch checkpoint is
   model_best.pt with best.json.

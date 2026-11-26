@@ -33,7 +33,7 @@ verdict after checking the drafts, and what changed.
 | objection | verdict | what was done |
 |---|---|---|
 | 1a. End to end against the ViT compares dense object supervision with the answer's label only | right; 5.1 said so, the abstract and 1.3 did not | the abstract, 1.3 and 1.4 now say what each is trained on |
-| 1b. The curve of 5.4 sets models reading labels against a ViT reading pixels and calls 74 points "the improvement over black-box vision" | right | the recognizer retrained on 300, 1,000 and 3,000 puzzles per layout and the facet model scored end to end at each size: 89.8 / 93.9 / 95.8, 0.2–0.3 below the labels (RESULTS §8). 5.4 now reports this column, drops the caution paragraph, and says the 74 points measure the object representation together with its labels, not two pixel learners on equal supervision; 1.1 and 8.8 say the same |
+| 1b. The curve of 5.4 sets models reading labels against a ViT reading pixels and calls 74 points "the improvement over black-box vision" | right | the recognizer retrained on 300, 1,000 and 3,000 puzzles per layout and the facet model scored end to end at each size: 89.8 / 93.9 / 95.8, 0.2–0.3 below the labels (RESULTS §8). 5.4 now reports this column, drops the caution paragraph, and says the 74 points measure the object representation together with its labels, not two pixel learners on equal supervision; 1.1 and 8.8 say the same. Then the control (2026-11-24, RESULTS §8): the same recognizer with a plain transformer as the reasoner gets 18.9 / 35.9 / 87.6 / 91.4 at 300 to 6000 puzzles per layout, 95.1 at 14× the weights; 5.4 reports it, and the abstract, 1.1 and 8.8 say that at 300 puzzles the gap is the structure, not the labels |
 | 1c. The ViT is a strawman | partly: published RPM solvers pick among candidates, ours generate | 5.1 gains a table of SCL, PredRNet and DRNet, as reported and as rerun under one protocol (Małkiński and Mańdziuk 2025a, already checked): 83–91% rerun, below our ViT's 93.1% at the same data; 1.4 says so |
 | 2a. 0 of 101 unseen steps is forced by one weight per offset | right | 3.6.6, 7.5 and 1.3 present it as what the parameterisation implies, with the count saying in advance which rows |
 | 2b. The 7.9% sum ceiling comes from reading the question row only, not from the shift | already in Statement 5, 7.3 and 8.7; the summaries said otherwise | the abstract, 1.3, 3.7, 7.8's table and 8.1 now name both causes |
@@ -49,6 +49,5 @@ verdict after checking the drafts, and what changed.
 | Minor: no equations of the forward pass in the main text | right | 4.4 and 7.2 give the forward pass as equations, written from the template as it runs |
 | Minor: the appendices were missing from the text the reader got | right; the combined text file leaves them out | the combined files are rebuilt with the appendices |
 
-**Still open after this round.** A black-box model given the same object labels as the recognizer (1b: the curve now
-removes the labels at test time but not their help in training); more seeds for the single-run cells (4b); the new
+**Still open after this round.** More seeds for the single-run cells (4b); the new
 architecture the review recommended as a baseline (1c). The value axis was never run on values to 1,000 (5a).

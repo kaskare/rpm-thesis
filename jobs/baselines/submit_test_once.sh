@@ -27,6 +27,8 @@ RUNS="$R/iraven_attr-rel_reg_do0_wd0.5_s0 $R/iraven_attr-abs_reg_do0_wd0.5_s0
       $R/iraven_mlp_reg_do0_wd0.5_s0 $R/iraven_mlp_reg_do0_wd0.5_s1 $R/iraven_mlp_s0 $R/iraven_mlp_s1
       $R/iraven_vit_x16_wd0.05_do0.1_s0 $R/iraven_vit_wd0.05_do0.1_s0
       $R/iraven_vit-sym_x16_n6000_s0 $R/iraven_vit-sym_n6000_s0"
+# TEST_RUNS replaces the list.
+RUNS=${TEST_RUNS:-$RUNS}
 
 source /mnt/appl/software/Anaconda3/2024.02-1/etc/profile.d/conda.sh
 conda activate nvsa

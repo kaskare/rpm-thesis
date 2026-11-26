@@ -94,8 +94,8 @@ with two to three times the weights, they score 75.6 on components at 100 puzzle
 within a point of the narrowed versions.
 
 **The same holds in a model that is not relational.** Giving the vision transformer the two complete rows as a set
-builds in the exchange of rows 1 and 2. At 3,000 puzzles per layout this raises the small transformer from 42.4 to
-62.8 (means of three seeds; the gain per seed is 7.6 to 28.0 points) and the large one from 45.8 to 62.0 (one seed). At 6,000 the small one keeps a gain of 10 points and the large one none
+builds in the exchange of rows 1 and 2. At 3,000 puzzles per layout this raises the small transformer from 48.2 to
+68.2 (means of three seeds; the gain per seed is 8.6 to 28.0 points) and the large one from 45.8 to 62.0 (one seed). At 6,000 the small one keeps a gain of 10 points and the large one none
 (92.1 against 93.4). Below 3,000 neither version learns the task, so there is nothing for the symmetry to multiply.
 
 ## 6.3 The gain is the sharing, not the exact invariance

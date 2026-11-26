@@ -223,6 +223,7 @@ number of weights, about 265k on I-RAVEN.
 | attribute GNN B | the same graph; nodes labelled only relatively: complete or question row, column, query | the facet model's symmetries: rows 1 and 2, components, attributes |
 | ViT | the images of the eight context panels as one picture, cut into 16-pixel patches | weights over patches |
 | ViT, rows built in | the same, with the two complete rows given as a set | also rows 1 and 2 |
+| recognizer + transformer | the recognizer's slot states for the eight context panels (Section 4.3) | nothing beyond the recognizer's patches |
 
 **A and B** are the pair that separates two things the facet model changes at once: the granularity of the graph and
 the symmetries. Both are written in PyTorch on the facet model's graph. B has the facet model's symmetries and A does
@@ -234,12 +235,20 @@ weights, the closest to the facet model) and width 224 (3,753k). It generates th
 model. Its target and the candidates it is matched against come from the annotation, so it is given labels for the
 answer and the candidates, and images for the context.
 
+**The recognizer with a transformer** is the control for supervision. The recognizer of Section 4.3, trained on the
+labelled panels of the same training puzzles, reads the eight context panels, and a plain transformer of depth 6 over
+its 8 × 22 slot states generates the answer's description. It is given what the facet model end to end is given, the
+same labels in training and the same perception at test time, and no structure for the task. The recognizer is either
+frozen, with the reasoner at width 64 (309k weights; 635k with the recognizer, against the facet pipeline's 592k) or
+224 (3,661k), or trained along with its own label loss kept on the context panels. It uses the ViT's recipe.
+
 **Training.** MLP, object GNN and the attribute GNNs: AdamW, 300 epochs, with the regularisation picked on the
 selection puzzles from a grid of 40 runs of the MLP and the object GNN (weight decay 0.5, cosine schedule, gradient clipping; layer normalisation in
 the MLP). The plain versions without regularisation are reported too. The ViT uses the usual recipe for a transformer
 trained from scratch (learning rate 5·10⁻⁴, weight decay 0.05, cosine schedule with warm-up, dropout 0.1), not tuned
 here. Larger versions of the MLP and the object GNN, up to 64 times the weights, were trained to check that size is
-not what they lack.
+not what they lack. Eight late runs of the ViT, made after an option for accumulating gradients was added, had a bug
+in the schedule and were rerun with it fixed (Appendix F.3).
 
 **Symbolic references.** Two models mark the level reached when the rules are given: a template in which the four
 rules are written out as logic and only 41 weights are learned, and a solver in plain Python with nothing learned.
@@ -256,3 +265,4 @@ They show what remains hard once the rules are known, and they are the only mode
 | object GNN | labels | no | no | objects |
 | MLP | labels | no | no | none |
 | ViT | images of the context; labels for the target | no | no | patches |
+| recognizer + transformer | the recognizer | no | no | none beyond the recognizer |

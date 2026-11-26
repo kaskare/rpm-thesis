@@ -133,7 +133,7 @@ Background facts cost too: the `plus` facts grow with the square of the value ra
   Sum and midpoint at 100 and 600 puzzles have three, with standard deviations of 0.4 to 3.9 points for the
   models of Sections 7.4 to 7.6. So do Chapter 6's comparisons with little data and the attributes at 6,000: standard
   deviations of 0.2 to 2.7 points, and each seed's gain within 2 points of the mean gain (+14.2, +13.5, +6.3). The
-  vision transformer varies more: its gain from the exchange of rows is 7.6 to 28.0 points across three seeds. The first scaled model of Section 7.7 had two outcomes, 100% at one seed and about 20%
+  vision transformer varies more: its gain from the exchange of rows is 8.6 to 28.0 points across three seeds. The first scaled model of Section 7.7 had two outcomes, 100% at one seed and about 20%
   at two, which went with whether its row descriptor carried the rule; with a descriptor that reads the steps it is at
   100% in six runs of six.
   The conclusions rest on effects of 10 to 60 points and on their direction, not on differences of a point or two;
@@ -150,7 +150,8 @@ Background facts cost too: the `plus` facts grow with the square of the value ra
 - **Rows of 10 are not compared across model families.** The runs differ in training length and recipe (Section 5.7).
 - **Perception is trained apart**, with labelled objects, and the reasoning model cannot take graded inputs as it
   stands (Section 5.3). The pipeline is end to end at test time only, and its labels give it more supervision than the
-  black-box transformer gets (Section 5.4).
+  black-box transformer gets. A black-box reasoner given the same labels closes most of that gap only from 3,000
+  puzzles per layout (Section 5.4).
 - **The fixed encoding.** Thermometer codes tie the facet model to the value range it was trained on, and the list of
   attributes is given.
 - **The I-RAVEN-X test pass came last.** The text reports puzzles 6300 to 7299, which were looked at throughout the
@@ -194,8 +195,9 @@ In a lifted relational template these symmetries are declared by leaving things 
 built this way generates the answers of I-RAVEN without the rules and without the candidates: 97.2% on the test
 split from object labels and 97.0% end to end behind an object recognizer, against 93.1% for a vision transformer
 with six times the weights, and 90% against 16% when each layout has 300 training puzzles, end to end as from
-labels. The recognizer learns from labelled objects and the transformer from the answer alone, so that gap is what
-the object representation and its labels are worth together. A graph network with the
+labels. The recognizer learns from labelled objects and the transformer from the answer alone. Given the same labels,
+a black-box transformer over the recognizer's output gets 19% from 300 puzzles per layout and needs about ten times the
+data to reach 90%, so where data is scarce the gap is the structure, not the labels. A graph network with the
 same symmetries does as well, so the credit goes to the structure and not to the framework.
 
 The assignment asked for symmetry-aware architectures that combine object recognition with priors on how objects
